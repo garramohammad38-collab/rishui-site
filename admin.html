@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>מבחני רישוי · لوحة الإدارة</title>
+<title>מוסמך · لوحة الإدارة</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -74,7 +74,7 @@ function msgHtml() { const m = flashMsg; flashMsg = null; return m ? `<div class
 
 /* ---------- setup + login ---------- */
 function setup() {
-  root.innerHTML = `<h1>لوحة إدارة רישוי</h1>${msgHtml()}
+  root.innerHTML = `<h1>لوحة إدارة מוסמך</h1>${msgHtml()}
   <div class="card"><h3>ربط المشروع (مرة وحدة)</h3>
     <p class="muted">من Supabase → Project Settings → API انسخ الـ Project URL والـ anon public key.</p>
     <label>Project URL</label><input id="u" dir="ltr" value="${esc(cfg.url)}" placeholder="https://xxxx.supabase.co">
@@ -86,7 +86,7 @@ function setup() {
   };
 }
 function login() {
-  root.innerHTML = `<h1>لوحة إدارة רישוי</h1>${msgHtml()}
+  root.innerHTML = `<h1>لوحة إدارة מוסמך</h1>${msgHtml()}
   <form class="card" id="f"><h3>تسجيل دخول المدير</h3>
     <label>الإيميل</label><input id="e" type="email" dir="ltr">
     <label>الباسوورد</label><input id="p" type="password" dir="ltr">
@@ -116,7 +116,7 @@ async function start() {
 /* ---------- layout ---------- */
 function render() {
   const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["stats","أرقام"]];
-  root.innerHTML = `<div class="top"><h1>لوحة إدارة רישוי</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
+  root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
   ${msgHtml()}<div id="body"></div>`;

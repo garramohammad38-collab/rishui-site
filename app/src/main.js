@@ -90,7 +90,7 @@ function frame(inner, { protect = false } = {}) {
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
   app.className = "app" + (protect ? " protect" : "");
-  app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "ר" : "R"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
+  app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
   <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${inner}`;
   app.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
     st.lang = b.dataset.l; store.set("lang", st.lang);
