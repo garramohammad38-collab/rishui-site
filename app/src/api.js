@@ -75,6 +75,9 @@ export async function bestMock(uid, track) {
   const rows = must(await supabase.from("mock_results").select("score,total").eq("user_id", uid).eq("track", track).limit(500));
   return rows.length ? Math.max(...rows.map((r) => Math.round((r.score / r.total) * 100))) : null;
 }
+export async function sendMessage(uid, email, track, body) {
+  must(await supabase.from("messages").insert({ user_id: uid || null, email, track: track || null, body }));
+}
 export async function redeem(code) {
   return must(await supabase.rpc("redeem_code", { p_code: code }));
 }

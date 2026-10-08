@@ -115,7 +115,7 @@ async function start() {
 
 /* ---------- layout ---------- */
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["stats","أرقام"]];
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["stats","أرقام"]];
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
@@ -123,7 +123,7 @@ function render() {
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, codes: viewCodes, tracks: viewTracks, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, stats: viewStats })[tab]();
 }
 
 /* ---------- list ---------- */
@@ -299,6 +299,15 @@ async function viewReports() {
   $("rows").innerHTML = data.length ? data.map(r => `<tr><td><button class="btn ghost" data-open="${r.question_id}">#${r.question_id}</button></td><td class="he" dir="rtl">${esc((r.questions?.he?.q || "").slice(0,100))}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ""}</td><td dir="ltr">${r.created_at.slice(0,10)}</td><td><button class="btn" data-res="${r.id}">تم</button></td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في تبليغات مفتوحة</td></tr>`;
   $("rows").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openEditor(+b.dataset.open));
   $("rows").querySelectorAll("[data-res]").forEach(b => b.onclick = async () => { await sb.from("reports").update({ resolved: true }).eq("id", +b.dataset.res); viewReports(); });
+}
+
+/* ---------- messages ---------- */
+async function viewMessages() {
+  $("body").innerHTML = `<div class="card"><h3>رسائل الطلاب (צור קשר)</h3><p class="muted">اضغط على الإيميل عشان ترد عليه، وبعدين "تم".</p><div class="tbl"><table><thead><tr><th>من</th><th>المسار</th><th>الرسالة</th><th>تاريخ</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const { data, error } = await sb.from("messages").select("id,email,track,body,created_at").eq("done", false).order("created_at", { ascending: false }).limit(300);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="5">${esc(error.message)}<br><span class="muted">إذا مكتوب إنو الجدول مش موجود: شغّل supabase/migration-4-messages.sql</span></td></tr>`; return; }
+  $("rows").innerHTML = data.length ? data.map(r => `<tr><td dir="ltr"><a href="mailto:${esc(r.email)}?subject=${encodeURIComponent("מוסמך – תשובה לפנייה")}">${esc(r.email)}</a></td><td>${esc(r.track ? trackLabel(r.track) : "")}</td><td class="he" dir="auto" style="white-space:pre-wrap">${esc(r.body)}</td><td dir="ltr">${r.created_at.slice(0,10)}</td><td><button class="btn" data-done="${r.id}">تم</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">ما في رسائل جديدة</td></tr>`;
+  $("rows").querySelectorAll("[data-done]").forEach(b => b.onclick = async () => { await sb.from("messages").update({ done: true }).eq("id", +b.dataset.done); viewMessages(); });
 }
 
 /* ---------- codes ---------- */

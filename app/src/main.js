@@ -104,9 +104,10 @@ function msgHtml() { return st.ui.msg ? `<div class="banner ${st.ui.msgBad ? "ba
 function flash(msg, bad = false) { st.ui.msg = msg; st.ui.msgBad = bad; }
 function openUrl(url) { if (url) Browser.open({ url }).catch(() => window.open(url, "_blank")); }
 function legalLinks() {
-  return `<div class="small-links"><button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button></div>`;
+  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button><button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button></div>`;
 }
 function bindLegal() {
+  if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
   if ($("lg-p")) $("lg-p").onclick = () => openUrl(`${LEGAL}/privacy-${st.lang}.html`);
 }
@@ -281,7 +282,8 @@ function chooseTrack(pending) {
     <div class="plans">${list.map(card).join("")}</div>
     ${first && pending ? `<div class="banner">⚠️ ${t("lockWarn")}</div>
       <div class="actions"><button class="primary" id="ok">${t("confirmTrack")}</button><button class="ghost" id="no">${t("pickOther")}</button></div>` : ""}
-  </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}`);
+  </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}${legalLinks()}`);
+  bindLegal();
   if ($("bk")) $("bk").onclick = route;
   if ($("no")) $("no").onclick = () => chooseTrack();
   const pick = async (k) => {
@@ -397,7 +399,9 @@ function home() {
     <button class="tile" id="ac"><b>${t("acct")}</b><span><bdi dir="ltr">${esc(st.user.email)}</bdi></span></button>
   </div>
   <div class="section-title">${t("bytopic")}</div>
-  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>`);
+  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
+  ${legalLinks()}`);
+  bindLegal();
   st.ui.msg = null;
   if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
@@ -598,6 +602,35 @@ function stats() {
   <div class="big-stat"><div class="tile"><span>${t("answered")}</span><span class="n">${tt.done}/${tt.n}</span></div><div class="tile"><span>${t("accuracy")}</span><span class="n">${tt.done ? Math.round((tt.right / tt.done) * 100) : 0}%</span></div></div>
   <div class="big-stat"><div class="tile"><span>${t("bestMock")}</span><span class="n">${st.best == null ? "—" : st.best + "%"}</span></div><div class="tile"><span>${t("mistakes")}</span><span class="n">${tt.wrong}</span></div></div>`);
   $("bk").onclick = route;
+}
+
+/* ---------------- contact ---------------- */
+function contact(from) {
+  const back = from || route;
+  S = { screen: () => contact(from), back };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("contact")}</h2></div>
+  ${msgHtml()}
+  <form class="card" id="cf" novalidate>
+    <p class="muted">${t("contactD")}</p>
+    <div class="field"><label for="cm">${t("email")}</label><input id="cm" type="email" dir="ltr" autocomplete="email" autocapitalize="off" value="${esc(st.user?.email || "")}"></div>
+    <div class="field"><label for="cb">${t("yourMsg")}</label><textarea id="cb" rows="6" maxlength="3000" style="width:100%;font:inherit;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);resize:vertical"></textarea></div>
+    <div class="err" id="er" hidden></div>
+    <button class="primary" type="submit" id="cs">${t("send")}</button>
+    ${SUPPORT ? `<p class="muted">${t("orEmail")} <a class="link" href="mailto:${esc(SUPPORT)}?subject=${encodeURIComponent(t("name") + " – " + t("contact"))}"><bdi dir="ltr">${esc(SUPPORT)}</bdi></a></p>` : ""}
+  </form>`);
+  st.ui.msg = null;
+  $("bk").onclick = () => back();
+  const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
+  $("cf").onsubmit = async (e) => {
+    e.preventDefault();
+    const em = $("cm").value.trim(), body = $("cb").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return err(t("badEmail"));
+    if (body.length < 2) return err(t("shortMsg"));
+    $("cs").disabled = true;
+    try { await api.sendMessage(st.user?.id, em, st.profile?.track, body); }
+    catch (x) { $("cs").disabled = false; return err(errMsg(x)); }
+    flash(t("sent")); back();
+  };
 }
 
 /* ---------------- account ---------------- */
