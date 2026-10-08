@@ -3,7 +3,7 @@ import { App as CapApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
 import * as api from "./api.js";
-import { T, TOPIC, topicName } from "./i18n.js";
+import { T, topicName as fallbackTopic } from "./i18n.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
 
 /* ---------------- state ---------------- */
@@ -24,7 +24,7 @@ const store = storeGetter();
 const st = {
   lang: store.get("lang") || "he",
   user: null, profile: null,
-  answers: new Map(), marks: new Set(), counts: {}, best: null,
+  answers: new Map(), marks: new Set(), counts: {}, best: null, tracks: [], topics: {}, ents: [],
   ui: { signup: false, plan: "exam", msg: null, msgBad: false, flashI: 0, flashBack: false, delArmed: false },
 };
 let S = null; // current session (quiz / mock / screen state)
@@ -37,7 +37,13 @@ const LET = { en: ["A", "B", "C", "D"], he: ["א", "ב", "ג", "ד"] };
 const fwd = () => (st.lang === "he" ? "←" : "→");
 const bwd = () => (st.lang === "he" ? "→" : "←");
 const today = () => new Date().toISOString().slice(0, 10);
-const hasAccess = () => st.profile && (st.profile.role === "admin" || (st.profile.plan_until && new Date(st.profile.plan_until) > new Date()));
+const TR = () => st.profile?.track || "nursing";
+const ent = () => st.ents.find((e) => e.track === TR() && new Date(e.until) > new Date());
+const hasAccess = () => !!st.profile && (st.profile.role === "admin" || !!ent());
+const trackOf = (id) => st.tracks.find((x) => x.id === id);
+const trackName = (id) => { const x = trackOf(id); return x ? `${x.icon || ""} ${x[st.lang]}`.trim() : id; };
+const topicName = (k, lang) => { const x = st.topics[k]; return x ? x[lang] : fallbackTopic(k, lang); };
+const posKey = () => `pos:${st.user.id}:${TR()}`;
 const isAdmin = () => st.profile?.role === "admin";
 const errMsg = (e) => {
   const m = String(e?.message || e || "");
@@ -57,7 +63,7 @@ function frame(inner, { protect = false } = {}) {
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
   app.className = "app" + (protect ? " protect" : "");
-  app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "ר" : "R"}</div><div><h1>${t("name")}</h1><small>${t("tag")}</small></div></div>
+  app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "ר" : "R"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
   <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${inner}`;
   app.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
     st.lang = b.dataset.l; store.set("lang", st.lang);
@@ -113,10 +119,14 @@ async function deviceInfo() {
 }
 async function loadUserData() {
   const uid = st.user.id;
-  const [profile, answers, marks, counts, best] = await Promise.all([
-    api.getProfile(uid), api.myAnswers(uid), api.myBookmarks(uid), api.counts(), api.bestMock(uid),
+  [st.profile, st.tracks, st.ents] = await Promise.all([api.getProfile(uid), api.tracks(), api.entitlements(uid)]);
+  const profile = st.profile;
+  if (!profile.track) return;
+  const tr = profile.track;
+  const [answers, marks, counts, best, topics] = await Promise.all([
+    api.myAnswers(uid, tr), api.myBookmarks(uid, tr), api.counts(tr), api.bestMock(uid, tr), api.topics(tr),
   ]);
-  st.profile = profile;
+  st.topics = Object.fromEntries(topics.map((x) => [x.id, x]));
   if (profile.lang && !store.get("lang")) st.lang = profile.lang;
   st.answers = new Map(answers.map((r) => [r.question_id, r.correct]));
   st.marks = new Set(marks);
@@ -126,7 +136,8 @@ async function loadUserData() {
 function route() {
   S = null;
   if (!st.user) return login();
-  if (!hasAccess() && !store.get("skip-plans:" + st.user.id)) return plans();
+  if (!st.profile?.track) return chooseTrack();
+  if (!hasAccess() && !store.get(`skip-plans:${st.user.id}:${TR()}`)) return plans();
   home();
 }
 
@@ -185,15 +196,37 @@ async function logout() {
   route();
 }
 
+/* ---------------- track ---------------- */
+function chooseTrack() {
+  S = { screen: chooseTrack, back: st.profile?.track ? route : null };
+  const cur = st.profile?.track;
+  frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
+    <div class="plans">${st.tracks.map((x) => `<button class="plan ${cur === x.id ? "on" : ""}" data-k="${esc(x.id)}"><span class="dot"></span>
+      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`).join("")}</div>
+  </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}`);
+  if ($("bk")) $("bk").onclick = route;
+  app.querySelectorAll(".plan").forEach((b) => (b.onclick = async () => {
+    const k = b.dataset.k;
+    loading();
+    try {
+      await api.updateProfile(null, null, k);
+      st.profile.track = k;
+      await loadUserData();
+      route();
+    } catch (e) { flash(errMsg(e), true); chooseTrack(); }
+  }));
+}
+
 /* ---------------- plans + purchase ---------------- */
 function plans() {
   S = { screen: plans, back: hasAccess() ? route : null };
   const d = new Date(); d.setMonth(d.getMonth() + 3);
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
-  const pm = priceOf("month"), pe = priceOf("exam");
+  const pm = priceOf(TR(), "month"), pe = priceOf(TR(), "exam");
   frame(`${msgHtml()}
   <div class="card">
     <h2>${t("choose")}</h2>
+    <button class="chip" id="trk" style="align-self:flex-start;cursor:pointer">${esc(trackName(TR()))} · ${t("switchTrack")}</button>
     <div class="plans">
       <button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
@@ -210,11 +243,12 @@ function plans() {
   bindLegal();
   st.ui.msg = null;
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
+  $("trk").onclick = chooseTrack;
   if ($("go")) $("go").onclick = async () => {
     const plan = st.ui.plan;
     if (plan === "exam") await api.updateProfile(null, $("ex").value).catch(() => {});
     $("go").disabled = true; $("go").textContent = t("buying");
-    const r = await buy(plan);
+    const r = await buy(TR(), plan);
     if (r === "cancelled") return plans();
     if (r !== "ok") { flash(t("payFail"), true); return plans(); }
     await waitForActivation();
@@ -229,18 +263,18 @@ function plans() {
     if (!v) return;
     try {
       const r = await api.redeem(v);
-      if (r === "ok") { st.profile = await api.getProfile(st.user.id); flash(t("codeOk")); return route(); }
+      if (r === "ok") { st.ents = await api.entitlements(st.user.id); flash(t("codeOk")); return hasAccess() ? route() : plans(); }
       flash(r === "used" ? t("codeUsed") : t("codeBad"), true); plans();
     } catch (e) { flash(errMsg(e), true); plans(); }
   };
-  $("fr").onclick = () => { store.set("skip-plans:" + st.user.id, true); home(); };
+  $("fr").onclick = () => { store.set(`skip-plans:${st.user.id}:${TR()}`, true); home(); };
 }
 // the store confirms the purchase to our server (webhook); poll the profile until the plan shows up
 async function waitForActivation() {
   frame(`<div class="card"><div class="wait"><div class="spin"></div><h2>${t("activating")}</h2></div></div>`);
   for (let i = 0; i < 15; i++) {
     await new Promise((r) => setTimeout(r, 2000));
-    try { st.profile = await api.getProfile(st.user.id); } catch { /* retry */ }
+    try { st.ents = await api.entitlements(st.user.id); } catch { /* retry */ }
     if (hasAccess()) { flash(t("activated")); return route(); }
   }
   flash(t("payPending")); home();
@@ -261,7 +295,8 @@ function home() {
   const tt = totals(), pct = tt.n ? Math.round((tt.done / tt.n) * 100) : 0, dl = daysLeft();
   frame(`${msgHtml()}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
-  ${dl != null ? `<div class="chips"><span class="chip cool">📅 ${dl} ${t("daysLeft")}</span></div>` : ""}
+  <div class="chips"><button class="chip" id="trk" style="cursor:pointer">${esc(trackName(TR()))} · ${t("switchTrack")}</button>${dl != null ? `<span class="chip cool">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
+  ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div class="hero">
     <div class="eyebrow">${t("progress")}</div>
     <h2>${tt.done} ${t("of")} ${tt.n} ${t("done")}</h2>
@@ -280,6 +315,7 @@ function home() {
   <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>`);
   st.ui.msg = null;
   if ($("lock")) $("lock").onclick = plans;
+  $("trk").onclick = chooseTrack;
   $("go").onclick = () => practice({ kind: "seq" });
   $("mk").onclick = mock;
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
@@ -298,11 +334,11 @@ async function practice(src) {
     let items;
     if (src.kind === "ids") {
       if (!src.ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
-      items = await api.questionsByIds(src.ids.slice(0, BATCH));
+      items = await api.questionsByIds(TR(), src.ids.slice(0, BATCH));
     } else {
-      const after = src.kind === "seq" ? (store.get("pos:" + st.user.id) || 0) : 0;
-      items = await api.questions({ topic: src.topic || null, afterId: after, limit: BATCH });
-      if (!items.length && after) { store.set("pos:" + st.user.id, 0); items = await api.questions({ limit: BATCH }); }
+      const after = src.kind === "seq" ? (store.get(posKey()) || 0) : 0;
+      items = await api.questions({ track: TR(), topic: src.topic || null, afterId: after, limit: BATCH });
+      if (!items.length && after) { store.set(posKey(), 0); items = await api.questions({ track: TR(), limit: BATCH }); }
     }
     if (!items.length) { frame(`<div class="card"><p class="muted">${hasAccess() ? t("noItems") : t("locked")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
     keepTerms(items);
@@ -330,7 +366,7 @@ function bindMark(q) {
     const on = !st.marks.has(q.id);
     if (on) st.marks.add(q.id); else st.marks.delete(q.id);
     $("mk").className = "tool" + (on ? " on" : ""); $("mk").textContent = on ? "★ " + t("saved") : "☆ " + t("save");
-    api.setBookmark(st.user.id, q.id, on).catch(() => {});
+    api.setBookmark(st.user.id, TR(), q.id, on).catch(() => {});
   };
 }
 function question() {
@@ -349,8 +385,8 @@ function question() {
 function pick(k) {
   const q = S.items[S.i], ok = k === q.answer;
   S.picked[S.i] = k; S.ans[S.i] = ok; st.answers.set(q.id, ok);
-  api.saveAnswer(st.user.id, q.id, k, ok).catch(() => {});
-  if (S.src.kind === "seq") store.set("pos:" + st.user.id, q.id);
+  api.saveAnswer(st.user.id, TR(), q.id, k, ok).catch(() => {});
+  if (S.src.kind === "seq") store.set(posKey(), q.id);
   feedback(k);
 }
 function feedback(k) {
@@ -368,9 +404,9 @@ function feedback(k) {
 async function mock() {
   loading();
   try {
-    const ids = await api.mockIds(MOCK_N);
+    const ids = await api.mockIds(TR(), MOCK_N);
     if (!ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
-    const items = await api.questionsByIds(ids);
+    const items = await api.questionsByIds(TR(), ids);
     keepTerms(items);
     S = { mode: "mock", items, i: 0, picked: Array(items.length).fill(null), start: Date.now(), limit: items.length * MOCK_SECONDS_PER_Q, tick: null, back: route };
     mockQ();
@@ -398,9 +434,9 @@ function mockQ() {
 function mockEnd() {
   stopTimer();
   S.ans = S.items.map((q, i) => S.picked[i] === q.answer);
-  S.items.forEach((q, i) => { if (S.picked[i] != null) { st.answers.set(q.id, S.ans[i]); api.saveAnswer(st.user.id, q.id, S.picked[i], S.ans[i]).catch(() => {}); } });
+  S.items.forEach((q, i) => { if (S.picked[i] != null) { st.answers.set(q.id, S.ans[i]); api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], S.ans[i]).catch(() => {}); } });
   const score = S.ans.filter(Boolean).length;
-  api.saveMock(st.user.id, score, S.items.length).catch(() => {});
+  api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
   const p = Math.round((score / S.items.length) * 100);
   if (st.best == null || p > st.best) st.best = p;
   result();
@@ -436,7 +472,7 @@ function result() {
 async function topicNext(topic, afterId) {
   loading();
   try {
-    const items = await api.questions({ topic, afterId, limit: BATCH });
+    const items = await api.questions({ track: TR(), topic, afterId, limit: BATCH });
     if (!items.length) return practice({ kind: "topic", topic });
     keepTerms(items);
     S = { mode: "practice", src: { kind: "topic", topic }, items, i: 0, ans: [], picked: [], start: Date.now(), tick: null, back: route };
@@ -483,8 +519,9 @@ function stats() {
 function account() {
   S = { screen: account, back: route };
   const p = st.profile;
-  const plan = !hasAccess() ? t("planNone") : p.plan === "month" ? t("planM") : p.plan === "code" ? t("planC") : p.plan === "exam" ? t("planE") : t("admin");
-  const until = p.plan_until ? new Date(p.plan_until).toISOString().slice(0, 10) : "";
+  const e = ent();
+  const plan = isAdmin() ? t("admin") : !e ? t("planNone") : e.plan === "month" ? t("planM") : e.plan === "code" ? t("planC") : t("planE");
+  const until = e ? new Date(e.until).toISOString().slice(0, 10) : "";
   frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("acct")}</h2></div>
   ${msgHtml()}
   <div class="card">

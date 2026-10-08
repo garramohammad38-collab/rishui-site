@@ -9,12 +9,21 @@ export const TOPIC = {
   ethics: { en: "Ethics & law", he: "אתיקה וחוק" },
   geri: { en: "Geriatrics", he: "גריאטריה" },
   comm: { en: "Community health", he: "בריאות הקהילה" },
+  // medicine track
+  m_int: { en: "Internal medicine", he: "רפואה פנימית" },
+  m_surg: { en: "Surgery", he: "כירורגיה" },
+  m_peds: { en: "Pediatrics", he: "רפואת ילדים" },
+  m_obgyn: { en: "Obstetrics & gynecology", he: "מיילדות וגינקולוגיה" },
+  m_psych: { en: "Psychiatry", he: "פסיכיאטריה" },
+  m_other: { en: "Other", he: "אחר" },
 };
+export const TRACKS = ["nursing", "medicine"];
 export const topicName = (k, lang) => (TOPIC[k] ? TOPIC[k][lang] : k);
 
 export const T = {
   en: {
-    dir: "ltr", name: "Rishui", tag: "Nursing licensing exam prep",
+    dir: "ltr", name: "Rishui", tag: "Licensing exam prep",
+    chooseTrack: "What are you preparing for?", nursing: "Nursing", medicine: "Medicine", nursingD: "Registered nurse licensing exam", medicineD: "Medical licensing exam", switchTrack: "Switch", noneYet: "Questions for this track are coming soon.",
     login: "Sign in", signup: "Create account", email: "Email", pass: "Password", cont: "Continue",
     badEmail: "Enter a valid email address.", shortPass: "Password needs at least 8 characters.",
     haveAcct: "Already have an account?", noAcct: "New here?", forgot: "Forgot password?",
@@ -52,7 +61,8 @@ export const T = {
     loadErr: "Couldn't load questions. Check your connection and try again.", retry: "Try again", saveDate: "Save",
   },
   he: {
-    dir: "rtl", name: "רישוי", tag: "הכנה לבחינת הרישוי בסיעוד",
+    dir: "rtl", name: "רישוי", tag: "הכנה לבחינות רישוי",
+    chooseTrack: "לאיזו בחינה אתה מתכונן?", nursing: "סיעוד", medicine: "רפואה", nursingD: "בחינת הרישוי לאחים ואחיות מוסמכים", medicineD: "בחינת הרישוי ברפואה", switchTrack: "החלפה", noneYet: "שאלות למסלול הזה יעלו בקרוב.",
     login: "התחברות", signup: "יצירת חשבון", email: "אימייל", pass: "סיסמה", cont: "המשך",
     badEmail: "יש להזין כתובת אימייל תקינה.", shortPass: "הסיסמה צריכה לפחות 8 תווים.",
     haveAcct: "כבר יש לך חשבון?", noAcct: "חדש כאן?", forgot: "שכחת סיסמה?",

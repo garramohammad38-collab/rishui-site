@@ -1,7 +1,8 @@
 import { Capacitor } from "@capacitor/core";
 import { Purchases } from "@revenuecat/purchases-capacitor";
 
-export const PRODUCTS = { month: "rishui_monthly", exam: "rishui_until_exam" };
+// product ids: rishui_<track>_monthly and rishui_<track>_until_exam
+const productRe = /^rishui_([a-z]+)_(monthly|until_exam)$/;
 const platform = Capacitor.getPlatform(); // "ios" | "android" | "web"
 export const storeAvailable = platform === "ios" || platform === "android";
 
@@ -17,22 +18,22 @@ export async function initPurchases(userId) {
   try {
     const { current } = await Purchases.getOfferings();
     for (const p of current?.availablePackages ?? []) {
-      const id = p.product?.identifier ?? "";
       // Google Play ids can look like "rishui_monthly:monthly"
-      if (id.startsWith(PRODUCTS.month)) packages.month = p;
-      if (id.startsWith(PRODUCTS.exam)) packages.exam = p;
+      const m = (p.product?.identifier ?? "").split(":")[0].match(productRe);
+      if (m) packages[`${m[1]}:${m[2] === "monthly" ? "month" : "exam"}`] = p;
     }
   } catch { /* store unreachable: prices just won't show */ }
 }
 
 // localized store price, e.g. "₪59.90"
-export const priceOf = (plan) => packages[plan]?.product?.priceString ?? null;
+export const priceOf = (track, plan) => packages[`${track}:${plan}`]?.product?.priceString ?? null;
 
 // returns "ok" | "cancelled" | "failed" | "unavailable"
-export async function buy(plan) {
-  if (!ready || !packages[plan]) return "unavailable";
+export async function buy(track, plan) {
+  const pkg = packages[`${track}:${plan}`];
+  if (!ready || !pkg) return "unavailable";
   try {
-    await Purchases.purchasePackage({ aPackage: packages[plan] });
+    await Purchases.purchasePackage({ aPackage: pkg });
     return "ok";
   } catch (e) {
     return e?.userCancelled || e?.code === "1" ? "cancelled" : "failed";

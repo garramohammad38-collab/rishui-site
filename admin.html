@@ -51,7 +51,18 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--accent-soft)}
 <div class="wrap" id="root"></div>
 <script>
 /* ===== Rishui admin panel — open this file in Chrome/Edge on your computer ===== */
-const TOPICS = { calc:"حسابات أدوية", med:"باطني", surg:"جراحة", peds:"أطفال", psych:"نفسي", pharm:"صيدلة", ob:"نسائية وولادة", ethics:"أخلاقيات وقانون", geri:"مسنين", comm:"صحة المجتمع" };
+// tracks and topics come from the database (tables "tracks" and "topics")
+let TRACKS = [], TOPICS_BY = {}; // TOPICS_BY[track][topicId] = Hebrew name
+let curTrack = localStorage.getItem("rs-track") || "nursing";
+const TOPICS_OF = tr => TOPICS_BY[tr] || {};
+const trackLabel = id => { const x = TRACKS.find(t => t.id === id); return x ? `${x.icon || ""} ${x.he}` : id; };
+async function loadMeta() {
+  const [{ data: tr }, { data: tp }] = await Promise.all([
+    sb.from("tracks").select("*").order("sort"), sb.from("topics").select("*").order("sort")]);
+  TRACKS = tr || []; TOPICS_BY = {};
+  for (const t of tp || []) (TOPICS_BY[t.track] = TOPICS_BY[t.track] || {})[t.id] = t.he;
+  if (!TRACKS.find(t => t.id === curTrack) && TRACKS[0]) curTrack = TRACKS[0].id;
+}
 const root = document.getElementById("root");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 const $ = id => document.getElementById(id);
@@ -99,18 +110,20 @@ async function start() {
     await sb.auth.signOut();
     msg("هاد الحساب مش مدير. شغّل أمر تعيين المدير من الدليل.", false); return login();
   }
-  me = p; render();
+  me = p; await loadMeta(); render();
 }
 
 /* ---------- layout ---------- */
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["codes","أكواد الدخول"],["stats","أرقام"]];
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["stats","أرقام"]];
   root.innerHTML = `<div class="top"><h1>لوحة إدارة רישוי</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
+  <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
   ${msgHtml()}<div id="body"></div>`;
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
+  $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, codes: viewCodes, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, codes: viewCodes, tracks: viewTracks, stats: viewStats })[tab]();
 }
 
 /* ---------- list ---------- */
@@ -118,7 +131,7 @@ const PAGE = 50;
 async function viewList() {
   const b = $("body"), s = listState;
   b.innerHTML = `<div class="card"><div class="row">
-    <select id="ft"><option value="">كل المواضيع</option>${Object.entries(TOPICS).map(([k,n]) => `<option value="${k}" ${s.topic===k?"selected":""}>${n}</option>`).join("")}</select>
+    <select id="ft"><option value="">كل المواضيع</option>${Object.entries(TOPICS_OF(curTrack)).map(([k,n]) => `<option value="${k}" ${s.topic===k?"selected":""}>${esc(n)}</option>`).join("")}</select>
     <select id="fp"><option value="">منشور وغير منشور</option><option value="1" ${s.pub==="1"?"selected":""}>منشور</option><option value="0" ${s.pub==="0"?"selected":""}>غير منشور</option></select>
     <input id="fq" placeholder="بحث بنص السؤال" value="${esc(s.q)}">
     <button class="btn" id="go">بحث</button><button class="btn ghost" id="new">+ سؤال جديد</button></div>
@@ -128,14 +141,14 @@ async function viewList() {
   $("new").onclick = () => { editing = null; tab = "edit"; render(); };
   $("pv").onclick = () => { if (s.page > 0) { s.page--; viewList(); } };
   $("nx").onclick = () => { s.page++; viewList(); };
-  let q = sb.from("questions").select("id,topic,he,published,is_free", { count: "exact" }).order("id").range(s.page*PAGE, s.page*PAGE+PAGE-1);
+  let q = sb.from("questions").select("id,topic,he,published,is_free", { count: "exact" }).eq("track", curTrack).order("id").range(s.page*PAGE, s.page*PAGE+PAGE-1);
   if (s.topic) q = q.eq("topic", s.topic);
   if (s.pub) q = q.eq("published", s.pub === "1");
   if (s.q) { const w = s.q.replace(/[,()*%]/g, " "); q = q.or(`he->>q.ilike.*${w}*,en->>q.ilike.*${w}*`); }
   const { data, count, error } = await q;
   if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
   $("pg").textContent = `${count} سؤال · صفحة ${s.page+1} من ${Math.max(1, Math.ceil(count/PAGE))}`;
-  $("rows").innerHTML = data.length ? data.map(r => `<tr class="click" data-id="${r.id}"><td>${r.id}</td><td>${esc(TOPICS[r.topic] || r.topic)}</td><td class="he" dir="rtl">${esc((r.he?.q || "").slice(0,120))}</td><td>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} ${r.is_free ? `<span class="pill">مجاني</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في نتائج</td></tr>`;
+  $("rows").innerHTML = data.length ? data.map(r => `<tr class="click" data-id="${r.id}"><td>${r.id}</td><td>${esc(TOPICS_OF(curTrack)[r.topic] || r.topic)}</td><td class="he" dir="rtl">${esc((r.he?.q || "").slice(0,120))}</td><td>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} ${r.is_free ? `<span class="pill">مجاني</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في نتائج</td></tr>`;
   $("rows").querySelectorAll("tr.click").forEach(tr => tr.onclick = () => openEditor(+tr.dataset.id));
 }
 async function openEditor(id) {
@@ -146,11 +159,12 @@ async function openEditor(id) {
 
 /* ---------- edit ---------- */
 function viewEdit() {
-  const q = editing || { topic: "med", answer: 0, he: { q:"", o:["","","",""], e:"" }, en: { q:"", o:["","","",""], e:"" }, terms: [], source: "", is_free: false, published: false, reviewed_by: "" };
+  const q = editing || { track: curTrack, topic: Object.keys(TOPICS_OF(curTrack))[0] || "", answer: 0, he: { q:"", o:["","","",""], e:"" }, en: { q:"", o:["","","",""], e:"" }, terms: [], source: "", is_free: false, published: false, reviewed_by: "" };
   const opts = (lang, dir) => q[lang].o.map((o,i) => `<div class="opt"><input type="radio" name="ans" value="${i}" ${q.answer===i?"checked":""} aria-label="الجواب الصحيح ${i+1}"><input id="${lang}-o${i}" dir="${dir}" value="${esc(o)}" placeholder="خيار ${i+1}"></div>`).join("");
   $("body").innerHTML = `<form class="card" id="f">
     <h3>${q.id ? `تعديل سؤال #${q.id}` : "سؤال جديد"}</h3>
-    <div class="row"><div><label>الموضوع</label><select id="tp">${Object.entries(TOPICS).map(([k,n]) => `<option value="${k}" ${q.topic===k?"selected":""}>${n}</option>`).join("")}</select></div>
+    <div class="row"><div><label>المسار</label><select id="trk">${TRACKS.map(t => `<option value="${t.id}" ${(q.track||curTrack)===t.id?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
+      <div><label>الموضوع</label><select id="tp"></select></div>
       <div><label>راجعه</label><input id="rv" value="${esc(q.reviewed_by || "")}"></div></div>
     <p class="muted">علّم الدائرة جنب الجواب الصحيح (نفس الترتيب بالعبري والإنجليزي).</p>
     <div class="grid2">
@@ -164,6 +178,8 @@ function viewEdit() {
     <div class="row" style="justify-content:flex-start"><button class="btn" type="submit">حفظ</button>${q.id ? `<button class="btn danger" type="button" id="del">حذف</button>` : ""}<button class="btn ghost" type="button" id="cn">رجوع للقائمة</button></div>
     <div id="er"></div>
   </form>`;
+  const fillTopics = () => { const tr = $("trk").value; $("tp").innerHTML = Object.entries(TOPICS_OF(tr)).map(([k,n]) => `<option value="${k}" ${q.topic===k?"selected":""}>${esc(n)}</option>`).join(""); };
+  fillTopics(); $("trk").onchange = fillTopics;
   $("cn").onclick = () => { editing = null; tab = "list"; render(); };
   let armed = false;
   if ($("del")) $("del").onclick = async () => {
@@ -177,7 +193,7 @@ function viewEdit() {
     const v = id => $(id).value.trim();
     const ans = root.querySelector("input[name=ans]:checked");
     const row = {
-      topic: v("tp"), answer: ans ? +ans.value : -1,
+      track: v("trk"), topic: v("tp"), answer: ans ? +ans.value : -1,
       he: { q: v("he-q"), o: [0,1,2,3].map(i => v("he-o"+i)), e: v("he-e") },
       en: { q: v("en-q"), o: [0,1,2,3].map(i => v("en-o"+i)), e: v("en-e") },
       terms: v("tm").split("\n").map(l => l.split("|").map(x => x.trim())).filter(p => p.length === 2 && p[0] && p[1]),
@@ -193,7 +209,7 @@ function viewEdit() {
 }
 function validate(r) {
   const p = [];
-  if (!TOPICS[r.topic]) p.push("موضوع غير معروف");
+  if (!TOPICS_OF(r.track)[r.topic]) p.push(`موضوع غير معروف بمسار ${r.track}: ${r.topic}`);
   if (!(r.answer >= 0 && r.answer <= 3)) p.push("لازم تختار الجواب الصحيح");
   for (const [l,n] of [["he","العبري"],["en","الإنجليزي"]]) {
     if (!r[l].q) p.push(`نص السؤال ب${n} فاضي`);
@@ -223,7 +239,7 @@ function rowsFromCSV(text) {
   const ix = Object.fromEntries(head.map((h,i) => [h.trim(), i]));
   const g = (r,k) => (r[ix[k]] ?? "").trim();
   return data.map(r => ({
-    topic: g(r,"topic"), answer: (+g(r,"answer")) - 1,
+    track: g(r,"track") || curTrack, topic: g(r,"topic"), answer: (+g(r,"answer")) - 1,
     he: { q: g(r,"q_he"), o: [1,2,3,4].map(i => g(r,"o"+i+"_he")), e: g(r,"e_he") },
     en: { q: g(r,"q_en"), o: [1,2,3,4].map(i => g(r,"o"+i+"_en")), e: g(r,"e_en") },
     terms: g(r,"terms").split(";").map(x => x.split("=").map(y => y.trim())).filter(p => p.length === 2 && p[0] && p[1]),
@@ -232,7 +248,7 @@ function rowsFromCSV(text) {
 }
 function rowsFromJSON(text) {
   const arr = JSON.parse(text);
-  return arr.map(x => ({ topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
+  return arr.map(x => ({ track: x.track || curTrack, topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
 }
 function viewImport() {
   $("body").innerHTML = `<div class="card"><h3>استيراد أسئلة</h3>
@@ -290,19 +306,47 @@ async function viewCodes() {
   const d = new Date(); d.setMonth(d.getMonth()+4);
   $("body").innerHTML = `<form class="card" id="f"><h3>كود جديد</h3>
     <div class="row"><div><label>الكود</label><input id="c" dir="ltr" value="${randCode()}"></div><div><label>عدد الاستخدامات</label><input id="n" type="number" min="1" value="30"></div>
-    <div><label>صالح لحد</label><input id="v" type="date" value="${d.toISOString().slice(0,10)}"></div><div><label>ملاحظة (لمين)</label><input id="nt" placeholder="مثلاً: كلية تل أبيب، دورة أيلول"></div></div>
+    <div><label>صالح لحد</label><input id="v" type="date" value="${d.toISOString().slice(0,10)}"></div><div><label>ملاحظة (لمين)</label><input id="nt" placeholder="مثلاً: كلية تل أبيب، دورة أيلول"></div>
+    <div><label>بيفتح مسار</label><select id="ct">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}<option value="all">كل المسارات</option></select></div></div>
     <button class="btn" type="submit">إنشاء</button></form>
-    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
+    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>المسار</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
   $("f").onsubmit = async e => {
     e.preventDefault();
-    const { error } = await sb.from("access_codes").insert({ code: $("c").value.trim().toUpperCase(), uses_left: +$("n").value, valid_until: $("v").value, note: $("nt").value.trim() || null });
+    const { error } = await sb.from("access_codes").insert({ code: $("c").value.trim().toUpperCase(), uses_left: +$("n").value, valid_until: $("v").value, note: $("nt").value.trim() || null, track: $("ct").value });
     if (error) msg(error.message, false); else msg("انعمل الكود");
     render();
   };
   const { data } = await sb.from("access_codes").select("*").order("created_at", { ascending: false }).limit(200);
-  $("rows").innerHTML = (data || []).map(r => `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">ما في أكواد</td></tr>`;
+  $("rows").innerHTML = (data || []).map(r => `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.track === "all" ? "كل المسارات" : esc(trackLabel(r.track))}</td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">ما في أكواد</td></tr>`;
 }
 function randCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "RS-"; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random()*a.length)]; return s; }
+
+/* ---------- tracks & topics ---------- */
+function viewTracks() {
+  const topics = Object.entries(TOPICS_OF(curTrack));
+  $("body").innerHTML = `<div class="card"><h3>مواضيع مسار ${esc(trackLabel(curTrack))}</h3>
+    <div class="tbl"><table><thead><tr><th>المعرّف</th><th>الاسم</th></tr></thead><tbody>${topics.map(([k,n]) => `<tr><td dir="ltr">${esc(k)}</td><td class="he" dir="rtl">${esc(n)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">ما في مواضيع</td></tr>`}</tbody></table></div>
+    <form id="ft" class="row"><input id="ti" dir="ltr" placeholder="معرّف بالإنجليزي، مثلاً p_sport"><input id="th" dir="rtl" placeholder="الاسم بالعبري"><input id="te" dir="ltr" placeholder="Name in English"><button class="btn" type="submit">إضافة موضوع</button></form></div>
+  <div class="card"><h3>مسار جديد</h3>
+    <form id="fk" class="row"><input id="ki" dir="ltr" placeholder="id, e.g. dietetics"><input id="kh" dir="rtl" placeholder="الاسم بالعبري"><input id="ke" dir="ltr" placeholder="Name in English"><input id="kc" placeholder="أيقونة 🥗" style="max-width:90px"><input id="kd" dir="rtl" placeholder="وصف قصير بالعبري"><button class="btn" type="submit">إضافة مسار</button></form>
+    <p class="muted">المعرّف بالإنجليزي، أحرف صغيرة بدون مسافات. بعدها لازم تعمل بالـApp Store منتجين: rishui_&lt;id&gt;_monthly و rishui_&lt;id&gt;_until_exam.</p></div>`;
+  $("ft").onsubmit = async e => {
+    e.preventDefault();
+    const id = $("ti").value.trim().toLowerCase(), he = $("th").value.trim(), en = $("te").value.trim();
+    if (!/^[a-z0-9_]+$/.test(id) || !he || !en) { msg("عبّي المعرّف (أحرف إنجليزية صغيرة) والاسمين", false); return render(); }
+    const { error } = await sb.from("topics").insert({ track: curTrack, id, he, en, sort: (topics.length + 1) * 10 });
+    if (error) msg(error.message, false); else msg("انضاف الموضوع");
+    await loadMeta(); render();
+  };
+  $("fk").onsubmit = async e => {
+    e.preventDefault();
+    const id = $("ki").value.trim().toLowerCase(), he = $("kh").value.trim(), en = $("ke").value.trim();
+    if (!/^[a-z]+$/.test(id) || !he || !en) { msg("المعرّف أحرف إنجليزية صغيرة بس، وعبّي الاسمين", false); return render(); }
+    const { error } = await sb.from("tracks").insert({ id, he, en, icon: $("kc").value.trim() || null, he_desc: $("kd").value.trim() || null, en_desc: en + " licensing exam", sort: (TRACKS.length + 1) * 10 });
+    if (error) msg(error.message, false); else { msg("انضاف المسار"); curTrack = id; localStorage.setItem("rs-track", id); }
+    await loadMeta(); render();
+  };
+}
 
 /* ---------- stats ---------- */
 async function viewStats() {
