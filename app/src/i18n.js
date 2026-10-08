@@ -22,7 +22,7 @@ export const topicName = (k, lang) => (TOPIC[k] ? TOPIC[k][lang] : k);
 
 export const T = {
   en: {
-    dir: "ltr", name: "Rishui", tag: "Licensing exam prep",
+    dir: "ltr", name: "Licensing Exams", tag: "Licensing exam prep",
     chooseTrack: "What are you preparing for?", nursing: "Nursing", medicine: "Medicine", nursingD: "Registered nurse licensing exam", medicineD: "Medical licensing exam", switchTrack: "Switch", noneYet: "Questions for this track are coming soon.",
     login: "Sign in", signup: "Create account", email: "Email", pass: "Password", cont: "Continue",
     badEmail: "Enter a valid email address.", shortPass: "Password needs at least 8 characters.",
@@ -61,7 +61,7 @@ export const T = {
     loadErr: "Couldn't load questions. Check your connection and try again.", retry: "Try again", saveDate: "Save",
   },
   he: {
-    dir: "rtl", name: "רישוי", tag: "הכנה לבחינות רישוי",
+    dir: "rtl", name: "מבחני רישוי", tag: "הכנה לבחינות רישוי",
     chooseTrack: "לאיזו בחינה אתה מתכונן?", nursing: "סיעוד", medicine: "רפואה", nursingD: "בחינת הרישוי לאחים ואחיות מוסמכים", medicineD: "בחינת הרישוי ברפואה", switchTrack: "החלפה", noneYet: "שאלות למסלול הזה יעלו בקרוב.",
     login: "התחברות", signup: "יצירת חשבון", email: "אימייל", pass: "סיסמה", cont: "המשך",
     badEmail: "יש להזין כתובת אימייל תקינה.", shortPass: "הסיסמה צריכה לפחות 8 תווים.",
