@@ -104,10 +104,11 @@ function msgHtml() { return st.ui.msg ? `<div class="banner ${st.ui.msgBad ? "ba
 function flash(msg, bad = false) { st.ui.msg = msg; st.ui.msgBad = bad; }
 function openUrl(url) { if (url) Browser.open({ url }).catch(() => window.open(url, "_blank")); }
 function legalLinks() {
-  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button><button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button></div>`;
+  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button><button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button>${st.user ? `<button class="link" id="lg-o">${t("logout")}</button>` : ""}</div>`;
 }
 function bindLegal() {
   if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
+  if ($("lg-o")) $("lg-o").onclick = logout;
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
   if ($("lg-p")) $("lg-p").onclick = () => openUrl(`${LEGAL}/privacy-${st.lang}.html`);
 }
@@ -235,7 +236,8 @@ function newPassword() {
     <div class="field"><label for="pw2">${t("passAgain")}</label><input id="pw2" type="password" dir="ltr" autocomplete="new-password"></div>
     <div class="err" id="er" hidden></div>
     <button class="primary" type="submit" id="sb">${t("newPassBtn")}</button>
-  </form>`);
+  </form>${legalLinks()}`);
+  bindLegal();
   const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
   $("f").onsubmit = async (e) => {
     e.preventDefault();
