@@ -262,23 +262,43 @@ async function logout() {
 }
 
 /* ---------------- track ---------------- */
-function chooseTrack() {
-  S = { screen: chooseTrack, back: st.profile?.track ? route : null };
-  const cur = st.profile?.track;
+// tracks this student may open: everything before the first choice; afterwards only tracks they hold
+// a plan or code for (admins can open all)
+function allowedTracks() {
+  if (!st.profile?.track || isAdmin()) return st.tracks;
+  const now = new Date();
+  const paid = new Set(st.ents.filter((e) => new Date(e.until) > now).map((e) => e.track));
+  return st.tracks.filter((x) => x.id === st.profile.track || paid.has(x.id));
+}
+const canSwitch = () => allowedTracks().length > 1;
+function chooseTrack(pending) {
+  S = { screen: () => chooseTrack(pending), back: st.profile?.track ? route : null };
+  const cur = st.profile?.track, first = !cur;
+  const list = allowedTracks();
+  const card = (x) => { const c = themeOf(x.id).l; return `<button class="plan ${(pending || cur) === x.id ? "on" : ""}" data-k="${esc(x.id)}" style="border-color:${c[0]};background:${c[2]};color:#0F1E33;border-inline-start-width:6px"><span class="dot" style="border-color:${c[0]}"></span>
+      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted" style="color:#4A5A6E">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`; };
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
-    <div class="plans">${st.tracks.map((x) => { const c = themeOf(x.id).l; return `<button class="plan ${cur === x.id ? "on" : ""}" data-k="${esc(x.id)}" style="border-color:${c[0]};background:${c[2]};color:#0F1E33;border-inline-start-width:6px"><span class="dot" style="border-color:${c[0]}"></span>
-      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted" style="color:#4A5A6E">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`; }).join("")}</div>
+    <div class="plans">${list.map(card).join("")}</div>
+    ${first && pending ? `<div class="banner">⚠️ ${t("lockWarn")}</div>
+      <div class="actions"><button class="primary" id="ok">${t("confirmTrack")}</button><button class="ghost" id="no">${t("pickOther")}</button></div>` : ""}
   </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}`);
   if ($("bk")) $("bk").onclick = route;
-  app.querySelectorAll(".plan").forEach((b) => (b.onclick = async () => {
-    const k = b.dataset.k;
+  if ($("no")) $("no").onclick = () => chooseTrack();
+  const pick = async (k) => {
     loading();
     try {
       await api.updateProfile(null, null, k);
-      st.profile.track = k;
+      st.profile = await api.getProfile(st.user.id);
+      if (st.profile.track !== k) throw new Error("track locked");
       await loadUserData();
       route();
     } catch (e) { flash(errMsg(e), true); chooseTrack(); }
+  };
+  if ($("ok")) $("ok").onclick = () => pick(pending);
+  app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => {
+    const k = b.dataset.k;
+    if (first && !isAdmin()) return chooseTrack(k); // first choice needs a confirm
+    if (k !== cur) pick(k);
   }));
 }
 
@@ -291,7 +311,7 @@ function plans() {
   frame(`${msgHtml()}
   <div class="card">
     <h2>${t("choose")}</h2>
-    <button class="chip" id="trk" style="align-self:flex-start;cursor:pointer">${esc(trackName(TR()))} · ${t("switchTrack")}</button>
+    <span class="chip" ${canSwitch() ? 'id="trk" role="button" style="align-self:flex-start;cursor:pointer"' : 'style="align-self:flex-start"'}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>
     <div class="plans">
       <button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
@@ -308,7 +328,7 @@ function plans() {
   bindLegal();
   st.ui.msg = null;
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
-  $("trk").onclick = chooseTrack;
+  if ($("trk")) $("trk").onclick = () => chooseTrack();
   if ($("go")) $("go").onclick = async () => {
     const plan = st.ui.plan;
     if (plan === "exam") await api.updateProfile(null, $("ex").value).catch(() => {});
@@ -360,7 +380,7 @@ function home() {
   const tt = totals(), pct = tt.n ? Math.round((tt.done / tt.n) * 100) : 0, dl = daysLeft();
   frame(`${msgHtml()}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
-  <div class="chips"><button class="chip" id="trk" style="cursor:pointer">${esc(trackName(TR()))} · ${t("switchTrack")}</button>${dl != null ? `<span class="chip cool">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
+  <div class="chips"><span class="chip" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip cool">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div class="hero">
     <div class="eyebrow">${t("progress")}</div>
@@ -380,7 +400,7 @@ function home() {
   <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>`);
   st.ui.msg = null;
   if ($("lock")) $("lock").onclick = plans;
-  $("trk").onclick = chooseTrack;
+  if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
   $("mk").onclick = mock;
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
