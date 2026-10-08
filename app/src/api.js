@@ -10,7 +10,9 @@ export const auth = {
   session: async () => (await supabase.auth.getSession()).data.session,
   signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
   signUp: (email, password) => supabase.auth.signUp({ email, password }),
-  reset: (email) => supabase.auth.resetPasswordForEmail(email),
+  // the link in the email opens the web app, where the student picks a new password
+  reset: (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" }),
+  setPassword: (password) => supabase.auth.updateUser({ password }),
   signOut: () => supabase.auth.signOut(),
   onChange: (fn) => supabase.auth.onAuthStateChange(fn),
 };

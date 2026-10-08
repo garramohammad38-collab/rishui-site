@@ -117,7 +117,11 @@ document.addEventListener("copy", (e) => { if (e.target?.closest?.(".protect")) 
 async function boot() {
   loading();
   CapApp.addListener("backButton", () => { if (S?.back) S.back(); else route(); }).catch(() => {});
+  // opened from a "reset password" email: ask for the new password first
+  let recovery = /type=recovery/.test(location.hash);
+  api.auth.onChange((event) => { if (event === "PASSWORD_RECOVERY") { recovery = true; newPassword(); } });
   const session = await api.auth.session().catch(() => null);
+  if (session && recovery) return newPassword();
   if (session) await afterLogin(session.user); else login();
 }
 
@@ -221,6 +225,29 @@ function authMsg(e) {
   if (/password/i.test(m)) return he ? "הסיסמה לא עומדת בדרישות. נסה סיסמה ארוכה יותר." : "The password doesn't meet the requirements. Try a longer one.";
   if (/fetch|network/i.test(m)) return t("netErr");
   return m || t("loadErr");
+}
+function newPassword() {
+  S = { screen: newPassword };
+  frame(`<form class="card" id="f" novalidate>
+    <h2>${t("newPass")}</h2>
+    <div class="field"><label for="pw">${t("pass")}</label><input id="pw" type="password" dir="ltr" autocomplete="new-password"></div>
+    <div class="field"><label for="pw2">${t("passAgain")}</label><input id="pw2" type="password" dir="ltr" autocomplete="new-password"></div>
+    <div class="err" id="er" hidden></div>
+    <button class="primary" type="submit" id="sb">${t("newPassBtn")}</button>
+  </form>`);
+  const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
+  $("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const a = $("pw").value, b = $("pw2").value;
+    if (a.length < 8) return err(t("shortPass"));
+    if (a !== b) return err(t("passMismatch"));
+    $("sb").disabled = true;
+    const { data, error } = await api.auth.setPassword(a);
+    if (error) { $("sb").disabled = false; return err(authMsg(error)); }
+    history.replaceState(null, "", location.pathname);
+    flash(t("passChanged"));
+    await afterLogin(data.user);
+  };
 }
 function blocked() {
   frame(`<div class="card"><h2>${t("acct")}</h2><p>${t("tooMany")}</p>${SUPPORT ? `<p class="muted">${t("support")}: <bdi dir="ltr">${esc(SUPPORT)}</bdi></p>` : ""}
