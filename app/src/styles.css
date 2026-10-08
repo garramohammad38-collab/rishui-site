@@ -215,3 +215,9 @@ body{-webkit-tap-highlight-color:transparent}
 }
 
 .explain span{white-space:pre-line}
+
+.newbox{background:var(--surface);border:2px solid var(--accent);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.newbox-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.newbox-h b{font-family:var(--display);font-size:16px}
+.newbox-l{display:flex;flex-wrap:wrap;gap:6px}
+.newtag{display:inline-block;background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600;margin-inline-end:6px}

@@ -396,7 +396,15 @@ function totals() {
 function home() {
   S = { screen: home };
   const tt = totals(), pct = tt.n ? Math.round((tt.done / tt.n) * 100) : 0, dl = daysLeft();
-  frame(`${msgHtml()}
+  // "what's new": compare published counts per topic with what this student saw last time
+  const seenKey = `seen-counts:${st.user.id}:${TR()}`;
+  let seen = store.get(seenKey);
+  if (!seen || typeof seen !== "object") { seen = st.counts; store.set(seenKey, st.counts); }
+  const added = Object.fromEntries(Object.keys(st.counts).map((k) => [k, Math.max(0, st.counts[k] - (seen[k] || 0))]).filter(([, n]) => n > 0));
+  const addedTotal = Object.values(added).reduce((a, b) => a + b, 0);
+  const newBox = addedTotal ? `<div class="newbox" role="status"><div class="newbox-h"><b>${st.lang === "he" ? `נוספו ${addedTotal} שאלות חדשות` : `${addedTotal} ${t("newQs")}`}</b><button class="link" id="nok">${t("gotIt")}</button></div>
+    <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
+  frame(`${msgHtml()}${newBox}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
@@ -422,10 +430,11 @@ function home() {
   </div>
   </div>
   <div class="section-title">${t("bytopic")}</div>
-  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
+  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
   ${legalLinks()}`, { wide: true });
   bindLegal();
   st.ui.msg = null;
+  if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
   if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });

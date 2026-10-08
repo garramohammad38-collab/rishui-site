@@ -23,7 +23,7 @@ export const topicName = (k, lang) => (TOPIC[k] ? TOPIC[k][lang] : k);
 export const T = {
   en: {
     dir: "ltr", name: "Musmach", tag: "Licensing exam prep",
-    chooseTrack: "What are you preparing for?", nursing: "Nursing", medicine: "Medicine", nursingD: "Registered nurse licensing exam", medicineD: "Medical licensing exam", switchTrack: "Switch", noneYet: "Questions for this track are coming soon.",
+    chooseTrack: "What are you preparing for?", nursing: "Nursing", medicine: "Medicine", nursingD: "Registered nurse licensing exam", medicineD: "Medical licensing exam", switchTrack: "Switch", noneYet: "Questions for this track are coming soon.", newQs: "new questions added", newIn: "in", gotIt: "Got it", newBadge: "new",
     login: "Sign in", signup: "Create account", email: "Email", pass: "Password", cont: "Continue",
     badEmail: "Enter a valid email address.", shortPass: "Password needs at least 8 characters.",
     haveAcct: "Already have an account?", noAcct: "New here?", forgot: "Forgot password?",
@@ -64,7 +64,7 @@ export const T = {
   },
   he: {
     dir: "rtl", name: "מוסמך", tag: "הכנה לבחינות רישוי",
-    chooseTrack: "לאיזו בחינה אתה מתכונן?", nursing: "סיעוד", medicine: "רפואה", nursingD: "בחינת הרישוי לאחים ואחיות מוסמכים", medicineD: "בחינת הרישוי ברפואה", switchTrack: "החלפה", noneYet: "שאלות למסלול הזה יעלו בקרוב.",
+    chooseTrack: "לאיזו בחינה אתה מתכונן?", nursing: "סיעוד", medicine: "רפואה", nursingD: "בחינת הרישוי לאחים ואחיות מוסמכים", medicineD: "בחינת הרישוי ברפואה", switchTrack: "החלפה", noneYet: "שאלות למסלול הזה יעלו בקרוב.", newQs: "שאלות חדשות נוספו", newIn: "ב", gotIt: "הבנתי", newBadge: "חדשות",
     login: "התחברות", signup: "יצירת חשבון", email: "אימייל", pass: "סיסמה", cont: "המשך",
     badEmail: "יש להזין כתובת אימייל תקינה.", shortPass: "הסיסמה צריכה לפחות 8 תווים.",
     haveAcct: "כבר יש לך חשבון?", noAcct: "חדש כאן?", forgot: "שכחת סיסמה?",
