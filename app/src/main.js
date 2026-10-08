@@ -208,8 +208,19 @@ function login() {
       const { data, error } = await api.auth.signIn(em, pw);
       if (error) return err(String(error.message).includes("fetch") ? t("netErr") : t("wrongLogin"));
       await afterLogin(data.user);
-    } catch (ex) { err(errMsg(ex)); } finally { if ($("sb")) $("sb").disabled = false; }
+    } catch (ex) { err(authMsg(ex)); } finally { if ($("sb")) $("sb").disabled = false; }
   };
+}
+// readable sign-up / sign-in errors
+function authMsg(e) {
+  const m = String(e?.message || e || "");
+  const he = st.lang === "he";
+  if (/already registered|already exists/i.test(m)) return he ? "כבר קיים חשבון עם האימייל הזה. נסה להתחבר." : "An account with this email already exists. Try signing in.";
+  if (/rate limit/i.test(m)) return he ? "יותר מדי ניסיונות. נסה שוב בעוד כמה דקות." : "Too many attempts. Try again in a few minutes.";
+  if (/signups? not allowed|disabled/i.test(m)) return he ? "ההרשמה סגורה כרגע." : "Sign-ups are currently closed.";
+  if (/password/i.test(m)) return he ? "הסיסמה לא עומדת בדרישות. נסה סיסמה ארוכה יותר." : "The password doesn't meet the requirements. Try a longer one.";
+  if (/fetch|network/i.test(m)) return t("netErr");
+  return m || t("loadErr");
 }
 function blocked() {
   frame(`<div class="card"><h2>${t("acct")}</h2><p>${t("tooMany")}</p>${SUPPORT ? `<p class="muted">${t("support")}: <bdi dir="ltr">${esc(SUPPORT)}</bdi></p>` : ""}
