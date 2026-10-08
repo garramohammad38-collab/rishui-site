@@ -35,6 +35,13 @@ export async function entitlements(uid) {
 export async function registerDevice(id, label) {
   return must(await supabase.rpc("register_device", { p_device_id: id, p_label: label }));
 }
+// "free mode": everything open, no subscription needed (switch in the admin panel)
+export async function freeMode() {
+  try {
+    const { data, error } = await supabase.from("app_settings").select("free_mode").eq("id", 1).maybeSingle();
+    return !error && !!data?.free_mode;
+  } catch { return false; }
+}
 export async function counts(track) {
   return must(await supabase.rpc("question_counts", { p_track: track }));
 }

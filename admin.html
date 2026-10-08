@@ -369,6 +369,14 @@ async function viewStats() {
   ]);
   $("g").innerHTML = [["مستخدمين", u.count], ["اشتراكات فعّالة", a.count], ["كل الأسئلة", q.count], ["منشورة", p.count]]
     .map(([n,v]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v ?? "—"}</span></div>`).join("");
+  const { data: cfg, error } = await sb.from("app_settings").select("free_mode").eq("id", 1).maybeSingle();
+  const box = document.createElement("div"); box.className = "card"; box.style.marginTop = "12px";
+  box.innerHTML = error || !cfg ? `<b>الوضع المجاني</b><p class="muted">شغّل supabase/migration-5-free-mode.sql عشان يظهر هاد الخيار.</p>`
+    : `<b>الوضع المجاني: ${cfg.free_mode ? "🟢 شغّال (كل الأسئلة ببلاش)" : "⚪ مطفي (بدها اشتراك)"}</b>
+       <p class="muted">لما يكون شغّال، كل طالب مسجّل بيحل كل أسئلة مساره بدون اشتراك.</p>
+       <button class="btn" id="fm">${cfg.free_mode ? "طفّي الوضع المجاني" : "شغّل الوضع المجاني"}</button>`;
+  $("body").appendChild(box);
+  if ($("fm")) $("fm").onclick = async () => { await sb.from("app_settings").update({ free_mode: !cfg.free_mode }).eq("id", 1); viewStats(); };
 }
 
 start();

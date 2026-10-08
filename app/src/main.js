@@ -39,7 +39,7 @@ const bwd = () => (st.lang === "he" ? "→" : "←");
 const today = () => new Date().toISOString().slice(0, 10);
 const TR = () => st.profile?.track || "nursing";
 const ent = () => st.ents.find((e) => e.track === TR() && new Date(e.until) > new Date());
-const hasAccess = () => !!st.profile && (st.profile.role === "admin" || !!ent());
+const hasAccess = () => !!st.profile && (st.profile.role === "admin" || st.freeMode || !!ent());
 const trackOf = (id) => st.tracks.find((x) => x.id === id);
 const trackName = (id) => { const x = trackOf(id); return x ? `${x.icon || ""} ${x[st.lang]}`.trim() : id; };
 const topicName = (k, lang) => { const x = st.topics[k]; return x ? x[lang] : fallbackTopic(k, lang); };
@@ -151,7 +151,7 @@ async function deviceInfo() {
 }
 async function loadUserData() {
   const uid = st.user.id;
-  [st.profile, st.tracks, st.ents] = await Promise.all([api.getProfile(uid), api.tracks(), api.entitlements(uid)]);
+  [st.profile, st.tracks, st.ents, st.freeMode] = await Promise.all([api.getProfile(uid), api.tracks(), api.entitlements(uid), api.freeMode()]);
   const profile = st.profile;
   if (!profile.track) return;
   const tr = profile.track;
