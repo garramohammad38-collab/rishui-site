@@ -52,6 +52,32 @@ const errMsg = (e) => {
   return t("loadErr");
 };
 
+/* each track has its own colors: [accent, soft, background] for light and dark */
+const THEMES = {
+  nursing:     { l: ["#1554A8", "#DCE8F8", "#EAF1FA"], d: ["#5B9CF0", "#16305A", "#0C1626"] },
+  medicine:    { l: ["#0F7A5C", "#D5F0E5", "#E8F5EF"], d: ["#46C79C", "#123D30", "#0A1A15"] },
+  physio:      { l: ["#C2581B", "#FBE2D2", "#FBF1E9"], d: ["#F08A4B", "#45240F", "#1C120B"] },
+  ot:          { l: ["#6D3FB5", "#E7DCF8", "#F3EEFB"], d: ["#A98BEA", "#2E2050", "#130F1F"] },
+  radiography: { l: ["#B42357", "#F8DAE5", "#FBEEF3"], d: ["#EE6E9A", "#4A1529", "#1C0C12"] },
+};
+const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
+function themeOf(id) {
+  if (THEMES[id]) return THEMES[id];
+  const i = [...(id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length, l = EXTRA[i];
+  return { l, d: [l[0], "#1E2A30", "#0E1418"] };
+}
+function applyTheme() {
+  const th = themeOf(st.profile?.track || "nursing");
+  let el = document.getElementById("track-theme");
+  if (!el) { el = document.createElement("style"); el.id = "track-theme"; document.head.appendChild(el); }
+  const v = ([a, s, b], dark) => `--accent:${a};--accent-soft:${s};--bg:${b};--on-accent:${dark ? b : "#FFFFFF"};`;
+  el.textContent = `:root{${v(th.l)}}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${v(th.d, true)}}}
+:root[data-theme="dark"]{${v(th.d, true)}}
+html,body{transition:background-color .3s}`;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", th.l[0]);
+}
+
 function stopTimer() { if (S?.tick) { clearInterval(S.tick); S.tick = null; } }
 function watermark(on) {
   wm.hidden = !on;
@@ -60,6 +86,7 @@ function watermark(on) {
 function frame(inner, { protect = false } = {}) {
   stopTimer();
   watermark(protect);
+  applyTheme();
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
   app.className = "app" + (protect ? " protect" : "");
@@ -201,8 +228,8 @@ function chooseTrack() {
   S = { screen: chooseTrack, back: st.profile?.track ? route : null };
   const cur = st.profile?.track;
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
-    <div class="plans">${st.tracks.map((x) => `<button class="plan ${cur === x.id ? "on" : ""}" data-k="${esc(x.id)}"><span class="dot"></span>
-      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`).join("")}</div>
+    <div class="plans">${st.tracks.map((x) => { const c = themeOf(x.id).l; return `<button class="plan ${cur === x.id ? "on" : ""}" data-k="${esc(x.id)}" style="border-color:${c[0]};background:${c[2]};color:#0F1E33;border-inline-start-width:6px"><span class="dot" style="border-color:${c[0]}"></span>
+      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted" style="color:#4A5A6E">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`; }).join("")}</div>
   </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}`);
   if ($("bk")) $("bk").onclick = route;
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = async () => {
