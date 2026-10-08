@@ -213,3 +213,5 @@ body{-webkit-tap-highlight-color:transparent}
 @media (min-width: 900px){
   .app:not(.wide) > form.card:first-of-type{max-width:460px;width:100%;align-self:center}
 }
+
+.explain span{white-space:pre-line}
