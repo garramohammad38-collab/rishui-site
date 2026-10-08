@@ -189,3 +189,27 @@ body{-webkit-tap-highlight-color:transparent}
 .opt{border-radius:14px}
 .flash,.rv{border-color:var(--cardline);box-shadow:var(--shadow)}
 .back{border-radius:12px;width:44px;height:44px}
+
+/* desktop / tablet web: use the width instead of a phone column */
+@media (min-width: 900px){
+  body{font-size:17px}
+  .app{max-width:760px;padding-inline:32px;padding-block:32px 48px;gap:22px}
+  .app.wide{max-width:1120px}
+  .home-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:20px;align-items:stretch}
+  .home-main .hero{justify-content:space-between;padding:28px}
+  .home-main .ring2{width:120px;height:120px}
+  .home-main .ring2 span{width:96px;height:96px;font-size:26px}
+  .home-main .hero h2{font-size:26px}
+  .home-main .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .app.wide .list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:0}
+  .app.wide .li{border-bottom:1px solid var(--bg)}
+  .app.wide .li:nth-child(odd){border-inline-end:1px solid var(--bg)}
+  .tile{min-height:120px;justify-content:space-between}
+  .tile:hover,.li:hover{background:var(--accent-soft)}
+  .opt:hover:not([disabled]){border-color:var(--accent-soft)}
+  .qtext{font-size:21px}
+  form.card,.card{padding:28px}
+}
+@media (min-width: 900px){
+  .app:not(.wide) > form.card:first-of-type{max-width:460px;width:100%;align-self:center}
+}

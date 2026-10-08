@@ -83,13 +83,13 @@ function watermark(on) {
   wm.hidden = !on;
   if (on) $("wm-text").innerHTML = Array(120).fill(`<span>${esc(st.user?.email || "")}</span>`).join("");
 }
-function frame(inner, { protect = false } = {}) {
+function frame(inner, { protect = false, wide = false } = {}) {
   stopTimer();
   watermark(protect);
   applyTheme();
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
-  app.className = "app" + (protect ? " protect" : "");
+  app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "");
   app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
   <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${inner}`;
   app.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
@@ -386,6 +386,7 @@ function home() {
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
+  <div class="home-main">
   <div class="hero">
     <div class="hero-row">
       <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
@@ -405,9 +406,10 @@ function home() {
     <button class="tile" id="sts"><b>${t("stats")}</b><span>${tt.done ? Math.round((tt.right / tt.done) * 100) : 0}% ${t("accuracy")}</span></button>
     <button class="tile" id="ac"><b>${t("acct")}</b><span><bdi dir="ltr">${esc(st.user.email)}</bdi></span></button>
   </div>
+  </div>
   <div class="section-title">${t("bytopic")}</div>
   <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
-  ${legalLinks()}`);
+  ${legalLinks()}`, { wide: true });
   bindLegal();
   st.ui.msg = null;
   if ($("lock")) $("lock").onclick = plans;
