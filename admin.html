@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>رישוי · لوحة الإدارة</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#EAF1FA;--surface:#fff;--ink:#0F1E33;--muted:#566A85;--line:#D2DEEC;--accent:#1554A8;--accent-soft:#DCE8F8;--ok:#1F8A4C;--ok-soft:#DDF2E5;--bad:#C2413A;--bad-soft:#F8E0DE;--amber-soft:#FBEBCF;
+  --font:"IBM Plex Sans Arabic","IBM Plex Sans Hebrew",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{margin:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+label{font-size:13px;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
+textarea{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:760px){.grid2,.grid4{grid-template-columns:1fr}}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row > *{flex:1;min-width:140px}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:600 14px var(--font);cursor:pointer;flex:none;min-width:0}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:start;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr.click{cursor:pointer}tr.click:hover{background:var(--accent-soft)}
+.tbl{overflow-x:auto}
+.pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill.off{background:var(--amber-soft);color:#8a5a0a}
+.msg{border-radius:8px;padding:8px 12px;font-size:14px}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}.msg.bad{background:var(--bad-soft);color:var(--bad)}
+.muted{color:var(--muted);font-size:13px}
+.he{font-family:"IBM Plex Sans Hebrew",var(--font)}
+.opt{display:flex;gap:8px;align-items:center}
+.opt input[type=radio]{width:auto;flex:none}
+.stat{font-size:28px;font-weight:600}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<script>
+/* ===== Rishui admin panel — open this file in Chrome/Edge on your computer ===== */
+const TOPICS = { calc:"حسابات أدوية", med:"باطني", surg:"جراحة", peds:"أطفال", psych:"نفسي", pharm:"صيدلة", ob:"نسائية وولادة", ethics:"أخلاقيات وقانون", geri:"مسنين", comm:"صحة المجتمع" };
+const root = document.getElementById("root");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const $ = id => document.getElementById(id);
+const cfg = { url: localStorage.getItem("rs-url") || "https://bbslhbcmfjfjbvqqcebg.supabase.co", key: localStorage.getItem("rs-key") || "sb_publishable_-PUr33K468fu-ywZehsbZQ_QBQnHeQX" };
+let sb = null, me = null, tab = "list", editing = null, listState = { topic: "", pub: "", q: "", page: 0 }, flashMsg = null;
+
+function msg(text, ok = true) { flashMsg = { text, ok }; }
+function msgHtml() { const m = flashMsg; flashMsg = null; return m ? `<div class="msg ${m.ok ? "ok" : "bad"}">${esc(m.text)}</div>` : ""; }
+
+/* ---------- setup + login ---------- */
+function setup() {
+  root.innerHTML = `<h1>لوحة إدارة רישוי</h1>${msgHtml()}
+  <div class="card"><h3>ربط المشروع (مرة وحدة)</h3>
+    <p class="muted">من Supabase → Project Settings → API انسخ الـ Project URL والـ anon public key.</p>
+    <label>Project URL</label><input id="u" dir="ltr" value="${esc(cfg.url)}" placeholder="https://xxxx.supabase.co">
+    <label>anon public key</label><input id="k" dir="ltr" value="${esc(cfg.key)}">
+    <button class="btn" id="s">حفظ</button></div>`;
+  $("s").onclick = () => {
+    cfg.url = $("u").value.trim(); cfg.key = $("k").value.trim();
+    localStorage.setItem("rs-url", cfg.url); localStorage.setItem("rs-key", cfg.key); start();
+  };
+}
+function login() {
+  root.innerHTML = `<h1>لوحة إدارة רישוי</h1>${msgHtml()}
+  <form class="card" id="f"><h3>تسجيل دخول المدير</h3>
+    <label>الإيميل</label><input id="e" type="email" dir="ltr">
+    <label>الباسوورد</label><input id="p" type="password" dir="ltr">
+    <button class="btn" type="submit">دخول</button>
+    <button class="btn ghost" type="button" id="cfg">تغيير ربط المشروع</button></form>`;
+  $("cfg").onclick = setup;
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.auth.signInWithPassword({ email: $("e").value.trim(), password: $("p").value });
+    if (error) { msg("الإيميل أو الباسوورد غلط", false); return login(); }
+    start();
+  };
+}
+async function start() {
+  if (!cfg.url || !cfg.key) return setup();
+  sb = sb || supabase.createClient(cfg.url, cfg.key);
+  const { data } = await sb.auth.getSession();
+  if (!data.session) return login();
+  const { data: p } = await sb.from("profiles").select("*").eq("id", data.session.user.id).single();
+  if (!p || p.role !== "admin") {
+    await sb.auth.signOut();
+    msg("هاد الحساب مش مدير. شغّل أمر تعيين المدير من الدليل.", false); return login();
+  }
+  me = p; render();
+}
+
+/* ---------- layout ---------- */
+function render() {
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["codes","أكواد الدخول"],["stats","أرقام"]];
+  root.innerHTML = `<div class="top"><h1>لوحة إدارة רישוי</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
+  <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
+  ${msgHtml()}<div id="body"></div>`;
+  root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
+  $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, codes: viewCodes, stats: viewStats })[tab]();
+}
+
+/* ---------- list ---------- */
+const PAGE = 50;
+async function viewList() {
+  const b = $("body"), s = listState;
+  b.innerHTML = `<div class="card"><div class="row">
+    <select id="ft"><option value="">كل المواضيع</option>${Object.entries(TOPICS).map(([k,n]) => `<option value="${k}" ${s.topic===k?"selected":""}>${n}</option>`).join("")}</select>
+    <select id="fp"><option value="">منشور وغير منشور</option><option value="1" ${s.pub==="1"?"selected":""}>منشور</option><option value="0" ${s.pub==="0"?"selected":""}>غير منشور</option></select>
+    <input id="fq" placeholder="بحث بنص السؤال" value="${esc(s.q)}">
+    <button class="btn" id="go">بحث</button><button class="btn ghost" id="new">+ سؤال جديد</button></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الموضوع</th><th>السؤال (עברית)</th><th>الحالة</th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="pv">السابق</button><span class="muted" id="pg"></span><button class="btn ghost" id="nx">التالي</button></div></div>`;
+  $("go").onclick = () => { s.topic = $("ft").value; s.pub = $("fp").value; s.q = $("fq").value.trim(); s.page = 0; viewList(); };
+  $("new").onclick = () => { editing = null; tab = "edit"; render(); };
+  $("pv").onclick = () => { if (s.page > 0) { s.page--; viewList(); } };
+  $("nx").onclick = () => { s.page++; viewList(); };
+  let q = sb.from("questions").select("id,topic,he,published,is_free", { count: "exact" }).order("id").range(s.page*PAGE, s.page*PAGE+PAGE-1);
+  if (s.topic) q = q.eq("topic", s.topic);
+  if (s.pub) q = q.eq("published", s.pub === "1");
+  if (s.q) { const w = s.q.replace(/[,()*%]/g, " "); q = q.or(`he->>q.ilike.*${w}*,en->>q.ilike.*${w}*`); }
+  const { data, count, error } = await q;
+  if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
+  $("pg").textContent = `${count} سؤال · صفحة ${s.page+1} من ${Math.max(1, Math.ceil(count/PAGE))}`;
+  $("rows").innerHTML = data.length ? data.map(r => `<tr class="click" data-id="${r.id}"><td>${r.id}</td><td>${esc(TOPICS[r.topic] || r.topic)}</td><td class="he" dir="rtl">${esc((r.he?.q || "").slice(0,120))}</td><td>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} ${r.is_free ? `<span class="pill">مجاني</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في نتائج</td></tr>`;
+  $("rows").querySelectorAll("tr.click").forEach(tr => tr.onclick = () => openEditor(+tr.dataset.id));
+}
+async function openEditor(id) {
+  const { data, error } = await sb.from("questions").select("*").eq("id", id).single();
+  if (error) { msg(error.message, false); return render(); }
+  editing = data; tab = "edit"; render();
+}
+
+/* ---------- edit ---------- */
+function viewEdit() {
+  const q = editing || { topic: "med", answer: 0, he: { q:"", o:["","","",""], e:"" }, en: { q:"", o:["","","",""], e:"" }, terms: [], source: "", is_free: false, published: false, reviewed_by: "" };
+  const opts = (lang, dir) => q[lang].o.map((o,i) => `<div class="opt"><input type="radio" name="ans" value="${i}" ${q.answer===i?"checked":""} aria-label="الجواب الصحيح ${i+1}"><input id="${lang}-o${i}" dir="${dir}" value="${esc(o)}" placeholder="خيار ${i+1}"></div>`).join("");
+  $("body").innerHTML = `<form class="card" id="f">
+    <h3>${q.id ? `تعديل سؤال #${q.id}` : "سؤال جديد"}</h3>
+    <div class="row"><div><label>الموضوع</label><select id="tp">${Object.entries(TOPICS).map(([k,n]) => `<option value="${k}" ${q.topic===k?"selected":""}>${n}</option>`).join("")}</select></div>
+      <div><label>راجعه</label><input id="rv" value="${esc(q.reviewed_by || "")}"></div></div>
+    <p class="muted">علّم الدائرة جنب الجواب الصحيح (نفس الترتيب بالعبري والإنجليزي).</p>
+    <div class="grid2">
+      <div class="he" dir="rtl"><label>שאלה (עברית)</label><textarea id="he-q">${esc(q.he.q)}</textarea>${opts("he","rtl")}<label>הסבר (עברית)</label><textarea id="he-e">${esc(q.he.e)}</textarea></div>
+      <div dir="ltr"><label>Question (English)</label><textarea id="en-q">${esc(q.en.q)}</textarea>${q.en.o.map((o,i) => `<input id="en-o${i}" value="${esc(o)}" placeholder="Option ${i+1}" style="margin-top:6px">`).join("")}<label>Explanation (English)</label><textarea id="en-e">${esc(q.en.e)}</textarea></div>
+    </div>
+    <label>المصدر (كتاب، فصل، إرشادات)</label><input id="src" dir="ltr" value="${esc(q.source)}">
+    <label>مصطلحات: كل سطر "English | עברית"</label><textarea id="tm" dir="ltr">${esc((q.terms||[]).map(x => x.join(" | ")).join("\n"))}</textarea>
+    <div class="row" style="justify-content:flex-start"><label style="flex:none"><input type="checkbox" id="pb" style="width:auto" ${q.published?"checked":""}> منشور للطلاب</label>
+      <label style="flex:none"><input type="checkbox" id="fr" style="width:auto" ${q.is_free?"checked":""}> سؤال مجاني (عيّنة)</label></div>
+    <div class="row" style="justify-content:flex-start"><button class="btn" type="submit">حفظ</button>${q.id ? `<button class="btn danger" type="button" id="del">حذف</button>` : ""}<button class="btn ghost" type="button" id="cn">رجوع للقائمة</button></div>
+    <div id="er"></div>
+  </form>`;
+  $("cn").onclick = () => { editing = null; tab = "list"; render(); };
+  let armed = false;
+  if ($("del")) $("del").onclick = async () => {
+    if (!armed) { armed = true; $("del").textContent = "متأكد؟ اضغط كمان مرة للحذف"; return; }
+    const { error } = await sb.from("questions").delete().eq("id", q.id);
+    if (error) { $("er").innerHTML = `<div class="msg bad">${esc(error.message)}</div>`; return; }
+    msg("انحذف السؤال"); editing = null; tab = "list"; render();
+  };
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const v = id => $(id).value.trim();
+    const ans = root.querySelector("input[name=ans]:checked");
+    const row = {
+      topic: v("tp"), answer: ans ? +ans.value : -1,
+      he: { q: v("he-q"), o: [0,1,2,3].map(i => v("he-o"+i)), e: v("he-e") },
+      en: { q: v("en-q"), o: [0,1,2,3].map(i => v("en-o"+i)), e: v("en-e") },
+      terms: v("tm").split("\n").map(l => l.split("|").map(x => x.trim())).filter(p => p.length === 2 && p[0] && p[1]),
+      source: v("src"), reviewed_by: v("rv") || null, published: $("pb").checked, is_free: $("fr").checked, updated_at: new Date().toISOString(),
+    };
+    const problems = validate(row);
+    if (problems.length) { $("er").innerHTML = `<div class="msg bad">${problems.map(esc).join("<br>")}</div>`; return; }
+    const res = q.id ? await sb.from("questions").update(row).eq("id", q.id).select().single() : await sb.from("questions").insert(row).select().single();
+    if (res.error) { $("er").innerHTML = `<div class="msg bad">${esc(res.error.message)}</div>`; return; }
+    msg(q.id ? `انحفظ السؤال #${res.data.id}` : `انضاف سؤال #${res.data.id}`);
+    editing = q.id ? res.data : null; render();
+  };
+}
+function validate(r) {
+  const p = [];
+  if (!TOPICS[r.topic]) p.push("موضوع غير معروف");
+  if (!(r.answer >= 0 && r.answer <= 3)) p.push("لازم تختار الجواب الصحيح");
+  for (const [l,n] of [["he","العبري"],["en","الإنجليزي"]]) {
+    if (!r[l].q) p.push(`نص السؤال ب${n} فاضي`);
+    if (r[l].o.length !== 4 || r[l].o.some(o => !o)) p.push(`لازم ٤ خيارات ب${n}`);
+    if (!r[l].e) p.push(`الشرح ب${n} فاضي`);
+  }
+  if (!r.source) p.push("المصدر فاضي");
+  return p;
+}
+
+/* ---------- import ---------- */
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function rowsFromCSV(text) {
+  const [head, ...data] = parseCSV(text.replace(/^﻿/, ""));
+  const ix = Object.fromEntries(head.map((h,i) => [h.trim(), i]));
+  const g = (r,k) => (r[ix[k]] ?? "").trim();
+  return data.map(r => ({
+    topic: g(r,"topic"), answer: (+g(r,"answer")) - 1,
+    he: { q: g(r,"q_he"), o: [1,2,3,4].map(i => g(r,"o"+i+"_he")), e: g(r,"e_he") },
+    en: { q: g(r,"q_en"), o: [1,2,3,4].map(i => g(r,"o"+i+"_en")), e: g(r,"e_en") },
+    terms: g(r,"terms").split(";").map(x => x.split("=").map(y => y.trim())).filter(p => p.length === 2 && p[0] && p[1]),
+    source: g(r,"source"), is_free: /^(1|true|yes|כן|نعم)$/i.test(g(r,"is_free")),
+  }));
+}
+function rowsFromJSON(text) {
+  const arr = JSON.parse(text);
+  return arr.map(x => ({ topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
+}
+function viewImport() {
+  $("body").innerHTML = `<div class="card"><h3>استيراد أسئلة</h3>
+    <p class="muted">ملف CSV (من Excel: Save As → CSV UTF-8) بنفس أعمدة القالب <b>questions-template.csv</b>، أو ملف JSON. الجواب الصحيح بالـCSV رقم من 1 لـ4. المصطلحات: <span dir="ltr">Lithium=ליתיום;Toxicity=הרעלה</span></p>
+    <input type="file" id="file" accept=".csv,.json,text/csv,application/json">
+    <label><input type="checkbox" id="pub" style="width:auto"> انشرهم مباشرة (الأفضل تخليهم مسودة لحد ما تراجعهم)</label>
+    <div id="pre"></div></div>`;
+  $("file").onchange = async () => {
+    const f = $("file").files[0]; if (!f) return;
+    const text = await f.text();
+    let rows;
+    try { rows = f.name.toLowerCase().endsWith(".json") ? rowsFromJSON(text) : rowsFromCSV(text); }
+    catch (e) { $("pre").innerHTML = `<div class="msg bad">الملف مش مقروء: ${esc(e.message)}</div>`; return; }
+    const bad = rows.map((r,i) => [i+2, validate(r)]).filter(([,p]) => p.length);
+    const good = rows.filter(r => !validate(r).length);
+    $("pre").innerHTML = `<p>${rows.length} صف · <b>${good.length}</b> جاهزين${bad.length ? ` · <span style="color:var(--bad)">${bad.length} فيهم مشاكل</span>` : ""}</p>
+      ${bad.length ? `<div class="msg bad">${bad.slice(0,20).map(([n,p]) => `سطر ${n}: ${p.map(esc).join("، ")}`).join("<br>")}</div>` : ""}
+      ${good.length ? `<button class="btn" id="go">استيراد ${good.length} سؤال</button>` : ""}`;
+    if ($("go")) $("go").onclick = async () => {
+      $("go").disabled = true;
+      const pub = $("pub").checked;
+      for (let i = 0; i < good.length; i += 200) {
+        const chunk = good.slice(i, i+200).map(r => ({ ...r, published: pub }));
+        const { error } = await sb.from("questions").insert(chunk);
+        if (error) { $("pre").insertAdjacentHTML("beforeend", `<div class="msg bad">توقف عند ${i}: ${esc(error.message)}</div>`); return; }
+      }
+      msg(`انضافوا ${good.length} سؤال`); tab = "list"; render();
+    };
+  };
+  const ex = document.createElement("div");
+  ex.className = "card";
+  ex.innerHTML = `<h3>تصدير نسخة احتياطية</h3><p class="muted">بينزّل كل الأسئلة كملف JSON على كمبيوترك.</p><button class="btn ghost" id="exp">تنزيل</button>`;
+  $("body").appendChild(ex);
+  $("exp").onclick = async () => {
+    let all = [], from = 0;
+    for (;;) { const { data, error } = await sb.from("questions").select("*").order("id").range(from, from+999); if (error || !data.length) break; all = all.concat(data); from += 1000; if (data.length < 1000) break; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(all, null, 1)], { type: "application/json" }));
+    a.download = `rishui-questions-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  };
+}
+
+/* ---------- reports ---------- */
+async function viewReports() {
+  $("body").innerHTML = `<div class="card"><h3>تبليغات الطلاب</h3><div class="tbl"><table><thead><tr><th>سؤال</th><th>النص</th><th>تاريخ</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const { data, error } = await sb.from("reports").select("id,question_id,note,created_at,questions(he)").eq("resolved", false).order("created_at", { ascending: false }).limit(200);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
+  $("rows").innerHTML = data.length ? data.map(r => `<tr><td><button class="btn ghost" data-open="${r.question_id}">#${r.question_id}</button></td><td class="he" dir="rtl">${esc((r.questions?.he?.q || "").slice(0,100))}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ""}</td><td dir="ltr">${r.created_at.slice(0,10)}</td><td><button class="btn" data-res="${r.id}">تم</button></td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في تبليغات مفتوحة</td></tr>`;
+  $("rows").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openEditor(+b.dataset.open));
+  $("rows").querySelectorAll("[data-res]").forEach(b => b.onclick = async () => { await sb.from("reports").update({ resolved: true }).eq("id", +b.dataset.res); viewReports(); });
+}
+
+/* ---------- codes ---------- */
+async function viewCodes() {
+  const d = new Date(); d.setMonth(d.getMonth()+4);
+  $("body").innerHTML = `<form class="card" id="f"><h3>كود جديد</h3>
+    <div class="row"><div><label>الكود</label><input id="c" dir="ltr" value="${randCode()}"></div><div><label>عدد الاستخدامات</label><input id="n" type="number" min="1" value="30"></div>
+    <div><label>صالح لحد</label><input id="v" type="date" value="${d.toISOString().slice(0,10)}"></div><div><label>ملاحظة (لمين)</label><input id="nt" placeholder="مثلاً: كلية تل أبيب، دورة أيلول"></div></div>
+    <button class="btn" type="submit">إنشاء</button></form>
+    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.from("access_codes").insert({ code: $("c").value.trim().toUpperCase(), uses_left: +$("n").value, valid_until: $("v").value, note: $("nt").value.trim() || null });
+    if (error) msg(error.message, false); else msg("انعمل الكود");
+    render();
+  };
+  const { data } = await sb.from("access_codes").select("*").order("created_at", { ascending: false }).limit(200);
+  $("rows").innerHTML = (data || []).map(r => `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">ما في أكواد</td></tr>`;
+}
+function randCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "RS-"; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random()*a.length)]; return s; }
+
+/* ---------- stats ---------- */
+async function viewStats() {
+  $("body").innerHTML = `<div class="grid4" id="g"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  const now = new Date().toISOString();
+  const [u, a, q, p] = await Promise.all([
+    sb.from("profiles").select("id", { count: "exact", head: true }),
+    sb.from("profiles").select("id", { count: "exact", head: true }).gt("plan_until", now),
+    sb.from("questions").select("id", { count: "exact", head: true }),
+    sb.from("questions").select("id", { count: "exact", head: true }).eq("published", true),
+  ]);
+  $("g").innerHTML = [["مستخدمين", u.count], ["اشتراكات فعّالة", a.count], ["كل الأسئلة", q.count], ["منشورة", p.count]]
+    .map(([n,v]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v ?? "—"}</span></div>`).join("");
+}
+
+start();
+</script>
+</body>
+</html>
