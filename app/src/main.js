@@ -54,11 +54,11 @@ const errMsg = (e) => {
 
 /* each track has its own colors: [accent, soft, background] for light and dark */
 const THEMES = {
-  nursing:     { l: ["#1554A8", "#DCE8F8", "#EAF1FA"], d: ["#5B9CF0", "#16305A", "#0C1626"] },
-  medicine:    { l: ["#0F7A5C", "#D5F0E5", "#E8F5EF"], d: ["#46C79C", "#123D30", "#0A1A15"] },
-  physio:      { l: ["#C2581B", "#FBE2D2", "#FBF1E9"], d: ["#F08A4B", "#45240F", "#1C120B"] },
-  ot:          { l: ["#6D3FB5", "#E7DCF8", "#F3EEFB"], d: ["#A98BEA", "#2E2050", "#130F1F"] },
-  radiography: { l: ["#B42357", "#F8DAE5", "#FBEEF3"], d: ["#EE6E9A", "#4A1529", "#1C0C12"] },
+  nursing:     { l: ["#1554A8", "#E2ECF8", "#F3F7FC"], d: ["#5B9CF0", "#16305A", "#0C1626"] },
+  medicine:    { l: ["#0F7A5C", "#DDF2E9", "#F2F9F6"], d: ["#46C79C", "#123D30", "#0A1A15"] },
+  physio:      { l: ["#B54E14", "#FBE6D8", "#FDF6F1"], d: ["#F08A4B", "#45240F", "#1C120B"] },
+  ot:          { l: ["#6D3FB5", "#ECE3FA", "#F8F5FD"], d: ["#A98BEA", "#2E2050", "#130F1F"] },
+  radiography: { l: ["#B42357", "#FAE1EA", "#FDF4F7"], d: ["#EE6E9A", "#4A1529", "#1C0C12"] },
 };
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
@@ -384,12 +384,17 @@ function home() {
   const tt = totals(), pct = tt.n ? Math.round((tt.done / tt.n) * 100) : 0, dl = daysLeft();
   frame(`${msgHtml()}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
-  <div class="chips"><span class="chip" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip cool">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
+  <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div class="hero">
-    <div class="eyebrow">${t("progress")}</div>
-    <h2>${tt.done} ${t("of")} ${tt.n} ${t("done")}</h2>
-    <div class="pbar"><i style="width:${pct}%"></i></div>
+    <div class="hero-row">
+      <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
+      <div class="hero-txt">
+        <span class="eyebrow">${t("progress")}</span>
+        <h2>${tt.done} ${t("of")} ${tt.n} ${t("qs")}</h2>
+        ${tt.done ? `<span class="okline">${t("accuracy")} ${Math.round((tt.right / tt.done) * 100)}%</span>` : ""}
+      </div>
+    </div>
     <button class="primary" id="go">${t("cont2")} ${fwd()}</button>
   </div>
   <div class="grid">
