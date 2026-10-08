@@ -169,9 +169,23 @@ async function loadUserData() {
 function route() {
   S = null;
   if (!st.user) return login();
-  if (!st.profile?.track) return chooseTrack();
+  if (!st.profile?.track) {
+    // only one track open (e.g. launch with nursing only): pick it, no choice screen
+    if (st.tracks?.length === 1) return autoTrack(st.tracks[0].id);
+    return chooseTrack();
+  }
   if (!hasAccess() && !store.get(`skip-plans:${st.user.id}:${TR()}`)) return plans();
   home();
+}
+
+async function autoTrack(id) {
+  loading();
+  try {
+    await api.updateProfile(null, null, id);
+    await loadUserData();
+  } catch { return chooseTrack(); }
+  if (!st.profile?.track) return chooseTrack();
+  route();
 }
 
 /* ---------------- auth ---------------- */
