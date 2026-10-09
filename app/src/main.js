@@ -325,8 +325,6 @@ function allowedTracks() {
 }
 const canSwitch = () => allowedTracks().length > 1;
 const soonName = (x) => (st.lang === "he" ? x.he : x.en);
-const soonCard = (x) => `<div class="plan soon" aria-disabled="true"><span class="soonicon" aria-hidden="true">${esc(x.icon || "🔒")}</span>
-  <span class="info"><b>${esc(soonName(x))}</b><span class="muted">${esc(x[st.lang + "_desc"] || "")}</span></span><span class="soontag">${t("soonTag")}</span></div>`;
 // small card on home: which tracks are coming
 const soonStrip = () => (st.soon || []).length ? `<div class="card soonbox"><b>${t("soonTitle")}</b><div class="chips">${st.soon.map((x) => `<span class="chip">${esc(x.icon || "")} ${esc(soonName(x))}</span>`).join("")}</div><span class="muted">${t("soonD")}</span></div>` : "";
 
@@ -337,7 +335,7 @@ function chooseTrack(pending) {
   const card = (x) => { const c = themeOf(x.id).l; return `<button class="plan ${(pending || cur) === x.id ? "on" : ""}" data-k="${esc(x.id)}" style="border-color:${c[0]};background:${c[2]};color:#0F1E33;border-inline-start-width:6px"><span class="dot" style="border-color:${c[0]}"></span>
       <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted" style="color:#4A5A6E">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`; };
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
-    <div class="plans">${list.map(card).join("")}${(st.soon || []).map(soonCard).join("")}</div>
+    <div class="plans">${list.map(card).join("")}</div>
     ${first && pending ? `<div class="banner">⚠️ ${t("lockWarn")}</div>
       <div class="actions"><button class="primary" id="ok">${t("confirmTrack")}</button><button class="ghost" id="no">${t("pickOther")}</button></div>` : ""}
   </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}${legalLinks()}`);
