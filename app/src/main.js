@@ -181,6 +181,9 @@ function route() {
     return chooseTrack();
   }
   if (!hasAccess() && !store.get(`skip-plans:${st.user.id}:${TR()}`)) return plans();
+  // opened from a friend's challenge link (?c=CODE)
+  const fcode = new URLSearchParams(location.search).get("c");
+  if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
   home();
 }
 
@@ -455,7 +458,7 @@ function home() {
   <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
-  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
+  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div><div id="leaguew"></div>
   <div class="home-main">
   <div class="hero">
     <div class="hero-row">
@@ -499,7 +502,7 @@ function home() {
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   // async parts: activity chart + an unfinished exam to continue
   bindGoal([]);
-  fillMission().then(fillJourney);
+  fillMission().then(fillJourney).then(fillLeague);
   $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
   api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("actc")) $("actc").innerHTML = activityChart(rows); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
@@ -623,14 +626,16 @@ async function examEnd() {
   const used = Math.min(examUsed(), S.limit || 1e9);
   S.ended = true;
   const ans = S.items.map((q, i) => S.picked[i] === q.answer);
+  const saves = [];
   S.items.forEach((q, i) => {
     if (S.picked[i] == null || S.saved[i]) return;
-    st.answers.set(q.id, ans[i]); api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], ans[i]).catch(() => {});
+    st.answers.set(q.id, ans[i]); saves.push(api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], ans[i]).catch(() => {}));
   });
   const score = ans.filter(Boolean).length, p = pctOf(score, S.items.length);
   if (st.best == null || p > st.best) st.best = p;
   const ex = { ...S.ex, ids: S.items.map((q) => q.id), picked: S.picked, used, status: "done", score, finished_at: new Date().toISOString() };
-  api.updateExam(ex.id, { ids: ex.ids, picked: ex.picked, i: S.i, used, status: "done", score, finished_at: ex.finished_at }).catch(() => {});
+  Promise.all([...saves, api.updateExam(ex.id, { ids: ex.ids, picked: ex.picked, i: S.i, used, status: "done", score, finished_at: ex.finished_at }).catch(() => {})])
+    .then(() => api.claimMockXp(ex.id)).then(xpToast).catch(() => {});
   api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
   examResult(ex, S.items, "all");
 }
@@ -801,13 +806,14 @@ function tools() {
     <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
     <div class="card"><h3>${t("jTitle")}</h3><p class="muted">${t("jBuildD")}</p><button class="primary" id="jt">${t("jTitle")}</button></div>
+    <div class="card"><h3>🏆 ${t("league")}</h3><p class="muted">${t("leagueJoinD")}</p><button class="primary" id="lgt2">${t("league")}</button></div>
     ${reminderCard()}
     <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
   </div>
   ${legalLinks()}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools);
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("lgt2").onclick = league;
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
@@ -945,12 +951,14 @@ async function missionFinish() {
   const act = await api.activity(st.user.id, TR(), 60).catch(() => []);
   scheduleReminders();
   const n = res.total, c = res.correct, topics = res.topics || [];
+  xpToast(res.xp);
   S = { screen: missionFinish, back: route };
   frame(`<div class="card score celebrate">
     <div class="big-emoji" aria-hidden="true">🎉</div>
     <h2>${t("bravo")}</h2>
     <div class="rw"><div><b class="okc">${c}</b><span>${t("rightN")}</span></div><div><b class="badc">${n - c}</b><span>${t("wrongN")}</span></div><div><b>🔥 ${streakOf(act, days)}</b><span>${t("streak")}</span></div></div>
     <p class="muted">${t("streakNote")}</p>
+    ${res.xp ? `<p class="okc"><b>+${res.xp} XP</b> · ${t("league")}</p>` : ""}
   </div>
   <div class="section-title">${topics.length ? t("reviewTopics") : t("allGood")}</div>
   ${topics.length ? `<div class="chips">${topics.map((k) => `<button class="chip pick cool" data-tp="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>` : ""}
@@ -1182,6 +1190,248 @@ async function planMock(n) {
   } catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = journey; }
 }
 
+/* ---------------- nursing league, daily challenge, friend challenges ---------------- */
+const TIER = { 1: ["🥉", "tier1"], 2: ["🥈", "tier2"], 3: ["🥇", "tier3"], 4: ["💎", "tier4"] };
+const tierName = (n) => `${TIER[n]?.[0] || ""} ${t(TIER[n]?.[1] || "tier1")}`;
+function xpToast(n) {
+  if (!n) return;
+  const el = document.createElement("div");
+  el.className = "xptoast"; el.setAttribute("role", "status"); el.textContent = `+${n} XP`;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 2200);
+}
+function timeLeft(endIso) {
+  const ms = Math.max(0, new Date(endIso) - Date.now()), d = Math.floor(ms / 864e5), h = Math.floor((ms % 864e5) / 36e5), m = Math.floor((ms % 36e5) / 6e4);
+  return d ? `${d} ${t("dShort")} ${h} ${t("hShort")}` : `${h} ${t("hShort")} ${m} ${t("mShort")}`;
+}
+function zones(L) {
+  const n = (L.board || []).length;
+  return { n, up: L.group_tier < 4 ? Math.ceil(n * 0.2) : 0, down: L.group_tier > 1 && n >= 5 ? Math.floor(n * 0.2) : 0 };
+}
+async function fillLeague() {
+  const w = $("leaguew"); if (!w) return;
+  let L, C;
+  try { [L, C] = await Promise.all([api.getLeague(TR()), api.dailyChallenge(TR()).catch(() => null)]); }
+  catch { w.innerHTML = ""; return; } // database not updated yet: hide
+  if (S?.screen !== home || !$("leaguew")) return;
+  const chDone = C ? (C.answers || []).length : 0, chN = C ? (C.ids || []).length : 0;
+  if (!L.member) {
+    $("leaguew").innerHTML = `<button class="jcta" id="lgo"><span class="jicon" aria-hidden="true">🏆</span><span><b>${t("league")}</b><small>${t("leagueJoinD")}</small></span><span aria-hidden="true">${fwd()}</span></button>`;
+  } else {
+    const me = (L.board || []).findIndex((x) => x.me) + 1;
+    $("leaguew").innerHTML = `<button class="jcta" id="lgo"><span class="jdays lg"><b>#${me || "–"}</b><small>${t("rank")}</small></span>
+      <span><b>${tierName(L.group_tier)}</b><small>${(L.board || []).find((x) => x.me)?.xp || 0} XP · ${t("weekEnds")} ${timeLeft(L.week_end)}</small>
+      ${chN ? `<small>⚡ ${t("dailyCh")}: ${chDone}/${chN}</small>` : ""}</span><span aria-hidden="true">${fwd()}</span></button>`;
+  }
+  $("lgo").onclick = () => league();
+}
+
+async function league() {
+  S = { screen: league, back: route };
+  frame(`<h2 class="page-h">${t("league")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true });
+  let L, C;
+  try { [L, C] = await Promise.all([api.getLeague(TR()), api.dailyChallenge(TR()).catch(() => null)]); }
+  catch (e) {
+    frame(`<h2 class="page-h">${t("league")}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`, { wide: true });
+    $("rt").onclick = league; $("hm").onclick = route; return;
+  }
+  if (S?.screen !== league) return;
+  if (L.member && L.last) return leagueResult(L.last);
+  const s = L.settings || {};
+  const rules = `<ul class="rules"><li>📝 ${t("xpMission")}: <b>${s.xp_mission} XP</b></li><li>⚡ ${t("xpChallenge")}: <b>${s.xp_challenge} XP</b></li><li>🔁 ${t("xpReview")}: <b>${s.xp_review} XP</b></li><li>⏱ ${t("xpMock")} (${s.mock_min_q}+ ${t("qs")}): <b>${s.xp_mock} XP</b></li></ul>
+    <p class="muted" style="font-size:13px">${t("xpCap")}: ${s.daily_cap} XP · ${t("xpNoRepeat")}</p>`;
+  if (!L.member) {
+    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("league")}</h2></div>
+    <div class="card lg-intro"><div class="big-emoji" aria-hidden="true">🏆</div><h2>${t("leagueIntro")}</h2><p class="muted">${t("leagueIntroD")}</p>${rules}
+      <div class="field"><label for="nk">${t("nick")}</label><input id="nk" maxlength="20" value="${esc(L.nickname || "")}" placeholder="${t("nickPh")}" autocomplete="off"></div>
+      <p class="muted" style="font-size:13px">🔒 ${t("nickPrivacy")}</p>
+      <div class="err" id="er" hidden></div>
+      <button class="primary" id="jn">${t("joinLeague")}</button></div>
+    ${friendCard()}`, { wide: true });
+    $("bk").onclick = route;
+    $("jn").onclick = async () => {
+      const nick = $("nk").value.trim();
+      if (nick.length < 2 || /[@<>]/.test(nick)) { $("er").textContent = t("nickBad"); $("er").hidden = false; return; }
+      $("jn").disabled = true;
+      try { await api.leagueJoin(TR(), nick); league(); } catch (e) { $("jn").disabled = false; $("er").textContent = /nickname/.test(e?.message || "") ? t("nickBad") : errMsg(e); $("er").hidden = false; }
+    };
+    bindFriend(); return;
+  }
+  const z = zones(L), board = L.board || [], meI = board.findIndex((x) => x.me), myXp = board[meI]?.xp || 0;
+  const target = z.up && meI >= z.up ? board[z.up - 1].xp - myXp + 1 : 0;
+  const chDone = C ? (C.answers || []).length : 0, chN = C ? (C.ids || []).length : 0, chRight = C ? (C.answers || []).filter((a) => a.correct).length : 0;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("league")}</h2></div>
+  <div class="lg-hero">
+    <div class="lg-tier"><span class="lg-emoji" aria-hidden="true">${TIER[L.group_tier][0]}</span><b>${t(TIER[L.group_tier][1])}</b><small>${esc(L.nickname)}</small></div>
+    <div class="lg-stats"><div><b>#${meI + 1}</b><span>${t("of")} ${z.n}</span></div><div><b>${myXp}</b><span>XP ${t("thisWeek")}</span></div></div>
+    <div class="lg-timer">⏳ ${t("weekEnds")} <b id="lgt">${timeLeft(L.week_end)}</b></div>
+    <div class="lg-today"><span>${t("todayXp")}: ${L.today_xp}/${s.daily_cap}</span><div class="gbar"><i style="width:${pctOf(L.today_xp, s.daily_cap)}%"></i></div></div>
+  </div>
+  <div class="banner jphase">${L.group_tier >= 4 ? t("topTier") : meI < z.up ? `⬆️ ${t("inUpZone")} ${tierName(L.group_tier + 1)}` : `${t("toNext")}${tierName(L.group_tier + 1)}: ${t("beTop")} ${z.up} ${t("firstN")}${target ? ` · ${t("need")} <bdi>${target} XP</bdi>` : ""}`}</div>
+  ${chN ? `<div class="card ch-card"><div class="card-h"><h3>⚡ ${t("dailyCh")}</h3><span class="muted">${chDone}/${chN}</span></div>
+    <p class="muted">${chDone >= chN ? `${t("chDone")} ${chRight}/${chN}` : t("dailyChD")}</p>
+    ${chDone >= chN ? "" : `<button class="primary" id="chg">${chDone ? t("contMission") : t("chStart")}</button>`}</div>` : ""}
+  <div class="section-title">${t("board")}</div>
+  <div class="card board">${board.map((x, i) => `<div class="brow ${x.me ? "me" : ""} ${i < z.up ? "up" : ""} ${z.down && i >= z.n - z.down ? "down" : ""}"><span class="brk">${i + 1}</span><span class="bnk">${esc(x.nick)}${x.me ? ` <small>(${t("you")})</small>` : ""}</span><span class="bxp"><bdi>${x.xp} XP</bdi></span></div>`).join("")}
+    <p class="muted" style="font-size:12px">${z.up ? `🟢 ${t("upZone")}` : ""} ${z.down ? `· 🔴 ${t("downZone")}` : ""}</p></div>
+  ${friendCard()}
+  <div class="card"><h3>${t("howXp")}</h3>${rules}</div>
+  <div class="small-links"><button class="link" id="lnk">${t("changeNick")}</button><button class="link" id="llv">${st.ui.leaveArmed ? t("leaveSure") : t("leaveLeague")}</button></div>`, { wide: true });
+  $("bk").onclick = route;
+  if ($("chg")) $("chg").onclick = () => challengeRun(C);
+  const tick = setInterval(() => { if (S?.screen !== league || !$("lgt")) return clearInterval(tick); $("lgt").textContent = timeLeft(L.week_end); }, 30000);
+  $("lnk").onclick = () => { const v = prompt(t("nick"), L.nickname); if (v && v.trim().length >= 2) api.leagueJoin(TR(), v.trim()).then(league).catch((e) => alert(errMsg(e))); };
+  $("llv").onclick = async () => { if (!st.ui.leaveArmed) { st.ui.leaveArmed = true; return league(); } st.ui.leaveArmed = false; await api.leagueLeave(TR()).catch(() => {}); league(); };
+  bindFriend();
+}
+function leagueResult(last) {
+  S = { screen: () => leagueResult(last), back: route };
+  const up = last.result === "up", down = last.result === "down";
+  const newTier = Math.min(4, Math.max(1, last.tier + (up ? 1 : down ? -1 : 0)));
+  frame(`<div class="card score celebrate">
+    <div class="big-emoji" aria-hidden="true">${up ? "🎉" : down ? "💪" : "👏"}</div>
+    <h2>${t("weekOver")}</h2>
+    <p>${t("youFinished")} <b>#${last.rank}</b> ${t("of")} ${last.size} · ${last.xp} XP</p>
+    <p class="lg-res ${up ? "okc" : down ? "badc" : ""}">${up ? t("resUp") : down ? t("resDown") : t("resStay")} <b>${tierName(newTier)}</b></p>
+    <button class="primary" id="ok">${t("newWeek")} ${fwd()}</button></div>`);
+  $("ok").onclick = async () => { await api.leagueSeen(last.group).catch(() => {}); league(); };
+}
+
+/* daily challenge: same 5 questions for everyone today, one try each */
+async function challengeRun(C) {
+  loading();
+  try {
+    const items = await api.questionsByIds(TR(), C.ids);
+    const done = new Map((C.answers || []).map((a) => [a.idx - 1, a]));
+    const slots = C.ids.map((id, i) => ({ q: items.find((q) => q.id === id), i, pick: done.get(i)?.pick ?? null, ok: done.get(i)?.correct })).filter((x) => x.q);
+    S = { mode: "challenge", slots, at: Math.max(0, slots.findIndex((x) => x.pick == null)), xp: 0, back: league };
+    challengeQ();
+  } catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = league; }
+}
+function challengeQ() {
+  S.screen = challengeQ;
+  const sl = S.slots[S.at], q = sl.q, tot = S.slots.length, answered = S.slots.filter((x) => x.pick != null).length;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><div class="progress"><i style="width:${pctOf(answered, tot)}%"></i></div><span class="timer">⚡ ${answered}/${tot}</span></div>
+  <div class="card">${qBody(q, S.at + 1, tot)}
+    <div class="opts">${q[st.lang].o.map((o, k) => `<button class="opt" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div class="err" id="er" hidden></div><div id="fb"></div></div>`, { protect: true });
+  $("bk").onclick = league; bindMark(q);
+  const after = () => {
+    const next = S.slots.findIndex((x) => x.pick == null);
+    $("fb").insertAdjacentHTML("beforeend", `<button class="primary" id="nx" style="margin-top:12px">${next < 0 ? t("seeResults") : t("next") + " " + fwd()}</button>`);
+    $("nx").onclick = () => { if (next < 0) challengeDone(); else { S.at = next; challengeQ(); } };
+  };
+  if (sl.pick != null) { $("fb").innerHTML = reveal(q, sl.pick); return after(); }
+  app.querySelectorAll(".opt").forEach((b) => (b.onclick = async () => {
+    const k = +b.dataset.k; app.querySelectorAll(".opt").forEach((x) => (x.disabled = true));
+    try {
+      const r = await api.challengeAnswer(TR(), sl.i, k);
+      sl.pick = k; sl.ok = r.correct; S.xp += r.xp || 0; st.answers.set(q.id, !!r.correct); xpToast(r.xp);
+      $("fb").innerHTML = reveal(q, k); after();
+    } catch (e) { app.querySelectorAll(".opt").forEach((x) => (x.disabled = false)); $("er").textContent = errMsg(e); $("er").hidden = false; }
+  }));
+}
+function challengeDone() {
+  const tot = S.slots.length, right = S.slots.filter((x) => x.ok).length, xp = S.xp;
+  S = { screen: challengeDone, back: league };
+  frame(`<div class="card score celebrate"><div class="big-emoji" aria-hidden="true">⚡</div><h2>${t("chDone")} ${right}/${tot}</h2>
+    ${xp ? `<p class="okc"><b>+${xp} XP</b></p>` : ""}<p class="muted">${t("chTomorrow")}</p>
+    <button class="primary" id="ok">${t("league")}</button></div>`);
+  $("ok").onclick = league;
+}
+
+/* friend challenges: share a code, both answer the same questions; accuracy first, then time */
+const friendCodes = () => store.get(`friend-codes:${st.user.id}`) || [];
+function rememberCode(c) { store.set(`friend-codes:${st.user.id}`, [c, ...friendCodes().filter((x) => x !== c)].slice(0, 5)); }
+function friendCard() {
+  const codes = friendCodes();
+  return `<div class="card"><h3>🤝 ${t("friendT")}</h3><p class="muted">${t("friendD")}</p>
+    <button class="primary" id="fcr">${t("friendNew")}</button>
+    <div class="row2"><input id="fcc" maxlength="8" placeholder="${t("codePh")}" autocapitalize="characters" dir="ltr" aria-label="${t("codePh")}"><button class="ghost slim" id="fcj">${t("join")}</button></div>
+    <div class="err" id="fer" hidden></div>
+    ${codes.length ? `<div class="chips">${codes.map((c) => `<button class="chip pick" data-fc="${esc(c)}"><bdi dir="ltr">${esc(c)}</bdi></button>`).join("")}</div>` : ""}</div>`;
+}
+function bindFriend() {
+  const err = (m) => { $("fer").textContent = m; $("fer").hidden = false; };
+  $("fcr").onclick = async () => {
+    $("fcr").disabled = true;
+    try { const code = await api.createFriend(TR()); rememberCode(code); friendReady(code); }
+    catch (e) { $("fcr").disabled = false; err(/too many/.test(e?.message || "") ? t("tooMany") : errMsg(e)); }
+  };
+  $("fcj").onclick = () => { const c = $("fcc").value.trim().toUpperCase(); if (c.length < 4) return err(t("codeBad")); friendStart(c, friendNick()); };
+  app.querySelectorAll("[data-fc]").forEach((b) => (b.onclick = () => friendStart(b.dataset.fc, friendNick())));
+}
+function friendReady(code) {
+  S = { screen: () => friendReady(code), back: league };
+  const link = `${api.appUrl}?c=${code}`, text = `${t("shareText")} ${code}\n${link}`;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("friendT")}</h2></div>
+  <div class="card score"><p class="muted">${t("codeIs")}</p><div class="bigcode" dir="ltr">${code}</div>
+    <button class="primary" id="sh">📤 ${t("share")}</button><span class="okline" id="cp" hidden>${t("copied")}</span>
+    <button class="ghost" id="go">${t("startMine")} ${fwd()}</button></div>`);
+  $("bk").onclick = league;
+  $("sh").onclick = async () => {
+    try { if (navigator.share) return await navigator.share({ text }); } catch { return; }
+    try { await navigator.clipboard.writeText(text); $("cp").hidden = false; } catch { prompt(t("share"), text); }
+  };
+  $("go").onclick = () => friendStart(code, friendNick());
+}
+async function friendStart(code, nick) {
+  loading();
+  try {
+    const fc = await api.startFriend(code, nick);
+    rememberCode(fc.code);
+    if (fc.finished) return friendBoard(fc.code, fc.board);
+    const items = await api.questionsByIds(fc.track, fc.ids);
+    const slots = fc.ids.map((id, i) => ({ q: items.find((q) => q.id === id), i, pick: fc.picked?.[i] ?? null })).filter((x) => x.q);
+    S = { mode: "friend", code: fc.code, slots, at: Math.max(0, slots.findIndex((x) => x.pick == null)), start: Date.now(), tick: null, back: league };
+    friendQ();
+  } catch (e) {
+    const m = /not found/.test(e?.message || "") ? t("codeBad") : /full/.test(e?.message || "") ? t("chFull") : errMsg(e);
+    frame(`<div class="card"><p>${esc(m)}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = league;
+  }
+}
+function friendQ() {
+  S.screen = friendQ;
+  const sl = S.slots[S.at], q = sl.q, tot = S.slots.length, answered = S.slots.filter((x) => x.pick != null).length;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><div class="progress"><i style="width:${pctOf(answered, tot)}%"></i></div><span class="timer" id="tm">00:00</span></div>
+  <div class="card">${qBody(q, S.at + 1, tot)}
+    <div class="opts">${q[st.lang].o.map((o, k) => `<button class="opt" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div class="err" id="er" hidden></div><div id="fb"></div></div>`, { protect: true });
+  const el = $("tm"), upd = () => clock(el, Math.floor((Date.now() - S.start) / 1000)); upd(); S.tick = setInterval(upd, 1000);
+  $("bk").onclick = league; bindMark(q);
+  const after = () => {
+    const next = S.slots.findIndex((x) => x.pick == null);
+    $("fb").insertAdjacentHTML("beforeend", `<button class="primary" id="nx" style="margin-top:12px">${next < 0 ? t("seeResults") : t("next") + " " + fwd()}</button>`);
+    $("nx").onclick = async () => {
+      if (next >= 0) { S.at = next; return friendQ(); }
+      const code = S.code; loading();
+      try { friendBoard(code, await api.finishFriend(code)); } catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p></div>`); }
+    };
+  };
+  if (sl.pick != null) { $("fb").innerHTML = reveal(q, sl.pick); return after(); }
+  app.querySelectorAll(".opt").forEach((b) => (b.onclick = async () => {
+    const k = +b.dataset.k; app.querySelectorAll(".opt").forEach((x) => (x.disabled = true));
+    try { const ok = await api.friendAnswer(S.code, sl.i, k); sl.pick = k; st.answers.set(q.id, !!ok); $("fb").innerHTML = reveal(q, k); after(); }
+    catch (e) { app.querySelectorAll(".opt").forEach((x) => (x.disabled = false)); $("er").textContent = errMsg(e); $("er").hidden = false; }
+  }));
+}
+function friendBoard(code, board) {
+  S = { screen: () => friendBoard(code, board), back: league };
+  const fin = (board || []).filter((x) => x.finished), winner = fin[0];
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("friendT")} <bdi dir="ltr">${esc(code)}</bdi></h2></div>
+  <div class="card score celebrate"><div class="big-emoji" aria-hidden="true">${winner?.me ? "🏆" : "🤝"}</div><h2>${winner ? (winner.me ? t("youWon") : `${esc(winner.nick)} ${t("leads")}`) : t("waiting")}</h2>
+    <p class="muted">${t("rule")}</p></div>
+  <div class="card board">${(board || []).map((x, i) => `<div class="brow ${x.me ? "me" : ""}"><span class="brk">${x.finished ? i + 1 : "…"}</span><span class="bnk">${esc(x.nick)}${x.me ? ` <small>(${t("you")})</small>` : ""}</span><span class="bxp">${x.finished ? `${x.correct} ✓ · ${clockText(x.seconds)}` : t("playing")}</span></div>`).join("")}</div>
+  <div class="actions"><button class="primary" id="rf2">${t("refresh")}</button><button class="ghost" id="lg">${t("league")}</button></div>`);
+  $("bk").onclick = league; $("lg").onclick = league;
+  $("rf2").onclick = () => friendStart(code);
+}
+const clockText = (s) => `${String(Math.floor((s || 0) / 60)).padStart(2, "0")}:${String((s || 0) % 60).padStart(2, "0")}`;
+function friendNick() {
+  let n = store.get(`friend-nick:${st.user.id}`);
+  if (!n) { n = (prompt(t("friendNick")) || "").trim().slice(0, 20); if (n) store.set(`friend-nick:${st.user.id}`, n); }
+  return n || null;
+}
+
 /* ---------------- daily goal + streak ---------------- */
 const goalKey = () => `goal:${st.user.id}`;
 const goalOf = () => store.get(goalKey()) || 20;
@@ -1206,7 +1456,7 @@ async function smartReview() {
   loading();
   try {
     const due = await api.dueReviews(st.user.id, TR(), BATCH);
-    if (due.length) return practice({ kind: "ids", ids: due.map((r) => r.question_id) });
+    if (due.length) return practice({ kind: "ids", ids: due.map((r) => r.question_id), smart: true });
   } catch { /* older database: fall back to answer history */ }
   let hist = [];
   try { hist = await api.answerHistory(st.user.id, TR()); } catch (e) { flash(errMsg(e), true); return route(); }
@@ -1220,7 +1470,7 @@ async function smartReview() {
     frame(`<div class="card"><h2>${t("smart")}</h2><p class="muted">${t("smartNone")}</p><button class="ghost" id="hm">${t("home")}</button></div>`);
     $("hm").onclick = route; return;
   }
-  practice({ kind: "ids", ids });
+  practice({ kind: "ids", ids, smart: true });
 }
 
 /* ---------------- reference sheet (page + pop-up inside questions) ---------------- */
@@ -1410,6 +1660,7 @@ function feedback(k) {
 /* ---------------- result ---------------- */
 function result() {
   S.screen = result;
+  if (S.src?.smart && !S.reviewClaimed) { S.reviewClaimed = true; api.completeReview(TR()).then(xpToast); }
   const n = S.items.length, c = S.ans.filter(Boolean).length, p = Math.round((c / n) * 100);
   const s = Math.min(Math.floor((Date.now() - S.start) / 1000), S.limit || 1e9);
   const by = {}; S.items.forEach((q, i) => { by[q.topic] = by[q.topic] || [0, 0]; by[q.topic][1]++; if (S.ans[i]) by[q.topic][0]++; });

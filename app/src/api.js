@@ -161,3 +161,18 @@ export async function getPlan(uid, track) {
 export async function savePlan(track, exam, minutes, days, weak) {
   return must(await supabase.rpc("save_study_plan", { p_track: track, p_exam: exam, p_minutes: minutes, p_days: days, p_weak: weak }));
 }
+
+/* ---------- league, daily challenge, friend challenges (all checked on the server) ---------- */
+export async function getLeague(track) { return must(await supabase.rpc("get_league", { p_track: track })); }
+export async function leagueJoin(track, nick) { must(await supabase.rpc("league_join", { p_track: track, p_nick: nick })); }
+export async function leagueLeave(track) { must(await supabase.rpc("league_leave", { p_track: track })); }
+export async function leagueSeen(group) { must(await supabase.rpc("league_seen", { p_group: group })); }
+export async function dailyChallenge(track) { return must(await supabase.rpc("get_daily_challenge", { p_track: track })); }
+export async function challengeAnswer(track, index, pick) { return must(await supabase.rpc("challenge_answer", { p_track: track, p_index: index + 1, p_pick: pick })); }
+export async function completeReview(track) { try { return must(await supabase.rpc("complete_review_session", { p_track: track })) || 0; } catch { return 0; } }
+export async function claimMockXp(examId) { try { return must(await supabase.rpc("claim_mock_xp", { p_exam: examId })) || 0; } catch { return 0; } }
+export async function createFriend(track) { return must(await supabase.rpc("create_friend_challenge", { p_track: track })); }
+export async function startFriend(code, nick) { return must(await supabase.rpc("start_friend_challenge", { p_code: code, p_nick: nick || null })); }
+export async function friendAnswer(code, index, pick) { return must(await supabase.rpc("friend_answer", { p_code: code, p_index: index + 1, p_pick: pick })); }
+export async function finishFriend(code) { return must(await supabase.rpc("finish_friend_challenge", { p_code: code })); }
+export const appUrl = window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/";
