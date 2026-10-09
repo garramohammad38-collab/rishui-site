@@ -525,6 +525,7 @@ function home() {
     <button class="tile" id="smr"><b>${t("smart")}</b><span>${t("smartD")}</span></button>
     <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
     <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
+    <button class="tile" id="pst"><b>📚 ${t("pastT")}</b><span>${t("pastTile")}</span></button>
     <button class="tile" id="srch"><b>🔍 ${t("search")}</b><span>${t("searchD")}</span></button>
     <button class="tile" id="clc"><b>${t("calcT")}</b><span>${t("calcD")}</span></button>
     <button class="tile" id="rfp"><b>${t("refT")}</b><span>${t("refD")}</span></button>
@@ -539,6 +540,7 @@ function home() {
   st.ui.msg = null;
   fillAnnouncement();
   $("una").onclick = () => practice({ kind: "unanswered" });
+  $("pst").onclick = pastExams;
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
   if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
@@ -797,6 +799,37 @@ async function openExam(ex, part) {
 }
 
 /* ---------------- my exams ---------------- */
+/* ---------------- past government exams: one section per sitting, newest first ---------------- */
+const MONTHS_HE = ["", "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+const MONTHS_EN = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const sessionName = (s) => [s.year, s.month ? (st.lang === "he" ? MONTHS_HE : MONTHS_EN)[s.month] : "", s.label || ""].filter(Boolean).join(" · ");
+async function pastExams() {
+  S = { screen: pastExams, back: myExams };
+  frame(`<h2 class="page-h">📚 ${t("pastT")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "exams" });
+  const list = await api.sessionList(TR()).catch(() => []);
+  if (S?.screen !== pastExams) return;
+  const years = [...new Set(list.map((s) => s.year))];
+  frame(`<h2 class="page-h">📚 ${t("pastT")}</h2><p class="muted">${t("pastD")}</p>
+    ${!list.length ? `<div class="card"><p class="muted">${t("pastEmpty")}</p></div>` : ""}
+    ${years.map((y) => `<div class="section-title">${y}</div><div class="xlist">${list.filter((s) => s.year === y).map((s) => `<div class="xrow">
+      <div class="xmain"><b>${esc(sessionName(s))}</b><span class="muted">${s.n} ${t("qs")}${s.note ? " · " + esc(s.note) : ""}</span></div>
+      <div class="xact"><button class="primary slim" data-s="${s.id}" data-m="exam">⏱ ${t("pastExam")}</button><button class="ghost slim" data-s="${s.id}" data-m="learn">${t("pastLearn")}</button></div>
+    </div>`).join("")}</div>`).join("")}
+    <button class="ghost" id="bk">${t("back")}</button>`, { wide: true, nav: "exams" });
+  $("bk").onclick = myExams;
+  app.querySelectorAll("[data-s]").forEach((b) => (b.onclick = async () => {
+    const s = list.find((x) => x.id === +b.dataset.s), timed = b.dataset.m === "exam";
+    b.disabled = true;
+    try {
+      const ids = await api.sessionIds(s.id);
+      if (!ids.length) throw new Error(t("noneMatch"));
+      const limit = timed ? ids.length * EXAM_SECONDS_PER_Q : null;
+      const row = await api.createExam({ track: TR(), settings: { timed, guided: !timed, topics: [], pool: "session", session: s.id, session_name: sessionName(s), deadline: limit ? new Date(Date.now() + limit * 1000).toISOString() : null }, ids, picked: ids.map(() => null), time_limit: limit });
+      runExam(row);
+    } catch (e) { b.disabled = false; flash(errMsg(e), true); pastExams(); }
+  }));
+}
+
 async function myExams() {
   S = { screen: myExams };
   frame(`<h2 class="page-h">${t("navExams")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "exams" });
@@ -807,19 +840,21 @@ async function myExams() {
   let armed = null;
   const draw = () => {
     frame(`<div class="page-hrow"><h2 class="page-h">${t("navExams")}</h2><button class="primary slim" id="nw">+ ${t("navNew")}</button></div>
+    <button class="examcta" id="pst"><span class="jicon" aria-hidden="true">📚</span><span><b>${t("pastT")}</b><small>${t("pastD")}</small></span><span aria-hidden="true">${fwd()}</span></button>
     <p class="muted">${list.length} ${t("examsFound")}</p>
     ${!list.length ? `<div class="card"><p class="muted">${t("noExams")}</p><button class="primary" id="nw2">${t("newExamGo")}</button></div>` : ""}
     <div class="xlist">${list.map((x) => {
       const n = x.ids.length, done = x.status === "done", ans = (x.picked || []).filter((v) => v != null).length, set = x.settings || {};
       return `<div class="xrow">
         <div class="xmain"><b>${t("examNo")} #${x.id}</b><span class="muted">${fmtDate(x.created_at)} · ${fmtTime(x.created_at)}</span>
-          <span class="xtags"><span class="tag">${set.timed ? "⏱ " + t("timed") : t("untimed")}</span><span class="tag">${set.guided ? t("guided") : t("unguided")}</span></span></div>
+          <span class="xtags">${set.session_name ? `<span class="tag cool">📚 ${esc(set.session_name)}</span>` : ""}<span class="tag">${set.timed ? "⏱ " + t("timed") : t("untimed")}</span><span class="tag">${set.guided ? t("guided") : t("unguided")}</span></span></div>
         <div class="xstat ${done ? "okline" : ""}">${done ? `${t("doneSt")} · <b>${pctOf(x.score, n)}%</b> <span class="muted">(${x.score}/${n})</span>` : `${t("openSt")} · ${ans}/${n}`}</div>
         <div class="xact">${done ? `<button class="ghost slim" data-v="${x.id}">${t("view")}</button><button class="ghost slim" data-a="${x.id}">${t("analysis")}</button>` : `<button class="primary slim" data-c="${x.id}">${t("contExam")}</button>`}
           <button class="link danger-l" data-d="${x.id}">${armed === x.id ? t("deleteSure") : t("delete")}</button></div>
       </div>`; }).join("")}</div>`, { wide: true, nav: "exams" });
     const get = (id) => list.find((x) => x.id === +id);
     if ($("nw")) $("nw").onclick = newExam; if ($("nw2")) $("nw2").onclick = newExam;
+    $("pst").onclick = pastExams;
     app.querySelectorAll("[data-c]").forEach((b) => (b.onclick = () => runExam(get(b.dataset.c))));
     app.querySelectorAll("[data-v]").forEach((b) => (b.onclick = () => openExam(get(b.dataset.v), "review")));
     app.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => openExam(get(b.dataset.a), "analysis")));

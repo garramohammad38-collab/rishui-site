@@ -324,3 +324,6 @@ Object.assign(T.he, { introAgain: "הדרכה קצרה", introAgainD: "לראו�
 
 Object.assign(T.en, { soonTag: "Coming soon", soonTitle: "More tracks coming soon", soonD: "We're preparing questions for these exams. They'll open here as soon as they're ready." });
 Object.assign(T.he, { soonTag: "בקרוב", soonTitle: "מסלולים נוספים בקרוב", soonD: "אנחנו מכינים שאלות לבחינות האלה. הן ייפתחו כאן ברגע שיהיו מוכנות." });
+
+Object.assign(T.en, { pastT: "Past licensing exams", pastTile: "Each sitting separately", pastD: "Previous government exams, each sitting on its own, in order. Solve one as a timed exam or learn it with explanations.", pastEmpty: "Past exams will be added here soon.", pastExam: "Timed exam", pastLearn: "Learn with explanations" });
+Object.assign(T.he, { pastT: "מבחני רישוי קודמים", pastTile: "כל מועד בנפרד", pastD: "מבחנים ממשלתיים קודמים, כל מועד בנפרד ולפי הסדר. אפשר לפתור כמבחן עם זמן או ללמוד עם הסברים.", pastEmpty: "מבחנים קודמים יעלו כאן בקרוב.", pastExam: "מבחן עם זמן", pastLearn: "לימוד עם הסברים" });

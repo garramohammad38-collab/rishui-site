@@ -501,3 +501,4 @@ button,.chip.pick,.tab,.tile{-webkit-tap-highlight-color:transparent}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea,select,[contenteditable=true]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 img{-webkit-user-drag:none;user-drag:none}
+.xtags .tag.cool{background:var(--accent-soft);color:var(--accent)}

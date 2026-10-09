@@ -128,6 +128,14 @@ export async function deleteAccount() {
 export async function examIds(track, n, topics = null, pool = "all") {
   return must(await supabase.rpc("exam_ids", { p_track: track, p_n: n, p_topics: topics?.length ? topics : null, p_pool: pool }));
 }
+// past government exam sittings (each its own section) and the question ids of one sitting, in order
+export async function sessionList(track) {
+  const { data, error } = await supabase.rpc("session_list", { p_track: track });
+  return error ? [] : data || [];
+}
+export async function sessionIds(id) {
+  return must(await supabase.rpc("session_ids", { p_session: id })) || [];
+}
 export async function createExam(row) {
   return must(await supabase.from("exams").insert(row).select("*").single());
 }

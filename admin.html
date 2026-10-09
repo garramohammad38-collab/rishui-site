@@ -123,7 +123,7 @@ async function start() {
 
 /* ---------- layout ---------- */
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["past","📚 امتحانات سابقة"],["stats","أرقام"]];
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
@@ -132,7 +132,7 @@ function render() {
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, ann: viewAnn, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, ann: viewAnn, past: viewPast, stats: viewStats })[tab]();
 }
 
 /* ---------- list ---------- */
@@ -297,7 +297,12 @@ function viewImport() {
     <p class="muted">ملف Excel (‎.xlsx‎) من القالب <b>musmach-questions-template.xlsx</b>، أو CSV بأعمدة <b>questions-template.csv</b>، أو JSON. التطبيق بيفحص كل سطر وبيلاقي الأسئلة المكررة قبل ما يضيف إشي.</p>
     <input type="file" id="file" accept=".xlsx,.csv,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
     <label><input type="checkbox" id="pub" style="width:auto"> انشرهم مباشرة (الأفضل تخليهم مسودة لحد ما تراجعهم)</label>
+    <label>تابعين لامتحان سابق؟ (اختياري)</label><select id="ses"><option value="">لا، أسئلة عادية</option></select>
+    <p class="muted">إذا اخترت امتحان، الأسئلة بتنضاف لخانته بنفس ترتيب الملف، وبتضل كمان جزء من بنك الأسئلة العادي.</p>
     <div id="pre"></div></div>`;
+  sb.from("exam_sessions").select("id,year,month,label").eq("track", curTrack).order("year", { ascending: false }).then(({ data }) => {
+    if (data && $("ses")) $("ses").innerHTML += data.map(x => `<option value="${x.id}">${esc(sesName(x))}</option>`).join("");
+  });
   $("file").onchange = async () => {
     const f = $("file").files[0]; if (!f) return;
     $("pre").innerHTML = `<p class="muted">بفحص الملف…</p>`;
@@ -345,7 +350,8 @@ function viewImport() {
 // adds in small groups; if a group fails, its rows are tried one by one so one bad row doesn't stop the rest
 async function runImport(list) {
   $("go").disabled = true;
-  const pub = $("pub").checked, clean = (r) => { const { line, heOnly, ...x } = r; return { ...x, published: pub }; };
+  const pub = $("pub").checked, ses = +$("ses").value || null;
+  const clean = (r) => { const { line, heOnly, ...x } = r; return { ...x, published: pub, ...(ses ? { session_id: ses, session_order: list.indexOf(r) + 1 } : {}) }; };
   let added = 0; const failed = [];
   for (let i = 0; i < list.length; i += 50) {
     const chunk = list.slice(i, i + 50);
@@ -439,6 +445,40 @@ function viewTracks() {
     if (error) msg(error.message, false); else { msg("انضاف المسار"); curTrack = id; localStorage.setItem("rs-track", id); }
     await loadMeta(); render();
   };
+}
+
+/* ---------- past government exams (one section per sitting) ---------- */
+const MON = ["", "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+const sesName = x => [x.year, x.month ? MON[x.month] : "", x.label || ""].filter(Boolean).join(" · ");
+async function viewPast() {
+  $("body").innerHTML = `<div class="card"><h3>امتحان سابق جديد (${esc(trackLabel(curTrack))})</h3>
+    <p class="muted">كل امتحان بيطلع للطلاب بخانة لحاله تحت "מבחני רישוי קודמים"، مرتبين من الأجدد. بعد ما تعمل الخانة، فوت على "استيراد" واختارها لما ترفع ملف الأسئلة.</p>
+    <div class="row"><div><label>السنة</label><input id="py" type="number" min="1990" max="2100" value="${new Date().getFullYear()}"></div>
+      <div><label>الشهر</label><select id="pm"><option value="">—</option>${MON.slice(1).map((m, i) => `<option value="${i + 1}" ${i + 1 === 4 ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+      <div><label>اسم إضافي (اختياري)</label><input id="pl" dir="rtl" placeholder="מועד א / שחזור"></div></div>
+    <label>مصدر الأسئلة (بيطلع للطلاب)</label><input id="pn" dir="rtl" placeholder="مثلًا: שחזור של בוגרי מחזור 2016">
+    <button class="btn" id="padd" style="align-self:flex-start">إضافة الامتحان</button></div>
+    <div class="card"><h3>الامتحانات</h3><div class="tbl"><table><thead><tr><th>الامتحان</th><th>أسئلة</th><th>الحالة</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  $("padd").onclick = async () => {
+    const year = +$("py").value; if (!year) return $("py").focus();
+    const { error } = await sb.from("exam_sessions").insert({ track: curTrack, year, month: +$("pm").value || null, label: $("pl").value.trim() || null, note: $("pn").value.trim() || null });
+    msg(error ? (/exam_sessions/.test(error.message) ? "لازم تشغّل supabase/migration-20-past-exams.sql أول." : error.message) : "انضاف الامتحان. هلأ ارفع أسئلته من تبويب \"استيراد\"", !error); render();
+  };
+  const { data, error } = await sb.from("exam_sessions").select("*").eq("track", curTrack).order("year", { ascending: false }).order("month", { ascending: false });
+  if (error) { $("rows").innerHTML = `<tr><td colspan="4" class="msg bad">لازم تشغّل supabase/migration-20-past-exams.sql بـ Supabase أول.</td></tr>`; return; }
+  const counts = {};
+  await Promise.all((data || []).map(async x => {
+    const [a, b] = await Promise.all([sb.from("questions").select("id", { count: "exact", head: true }).eq("session_id", x.id),
+      sb.from("questions").select("id", { count: "exact", head: true }).eq("session_id", x.id).eq("published", true)]);
+    counts[x.id] = [a.count || 0, b.count || 0];
+  }));
+  $("rows").innerHTML = (data || []).map(x => `<tr><td><b>${esc(sesName(x))}</b>${x.note ? `<div class="muted">${esc(x.note)}</div>` : ""}</td>
+    <td>${counts[x.id][0]}${counts[x.id][0] !== counts[x.id][1] ? ` <span class="muted">(${counts[x.id][1]} منشورين)</span>` : ""}</td>
+    <td>${x.published ? `<span class="pill">ظاهر للطلاب</span>` : `<span class="pill off">مخفي</span>`}</td>
+    <td class="row" style="flex-wrap:nowrap"><button class="btn ${x.published ? "ghost" : ""}" data-pub="${x.id}" data-v="${x.published ? 0 : 1}">${x.published ? "إخفاء" : "إظهار للطلاب"}</button>
+      ${counts[x.id][0] ? "" : `<button class="btn danger" data-del="${x.id}">حذف</button>`}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">لسا ما في امتحانات سابقة</td></tr>`;
+  $("rows").querySelectorAll("[data-pub]").forEach(b => b.onclick = async () => { await sb.from("exam_sessions").update({ published: b.dataset.v === "1" }).eq("id", +b.dataset.pub); viewPast(); });
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await sb.from("exam_sessions").delete().eq("id", +b.dataset.del); viewPast(); });
 }
 
 /* ---------- announcements ---------- */
