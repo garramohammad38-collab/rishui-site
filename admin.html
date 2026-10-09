@@ -48,6 +48,9 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--accent-soft)}
 .stat{font-size:28px;font-weight:600}
 [hidden]{display:none!important}
 .sumgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.sumgrid div{background:#f4f6fa;border-radius:10px;padding:10px;display:flex;flex-direction:column;align-items:center}.sumgrid b{font-size:22px}.sumgrid span{font-size:12px;color:#666}
+.bars{display:flex;align-items:flex-end;gap:2px;height:140px;padding-top:6px}.bcol{flex:1;display:flex;align-items:flex-end;gap:1px;height:100%;min-width:2px}.bcol i{flex:1;border-radius:3px 3px 0 0;min-height:1px}
+.bax{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.li{position:relative;display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;overflow:hidden}.li>span{position:relative;z-index:1}.lbar{position:absolute;inset-block:0;inset-inline-start:0;background:var(--accent-soft)}
 </style>
 </head>
 <body>
@@ -423,24 +426,58 @@ function viewTracks() {
 }
 
 /* ---------- stats ---------- */
+let statDays = 30;
+const ZONES = { "Asia/Jerusalem": "إسرائيل", "Asia/Tel_Aviv": "إسرائيل", "Asia/Hebron": "فلسطين", "Asia/Gaza": "فلسطين", "Asia/Amman": "الأردن", "Europe/Berlin": "ألمانيا", "Europe/London": "بريطانيا", "America/New_York": "أمريكا", "Asia/Dubai": "الإمارات", "Europe/Moscow": "روسيا", "Africa/Cairo": "مصر" };
+const DEV = { mobile: "📱 تلفون", desktop: "💻 كمبيوتر", tablet: "📲 تابلت" };
+const PAGES = { "/": "الصفحة الرئيسية", "/app/": "التطبيق بالمتصفح", "/admin.html": "لوحة الإدارة", "/legal/": "الصفحات القانونية", "/legal/privacy-he.html": "الخصوصية (عبري)", "/legal/terms-he.html": "الشروط (عبري)", "/legal/privacy-en.html": "الخصوصية (إنجليزي)", "/legal/terms-en.html": "الشروط (إنجليزي)" };
+const num = n => Number(n || 0).toLocaleString("en-US");
+function bars(rows, keys, colors) {
+  const max = Math.max(1, ...rows.flatMap(r => keys.map(k => +r[k] || 0)));
+  return `<div class="bars">${rows.map(r => `<div class="bcol" title="${esc(r.d)}: ${keys.map(k => num(r[k])).join(" / ")}">${keys.map((k, i) => `<i style="height:${Math.round(100 * (+r[k] || 0) / max)}%;background:${colors[i]}"></i>`).join("")}</div>`).join("")}</div>
+    <div class="bax"><span>${esc(rows[0]?.d || "")}</span><span>${esc(rows.at(-1)?.d || "")}</span></div>`;
+}
+function topList(title, rows, label) {
+  const total = rows.reduce((s, r) => s + +r.n, 0) || 1;
+  return `<div class="card"><b>${title}</b>${rows.length ? rows.map(r => `<div class="li"><span>${esc(label(r.k))}</span><span class="muted">${num(r.n)}</span><div class="lbar" style="width:${Math.round(100 * r.n / total)}%"></div></div>`).join("") : `<span class="muted">لسا ما في</span>`}</div>`;
+}
+const cardsHtml = list => `<div class="grid4">${list.map(([n, v, sub]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v}</span>${sub ? `<span class="muted">${sub}</span>` : ""}</div>`).join("")}</div>`;
 async function viewStats() {
-  $("body").innerHTML = `<div class="grid4" id="g"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  $("body").innerHTML = `<div class="row" style="justify-content:flex-start">${[7, 30, 90].map(d => `<button class="btn ${d === statDays ? "" : "ghost"}" data-d="${d}">آخر ${d} يوم</button>`).join("")}</div><div id="st"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  $("body").querySelectorAll("[data-d]").forEach(b => b.onclick = () => { statDays = +b.dataset.d; viewStats(); });
   const now = new Date().toISOString();
-  const [u, a, q, p] = await Promise.all([
+  const [{ data: r, error }, u, a, q, p, { data: cfg, error: ce }] = await Promise.all([
+    sb.rpc("admin_stats", { p_days: statDays }),
     sb.from("profiles").select("id", { count: "exact", head: true }),
     sb.from("profiles").select("id", { count: "exact", head: true }).gt("plan_until", now),
     sb.from("questions").select("id", { count: "exact", head: true }),
     sb.from("questions").select("id", { count: "exact", head: true }).eq("published", true),
+    sb.from("app_settings").select("free_mode").eq("id", 1).maybeSingle(),
   ]);
-  $("g").innerHTML = [["مستخدمين", u.count], ["اشتراكات فعّالة", a.count], ["كل الأسئلة", q.count], ["منشورة", p.count]]
-    .map(([n,v]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v ?? "—"}</span></div>`).join("");
-  const { data: cfg, error } = await sb.from("app_settings").select("free_mode").eq("id", 1).maybeSingle();
-  const box = document.createElement("div"); box.className = "card"; box.style.marginTop = "12px";
-  box.innerHTML = error || !cfg ? `<b>الوضع المجاني</b><p class="muted">شغّل supabase/migration-5-free-mode.sql عشان يظهر هاد الخيار.</p>`
-    : `<b>الوضع المجاني: ${cfg.free_mode ? "🟢 شغّال (كل الأسئلة ببلاش)" : "⚪ مطفي (بدها اشتراك)"}</b>
+  let h = "";
+  if (error || !r) {
+    h += `<div class="msg bad">إحصائيات الزوار والطلاب مش جاهزة: شغّل supabase/migration-17-site-stats.sql بـ Supabase. ${esc(error?.message || "")}</div>`;
+  } else {
+    const s = r.site, ap = r.app, acc = ap.answers ? Math.round(100 * ap.correct / ap.answers) : 0;
+    h += `<h3>🌐 زوار الموقع</h3>` + cardsHtml([
+      ["زوار اليوم", num(s.today_visitors)], [`زوار آخر ${statDays} يوم`, num(s.visitors), "كل شخص مرة وحدة"],
+      ["مرات فتح الصفحات", num(s.visits)], ["فتحوا التطبيق بالمتصفح", num(s.app_visitors)]]);
+    h += `<div class="card"><b>زوار كل يوم</b>${bars(s.by_day, ["n"], ["var(--accent)"])}</div>`;
+    h += `<div class="grid2">` + topList("من وين إجوا", s.refs, k => k || "دخلوا مباشرة / واتساب / تطبيق") + topList("أي صفحات فتحوا", s.pages, k => PAGES[k] || k)
+       + topList("نوع الجهاز", s.devices, k => DEV[k] || k) + topList("من أي بلد (تقريبًا)", s.zones, k => ZONES[k] || k) + `</div>`;
+    h += `<h3>🎓 الطلاب بالتطبيق</h3>` + cardsHtml([
+      ["سجّلوا اليوم", num(ap.new_today)], [`سجّلوا آخر ${statDays} يوم`, num(ap.new_users), `من أصل ${num(ap.users)}`],
+      ["حلّوا أسئلة اليوم", num(ap.active_today)], ["حلّوا أسئلة آخر 7 أيام", num(ap.active_7)],
+      [`إجابات آخر ${statDays} يوم`, num(ap.answers), `${acc}% صحيحة`], ["طلاب شغّالين بالفترة", num(ap.active)],
+      ["امتحانات خلصت", num(ap.exams_done)], ["مهمات يومية خلصت", num(ap.missions_done)]]);
+    h += `<div class="card"><b>كل يوم: <span style="color:var(--ok)">■</span> سجّلوا جديد · <span style="color:var(--accent)">■</span> حلّوا أسئلة</b>${bars(ap.signups_by_day, ["n", "a"], ["var(--ok)", "var(--accent)"])}</div>`;
+    h += `<div class="card"><b>أصعب المواضيع (أقل نسبة إجابات صحيحة)</b>${ap.hard_topics.length ? `<div class="tbl"><table><thead><tr><th>الموضوع</th><th>إجابات</th><th>صحيحة</th></tr></thead><tbody>${ap.hard_topics.map(t => `<tr><td class="he">${esc(trackLabel(t.track))} · ${esc(TOPICS_OF(t.track)[t.k] || t.k)}</td><td>${num(t.n)}</td><td>${t.pct}%</td></tr>`).join("")}</tbody></table></div>` : `<span class="muted">بتظهر لما يكون في 10 إجابات على الأقل بالموضوع.</span>`}</div>`;
+  }
+  h += `<h3>📦 عام</h3>` + cardsHtml([["كل المستخدمين", num(u.count)], ["اشتراكات فعّالة", num(a.count)], ["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]]);
+  h += ce || !cfg ? `<div class="card"><b>الوضع المجاني</b><p class="muted">شغّل supabase/migration-5-free-mode.sql عشان يظهر هاد الخيار.</p></div>`
+    : `<div class="card"><b>الوضع المجاني: ${cfg.free_mode ? "🟢 شغّال (كل الأسئلة ببلاش)" : "⚪ مطفي (بدها اشتراك)"}</b>
        <p class="muted">لما يكون شغّال، كل طالب مسجّل بيحل كل أسئلة مساره بدون اشتراك.</p>
-       <button class="btn" id="fm">${cfg.free_mode ? "طفّي الوضع المجاني" : "شغّل الوضع المجاني"}</button>`;
-  $("body").appendChild(box);
+       <button class="btn" id="fm" style="align-self:flex-start">${cfg.free_mode ? "طفّي الوضع المجاني" : "شغّل الوضع المجاني"}</button></div>`;
+  $("st").innerHTML = h; $("st").style.cssText = "display:flex;flex-direction:column;gap:12px";
   if ($("fm")) $("fm").onclick = async () => { await sb.from("app_settings").update({ free_mode: !cfg.free_mode }).eq("id", 1); viewStats(); };
 }
 
