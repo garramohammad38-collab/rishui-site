@@ -39,6 +39,11 @@ export async function updateProfile(lang, examDate, track = null) {
 export async function tracks() {
   return must(await supabase.from("tracks").select("*").eq("active", true).order("sort"));
 }
+// tracks that are listed as "coming soon" (nobody can enter them yet)
+export async function soonTracks() {
+  const { data, error } = await supabase.from("tracks").select("id,he,en,icon,he_desc,en_desc,sort").eq("coming_soon", true).eq("active", false).order("sort");
+  return error ? [] : data || [];
+}
 export async function topics(track) {
   return must(await supabase.from("topics").select("id,he,en,sort").eq("track", track).order("sort"));
 }

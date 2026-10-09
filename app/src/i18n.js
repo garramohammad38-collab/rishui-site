@@ -321,3 +321,6 @@ Object.assign(T.he, {
 
 Object.assign(T.en, { introAgain: "Quick tour", introAgainD: "See the short introduction to the app again." });
 Object.assign(T.he, { introAgain: "הדרכה קצרה", introAgainD: "לראות שוב את ההסבר הקצר על האפליקציה." });
+
+Object.assign(T.en, { soonTag: "Coming soon", soonTitle: "More tracks coming soon", soonD: "We're preparing questions for these exams. They'll open here as soon as they're ready." });
+Object.assign(T.he, { soonTag: "בקרוב", soonTitle: "מסלולים נוספים בקרוב", soonD: "אנחנו מכינים שאלות לבחינות האלה. הן ייפתחו כאן ברגע שיהיו מוכנות." });

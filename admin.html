@@ -404,12 +404,25 @@ function randCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "RS-
 /* ---------- tracks & topics ---------- */
 function viewTracks() {
   const topics = Object.entries(TOPICS_OF(curTrack));
-  $("body").innerHTML = `<div class="card"><h3>مواضيع مسار ${esc(trackLabel(curTrack))}</h3>
+  const tr = TRACKS.find(t => t.id === curTrack) || {};
+  const state = tr.active ? "open" : tr.coming_soon ? "soon" : "hidden";
+  const stLabel = { open: "🟢 مفتوح للطلاب", soon: "🟡 بقريبًا (ظاهر بس مقفول)", hidden: "⚪ مخفي" };
+  $("body").innerHTML = `<div class="card"><h3>حالة مسار ${esc(trackLabel(curTrack))}: ${stLabel[state]}</h3>
+    <p class="muted">"بقريبًا" = الطلاب بيشوفوه بالتطبيق مع كلمة "בקרוב" وما بيقدروا يفوتوا عليه. لما تجهز الأسئلة، افتحه.</p>
+    <div class="row" style="justify-content:flex-start">${["open","soon","hidden"].map(k => `<button class="btn ${k === state ? "" : "ghost"}" data-st="${k}" style="flex:none">${stLabel[k]}</button>`).join("")}</div></div>
+  <div class="card"><h3>مواضيع مسار ${esc(trackLabel(curTrack))}</h3>
     <div class="tbl"><table><thead><tr><th>المعرّف</th><th>الاسم</th></tr></thead><tbody>${topics.map(([k,n]) => `<tr><td dir="ltr">${esc(k)}</td><td class="he" dir="rtl">${esc(n)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">ما في مواضيع</td></tr>`}</tbody></table></div>
     <form id="ft" class="row"><input id="ti" dir="ltr" placeholder="معرّف بالإنجليزي، مثلاً p_sport"><input id="th" dir="rtl" placeholder="الاسم بالعبري"><input id="te" dir="ltr" placeholder="Name in English"><button class="btn" type="submit">إضافة موضوع</button></form></div>
   <div class="card"><h3>مسار جديد</h3>
     <form id="fk" class="row"><input id="ki" dir="ltr" placeholder="id, e.g. dietetics"><input id="kh" dir="rtl" placeholder="الاسم بالعبري"><input id="ke" dir="ltr" placeholder="Name in English"><input id="kc" placeholder="أيقونة 🥗" style="max-width:90px"><input id="kd" dir="rtl" placeholder="وصف قصير بالعبري"><button class="btn" type="submit">إضافة مسار</button></form>
     <p class="muted">المعرّف بالإنجليزي، أحرف صغيرة بدون مسافات. بعدها لازم تعمل بالـApp Store منتجين: rishui_&lt;id&gt;_monthly و rishui_&lt;id&gt;_until_exam.</p></div>`;
+  $("body").querySelectorAll("[data-st]").forEach(b => b.onclick = async () => {
+    const k = b.dataset.st; if (k === state) return;
+    if (k === "open" && !confirm("متأكد؟ لما تفتح المسار، الطلاب الجداد بيقدروا يختاروه ويحلّوا أسئلته.")) return;
+    const { error } = await sb.from("tracks").update({ active: k === "open", coming_soon: k === "soon" }).eq("id", curTrack);
+    if (error) msg(/coming_soon/.test(error.message) ? "لازم تشغّل supabase/migration-19-coming-soon.sql أول." : error.message, false); else msg("تغيّرت حالة المسار");
+    await loadMeta(); render();
+  });
   $("ft").onsubmit = async e => {
     e.preventDefault();
     const id = $("ti").value.trim().toLowerCase(), he = $("th").value.trim(), en = $("te").value.trim();

@@ -490,3 +490,9 @@ button,.chip.pick,.tab,.tile{-webkit-tap-highlight-color:transparent}
 
 /* admin announcement on home */
 .newbox.ann .ann-b{margin:6px 0 0;white-space:pre-line;line-height:1.6}
+
+/* coming-soon tracks */
+.plan.soon{opacity:.72;cursor:default;border-style:dashed;align-items:center}
+.plan.soon .soonicon{font-size:22px;flex:none;width:28px;text-align:center}
+.soontag{margin-inline-start:auto;flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--amber-soft,#FBEBCF);color:#8a5a0a}
+.soonbox{gap:8px}.soonbox .chips{display:flex;flex-wrap:wrap;gap:6px}
