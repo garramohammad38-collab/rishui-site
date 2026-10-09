@@ -85,7 +85,7 @@ function watermark(on) {
 }
 function frame(inner, { protect = false, wide = false } = {}) {
   stopTimer();
-  watermark(protect);
+  watermark(false);
   applyTheme();
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
@@ -522,10 +522,34 @@ function feedback(k) {
 }
 
 /* ---------------- mock exam ---------------- */
-async function mock() {
+const MOCK_MAX = 180;
+function mock() {
+  // setup: the student picks how many questions (up to 180, or what the bank has)
+  const avail = Math.min(MOCK_MAX, totals().n || MOCK_MAX);
+  const opts = [10, 25, 50, 100, 150, 180].filter((n) => n <= avail);
+  if (!opts.includes(avail) && avail < 180) opts.push(avail);
+  let n = Math.min(store.get("mock-n") || 50, avail) || avail;
+  S = { screen: mock, back: route };
+  const draw = () => {
+    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("mock")}</h2></div>
+    <div class="card">
+      <h2>${t("mockHow")}</h2>
+      <div class="chips">${opts.map((o) => `<button class="chip ${o === n ? "cool" : ""}" data-n="${o}" style="cursor:pointer;min-height:44px;padding-inline:16px">${o}</button>`).join("")}</div>
+      <div class="field"><label for="mn">${t("mockCustom")} (1–${avail})</label><input id="mn" type="number" inputmode="numeric" min="1" max="${avail}" value="${n}" dir="ltr"></div>
+      <p class="muted">${t("mockTime")}: ${Math.round((n * MOCK_SECONDS_PER_Q) / 60)} ${t("min")} · ${totals().n} ${t("qs")} ${t("mockAvail")}</p>
+      <button class="primary" id="ms">${t("mockStart")} ${fwd()}</button>
+    </div>`);
+    $("bk").onclick = route;
+    app.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { n = +b.dataset.n; draw(); }));
+    $("mn").onchange = () => { n = Math.max(1, Math.min(avail, Math.round(+$("mn").value || 1))); draw(); };
+    $("ms").onclick = () => { store.set("mock-n", n); startMock(n); };
+  };
+  draw();
+}
+async function startMock(n) {
   loading();
   try {
-    const ids = await api.mockIds(TR(), MOCK_N);
+    const ids = await api.mockIds(TR(), n);
     if (!ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
     const items = await api.questionsByIds(TR(), ids);
     keepTerms(items);
