@@ -123,7 +123,7 @@ async function start() {
 
 /* ---------- layout ---------- */
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["stats","أرقام"]];
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
@@ -132,7 +132,7 @@ function render() {
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, ann: viewAnn, stats: viewStats })[tab]();
 }
 
 /* ---------- list ---------- */
@@ -426,6 +426,40 @@ function viewTracks() {
     if (error) msg(error.message, false); else { msg("انضاف المسار"); curTrack = id; localStorage.setItem("rs-track", id); }
     await loadMeta(); render();
   };
+}
+
+/* ---------- announcements ---------- */
+async function viewAnn() {
+  $("body").innerHTML = `<div class="card"><h3>إعلان جديد للطلاب</h3>
+    <p class="muted">بيطلع للطلاب فوق بالصفحة الرئيسية بالتطبيق، لحد ما يضغطوا "הבנתי". اكتب باللغة اللي بدك ياها (الطلاب أغلبهم بالعبري).</p>
+    <label>العنوان</label><input id="at" maxlength="120" dir="auto" placeholder="مثلًا: נוספו 200 שאלות חדשות! 🎉">
+    <label>النص (اختياري)</label><textarea id="ab" maxlength="2000" dir="auto" placeholder="تفاصيل..."></textarea>
+    <div class="row"><div><label>لمين</label><select id="atr"><option value="">كل الطلاب</option>${TRACKS.map(t => `<option value="${t.id}">${esc(trackLabel(t.id))} بس</option>`).join("")}</select></div>
+      <div><label>لقديش يضل ظاهر</label><select id="ad"><option value="1">يوم</option><option value="3">3 أيام</option><option value="7" selected>أسبوع</option><option value="30">شهر</option><option value="">لحد ما أوقفه</option></select></div></div>
+    <div id="apv"></div>
+    <button class="btn" id="asend" style="align-self:flex-start">📢 انشر الإعلان</button></div>
+    <div class="card"><h3>الإعلانات</h3><div class="tbl"><table><thead><tr><th>الإعلان</th><th>لمين</th><th>تاريخ</th><th>الحالة</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const prev = () => { const t = $("at").value.trim(), b = $("ab").value.trim();
+    $("apv").innerHTML = t ? `<label>هيك رح يطلع للطالب:</label><div style="background:var(--accent-soft);border-radius:12px;padding:12px" dir="auto"><b>📢 ${esc(t)}</b>${b ? `<p style="margin:6px 0 0;white-space:pre-line">${esc(b)}</p>` : ""}</div>` : ""; };
+  $("at").oninput = prev; $("ab").oninput = prev;
+  $("asend").onclick = async () => {
+    const title = $("at").value.trim(); if (!title) { $("at").focus(); return; }
+    const days = $("ad").value, row = { title, body: $("ab").value.trim() || null, track: $("atr").value || null,
+      expires_at: days ? new Date(Date.now() + days * 864e5).toISOString() : null };
+    $("asend").disabled = true;
+    const { error } = await sb.from("announcements").insert(row);
+    if (error) { msg(/announcements/.test(error.message) ? "لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول." : error.message, false); }
+    else msg("✅ انشر الإعلان. الطلاب رح يشوفوه لما يفتحوا التطبيق.");
+    render();
+  };
+  const { data, error } = await sb.from("announcements").select("*").order("created_at", { ascending: false }).limit(50);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="5" class="msg bad">لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول.</td></tr>`; return; }
+  const live = a => a.active && (!a.expires_at || new Date(a.expires_at) > new Date());
+  $("rows").innerHTML = (data || []).map(a => `<tr><td dir="auto"><b>${esc(a.title)}</b>${a.body ? `<div class="muted" style="white-space:pre-line">${esc(a.body)}</div>` : ""}</td>
+    <td>${a.track ? esc(trackLabel(a.track)) : "الكل"}</td><td dir="ltr" style="text-align:start">${fmtDT(a.created_at)}</td>
+    <td>${live(a) ? `<span class="pill">ظاهر${a.expires_at ? " لحد " + esc(a.expires_at.slice(0, 10)) : ""}</span>` : `<span class="pill off">موقوف</span>`}</td>
+    <td>${live(a) ? `<button class="btn danger" data-off="${a.id}">وقّف</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">لسا ما نشرت إعلانات</td></tr>`;
+  $("rows").querySelectorAll("[data-off]").forEach(b => b.onclick = async () => { await sb.from("announcements").update({ active: false }).eq("id", +b.dataset.off); viewAnn(); });
 }
 
 /* ---------- users ---------- */

@@ -487,3 +487,6 @@ button,.chip.pick,.tab,.tile{-webkit-tap-highlight-color:transparent}
 .sb.new{color:var(--accent);background:var(--accent-soft)}
 .empty{text-align:center;align-items:center}
 #netbar{position:fixed;top:0;inset-inline:0;z-index:70;background:var(--amber);color:#fff;font-size:13px;font-weight:600;text-align:center;padding:calc(6px + env(safe-area-inset-top)) 12px 6px}
+
+/* admin announcement on home */
+.newbox.ann .ann-b{margin:6px 0 0;white-space:pre-line;line-height:1.6}

@@ -102,6 +102,13 @@ export async function bestMock(uid, track) {
   const rows = must(await supabase.from("mock_results").select("score,total").eq("user_id", uid).eq("track", track).limit(500));
   return rows.length ? Math.max(...rows.map((r) => Math.round((r.score / r.total) * 100))) : null;
 }
+// admin announcements for this track (or for everyone); the database hides expired / switched-off ones
+export async function announcements(track) {
+  const { data, error } = await supabase.from("announcements").select("id,title,body,created_at")
+    .or(`track.is.null,track.eq.${track}`).order("created_at", { ascending: false }).limit(5);
+  return error ? [] : data || [];
+}
+
 export async function sendMessage(uid, email, track, body) {
   must(await supabase.from("messages").insert({ user_id: uid || null, email, track: track || null, body }));
 }

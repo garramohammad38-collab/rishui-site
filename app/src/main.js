@@ -469,6 +469,16 @@ function topicBars(rows) {
 }
 
 /* ---------------- home ---------------- */
+// newest admin announcement the student hasn't closed yet
+async function fillAnnouncement() {
+  const key = `ann-seen:${st.user.id}`, seen = new Set(store.get(key) || []);
+  const list = (await api.announcements(TR()).catch(() => [])).filter((a) => !seen.has(a.id));
+  const box = $("annw"); if (!box || !list.length) return;
+  const a = list[0];
+  box.innerHTML = `<div class="newbox ann" role="status"><div class="newbox-h"><b>📢 ${esc(a.title)}</b><button class="link" id="annx">${t("gotIt")}</button></div>${a.body ? `<p class="ann-b">${esc(a.body)}</p>` : ""}</div>`;
+  $("annx").onclick = () => { seen.add(a.id); store.set(key, [...seen].slice(-50)); box.innerHTML = ""; fillAnnouncement(); };
+}
+
 function home() {
   S = { screen: home };
   const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
@@ -482,7 +492,7 @@ function home() {
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
   const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
   const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
-  frame(`${msgHtml()}${newBox}
+  frame(`${msgHtml()}<div id="annw"></div>${newBox}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
   <div class="welcome"><h2>${greet} 👋</h2>
     <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}<span class="chip ${hasAccess() ? "ok" : ""}">${pkg}</span></div></div>
@@ -520,6 +530,7 @@ function home() {
   ${legalLinks()}`, { wide: true, nav: "home" });
   bindLegal();
   st.ui.msg = null;
+  fillAnnouncement();
   $("una").onclick = () => practice({ kind: "unanswered" });
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
   if ($("lock")) $("lock").onclick = plans;
