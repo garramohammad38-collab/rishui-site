@@ -129,3 +129,26 @@ export async function topicStats(track) {
 export async function searchQuestions(track, q) {
   return must(await supabase.rpc("search_questions", { p_track: track, p_q: q }));
 }
+
+/* ---------- daily mission + spaced repetition ---------- */
+export async function setTz(tz) {
+  try { await supabase.rpc("set_my_tz", { p_tz: tz }); } catch { /* older database */ }
+}
+export async function dailyMission(track, n = 10) {
+  return must(await supabase.rpc("get_daily_mission", { p_track: track, p_n: n }));
+}
+// index is 0-based here (1-based in SQL); returns true/false, checked on the server
+export async function missionAnswer(track, index, pick) {
+  return must(await supabase.rpc("mission_answer", { p_track: track, p_index: index + 1, p_pick: pick }));
+}
+export async function completeMission(track) {
+  return must(await supabase.rpc("complete_daily_mission", { p_track: track }));
+}
+export async function missionDays(uid, track, days = 60) {
+  const from = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+  try { return must(await supabase.from("daily_missions").select("day,status,correct,ids").eq("user_id", uid).eq("track", track).gte("day", from).order("day")); }
+  catch { return []; }
+}
+export async function dueReviews(uid, track, limit = 20) {
+  return must(await supabase.from("review_items").select("question_id,box,due").eq("user_id", uid).eq("track", track).lte("due", new Date().toLocaleDateString("en-CA")).order("due").limit(limit));
+}

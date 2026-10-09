@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import * as api from "./api.js";
 import { T, topicName as fallbackTopic } from "./i18n.js";
 import { REF } from "./reference.js";
@@ -37,7 +38,7 @@ const $ = (id) => document.getElementById(id);
 const LET = { en: ["A", "B", "C", "D"], he: ["א", "ב", "ג", "ד"] };
 const fwd = () => (st.lang === "he" ? "←" : "→");
 const bwd = () => (st.lang === "he" ? "→" : "←");
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toLocaleDateString("en-CA"); // the student's own date
 const TR = () => st.profile?.track || "nursing";
 const ent = () => st.ents.find((e) => e.track === TR() && new Date(e.until) > new Date());
 const hasAccess = () => !!st.profile && (st.profile.role === "admin" || st.freeMode || !!ent());
@@ -139,6 +140,7 @@ async function afterLogin(user) {
     const ok = await api.registerDevice(dev.id, dev.label);
     if (!ok) return blocked();
     await loadUserData();
+    try { api.setTz(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch { /* ignore */ }
     await initPurchases(user.id).catch(() => {});
     route();
   } catch (e) {
@@ -425,7 +427,7 @@ function ringSvg(p, size = 120, label = `${p}%`) {
 // bars for the last 14 days of answers
 function activityChart(rows, days = 14) {
   const by = Object.fromEntries((rows || []).map((r) => [r.day, r]));
-  const list = [...Array(days)].map((_, i) => { const d = new Date(Date.now() - (days - 1 - i) * 864e5).toISOString().slice(0, 10); return { d, n: by[d]?.n || 0, c: by[d]?.correct || 0 }; });
+  const list = [...Array(days)].map((_, i) => { const d = new Date(Date.now() - (days - 1 - i) * 864e5).toLocaleDateString("en-CA"); return { d, n: by[d]?.n || 0, c: by[d]?.correct || 0 }; });
   const max = Math.max(5, ...list.map((x) => x.n)), W = 300, H = 110, bw = W / days;
   return `<svg class="act" viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="${t("activityL")}">
     ${list.map((x, i) => { const h = (x.n / max) * H, hc = (x.c / max) * H, xx = i * bw + 3; return `<rect x="${xx}" y="${H - h}" width="${bw - 6}" height="${h}" rx="3" fill="var(--accent-soft)"><title>${x.d}: ${x.n}</title></rect><rect x="${xx}" y="${H - hc}" width="${bw - 6}" height="${hc}" rx="3" fill="var(--accent)"/>${i % 2 === days % 2 ? "" : `<text x="${xx + (bw - 6) / 2}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--muted)">${x.d.slice(8)}.${x.d.slice(5, 7)}</text>`}`; }).join("")}
@@ -448,7 +450,7 @@ function home() {
   const newBox = addedTotal ? `<div class="newbox" role="status"><div class="newbox-h"><b>${st.lang === "he" ? `נוספו ${addedTotal} שאלות חדשות` : `${addedTotal} ${t("newQs")}`}</b><button class="link" id="nok">${t("gotIt")}</button></div>
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
   const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
-  frame(`${msgHtml()}${newBox}<div id="openx"></div>
+  frame(`${msgHtml()}${newBox}<div id="missionw">${missionCard(null, "loading")}</div><div id="openx"></div>
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
   <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
@@ -497,6 +499,7 @@ function home() {
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   // async parts: activity chart + an unfinished exam to continue
   bindGoal([]);
+  fillMission();
   $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
   api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("actc")) $("actc").innerHTML = activityChart(rows); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
@@ -797,10 +800,11 @@ function tools() {
     <div class="card"><h3>${t("search")}</h3><p class="muted">${t("searchD")}</p><button class="primary" id="srch">${t("search")}</button></div>
     <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
+    ${reminderCard()}
     <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
   </div>
   ${legalLinks()}`, { wide: true, nav: "tools" });
-  bindLegal(); st.ui.msg = null;
+  bindLegal(); st.ui.msg = null; bindReminder();
   $("ac").onclick = account; $("hp").onclick = () => contact(tools);
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
@@ -813,16 +817,196 @@ function tools() {
   };
 }
 
+/* ---------------- daily mission (server-built, server-checked) ---------------- */
+const MISSION_N = 10;
+const prevDay = (s) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() - 1); return d.toLocaleDateString("en-CA"); };
+// study streak: a day counts if the student answered questions or finished the mission.
+// One missed day per week is forgiven, so a single bad day doesn't wipe the streak.
+function streakOf(rows, mdays = st.missionDays || []) {
+  const by = new Set([...(rows || []).filter((r) => r.n > 0).map((r) => r.day), ...mdays.filter((m) => m.status === "done").map((m) => m.day)]);
+  let d = today(), n = 0, i = 0, lastFree = -99;
+  if (!by.has(d)) d = prevDay(d);
+  for (;;) {
+    if (by.has(d)) n++;
+    else if (i - lastFree > 7 && by.has(prevDay(d))) lastFree = i;
+    else break;
+    d = prevDay(d); i++;
+    if (i > 400) break;
+  }
+  return n;
+}
+function missionCard(m, state) {
+  if (state === "loading") return `<div class="mission sk"><span class="eyebrow">${t("mission")}</span><div class="spin sm"></div></div>`;
+  if (state === "error") return `<div class="mission"><span class="eyebrow">${t("mission")}</span><p class="muted">${t("missionErr")}</p><button class="ghost slim" id="mretry">${t("retry")}</button></div>`;
+  if (!m) return "";
+  const n = m.ids.length, done = (m.picked || []).filter((v) => v != null).length;
+  if (m.status === "done") return `<div class="mission done"><div class="mission-h"><span class="badge-ok" aria-hidden="true">✓</span><div><b>${t("missionDone")}</b><span class="muted">${m.correct}/${n} ${t("rightN")} · ${t("missionDoneD")}</span></div></div>
+    <button class="ghost slim" id="mres">${t("seeResults")}</button></div>`;
+  const k = (x) => (m.kinds || []).filter((v) => v === x).length;
+  return `<div class="mission">
+    <div class="mission-h"><div><span class="eyebrow">${t("mission")}</span><h2>${n} ${t("qs")}</h2></div><span class="mleft">${t("left")} <b>${n - done}</b></span></div>
+    <div class="gbar" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${done}"><i style="width:${pctOf(done, n)}%"></i></div>
+    <div class="mkinds">${k("review") ? `<span>🔁 ${k("review")} ${t("kReview")}</span>` : ""}${k("weak") ? `<span>🎯 ${k("weak")} ${t("kWeak")}</span>` : ""}${k("mix") ? `<span>🧩 ${k("mix")} ${t("kMix")}</span>` : ""}</div>
+    <button class="primary" id="mgo">${done ? t("contMission") : t("startMission")} ${fwd()}</button>
+  </div>`;
+}
+async function fillMission() {
+  const w = $("missionw"); if (!w) return;
+  w.innerHTML = missionCard(null, "loading");
+  try {
+    const [m, days] = await Promise.all([api.dailyMission(TR(), MISSION_N), api.missionDays(st.user.id, TR())]);
+    st.mission = m; st.missionDays = days;
+  } catch (e) {
+    // database without the mission functions yet: just hide the card
+    if (/get_daily_mission|function|schema cache/i.test(e?.message || "")) { w.innerHTML = ""; return; }
+    if (S?.screen !== home || !$("missionw")) return;
+    $("missionw").innerHTML = missionCard(null, "error"); $("mretry").onclick = fillMission; return;
+  }
+  if (S?.screen !== home || !$("missionw")) return;
+  $("missionw").innerHTML = missionCard(st.mission);
+  if ($("mgo")) $("mgo").onclick = () => missionRun(st.mission);
+  if ($("mres")) $("mres").onclick = () => missionFinish();
+  scheduleReminders();
+}
+async function missionRun(m) {
+  loading();
+  try {
+    const items = await api.questionsByIds(TR(), m.ids);
+    const byId = new Map(items.map((q) => [q.id, q]));
+    keepTerms(items);
+    // keep the server's order; questions that were unpublished meanwhile are skipped
+    const slots = m.ids.map((id, i) => ({ q: byId.get(id), i, pick: m.picked?.[i] ?? null })).filter((x) => x.q);
+    if (!slots.length) throw new Error(t("noItems"));
+    const first = slots.findIndex((x) => x.pick == null);
+    S = { mode: "mission", m, slots, at: first < 0 ? slots.length - 1 : first, start: Date.now(), tick: null, back: route };
+    missionQ();
+  } catch (e) {
+    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`);
+    $("rt").onclick = () => missionRun(m); $("hm").onclick = route;
+  }
+}
+function missionQ() {
+  S.screen = missionQ;
+  const sl = S.slots[S.at], q = sl.q, c = q[st.lang], tot = S.slots.length;
+  const answered = S.slots.filter((x) => x.pick != null).length, last = S.at === tot - 1;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button>
+    <div class="progress"><i style="width:${pctOf(answered, tot)}%"></i></div><span class="timer">${t("left")} ${tot - answered}</span></div>
+  <div class="card">${qBody(q, S.at + 1, tot)}
+    <div class="opts">${c.o.map((o, k) => `<button class="opt" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div class="err" id="er" hidden></div>
+    <div id="fb"></div>
+  </div>`, { protect: true });
+  app.querySelector(".qmeta").insertAdjacentHTML("beforeend", `<span class="tag kind">${{ review: "🔁 " + t("kReview"), weak: "🎯 " + t("kWeak"), mix: "🧩 " + t("kMix") }[S.m.kinds?.[sl.i]] || ""}</span>`);
+  $("bk").onclick = route; bindMark(q);
+  const after = () => {
+    const allDone = S.slots.every((x) => x.pick != null);
+    $("fb").insertAdjacentHTML("beforeend", `<button class="primary" id="nx" style="margin-top:12px">${allDone ? t("finishMission") : t("next") + " " + fwd()}</button>`);
+    $("nx").onclick = () => {
+      const nextOpen = S.slots.findIndex((x, j) => j > S.at && x.pick == null);
+      const anyOpen = S.slots.findIndex((x) => x.pick == null);
+      if (nextOpen >= 0) { S.at = nextOpen; missionQ(); } else if (anyOpen >= 0) { S.at = anyOpen; missionQ(); } else missionFinish();
+    };
+  };
+  if (sl.pick != null) { $("fb").innerHTML = reveal(q, sl.pick); after(); return; }
+  app.querySelectorAll(".opt").forEach((b) => (b.onclick = async () => {
+    const k = +b.dataset.k;
+    app.querySelectorAll(".opt").forEach((x) => (x.disabled = true));
+    b.classList.add("sel");
+    try {
+      const ok = await api.missionAnswer(TR(), sl.i, k);
+      sl.pick = k; S.m.picked[sl.i] = k; st.answers.set(q.id, !!ok);
+      if (S?.screen !== missionQ) return;
+      b.classList.remove("sel");
+      $("fb").innerHTML = reveal(q, k); after();
+      const n2 = S.slots.filter((x) => x.pick != null).length;
+      app.querySelector(".qbar .progress i").style.width = pctOf(n2, tot) + "%";
+      app.querySelector(".qbar .timer").textContent = `${t("left")} ${tot - n2}`;
+      requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    } catch (e) {
+      b.classList.remove("sel");
+      app.querySelectorAll(".opt").forEach((x) => (x.disabled = false));
+      $("er").textContent = errMsg(e); $("er").hidden = false;
+    }
+  }));
+}
+async function missionFinish() {
+  loading();
+  let res;
+  try { res = await api.completeMission(TR()); }
+  catch (e) {
+    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`);
+    $("rt").onclick = missionFinish; $("hm").onclick = route; return;
+  }
+  if (st.mission) st.mission.status = "done";
+  const days = await api.missionDays(st.user.id, TR()).catch(() => st.missionDays || []);
+  st.missionDays = days;
+  const act = await api.activity(st.user.id, TR(), 60).catch(() => []);
+  scheduleReminders();
+  const n = res.total, c = res.correct, topics = res.topics || [];
+  S = { screen: missionFinish, back: route };
+  frame(`<div class="card score celebrate">
+    <div class="big-emoji" aria-hidden="true">🎉</div>
+    <h2>${t("bravo")}</h2>
+    <div class="rw"><div><b class="okc">${c}</b><span>${t("rightN")}</span></div><div><b class="badc">${n - c}</b><span>${t("wrongN")}</span></div><div><b>🔥 ${streakOf(act, days)}</b><span>${t("streak")}</span></div></div>
+    <p class="muted">${t("streakNote")}</p>
+  </div>
+  <div class="section-title">${topics.length ? t("reviewTopics") : t("allGood")}</div>
+  ${topics.length ? `<div class="chips">${topics.map((k) => `<button class="chip pick cool" data-tp="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>` : ""}
+  <div class="actions"><button class="primary" id="hm">${t("home")}</button><button class="ghost" id="mp">${t("morePractice")}</button></div>
+  <p class="muted" style="text-align:center">${t("missionDoneD")}</p>`);
+  $("hm").onclick = route; $("mp").onclick = () => practice({ kind: "seq" });
+  app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.tp })));
+}
+
+/* ---------------- daily reminder (phone only, local notifications) ---------------- */
+const remKey = () => `reminder:${st.user.id}`;
+const canNotify = () => Capacitor.getPlatform() !== "web";
+async function scheduleReminders() {
+  if (!canNotify() || !st.user) return;
+  const r = store.get(remKey());
+  try {
+    const pend = await LocalNotifications.getPending();
+    const mine = (pend?.notifications || []).filter((x) => x.id >= 7001 && x.id <= 7014);
+    if (mine.length) await LocalNotifications.cancel({ notifications: mine.map((x) => ({ id: x.id })) });
+    if (!r?.on) return;
+    const [h, mi] = String(r.time || "19:00").split(":").map(Number);
+    const doneToday = st.mission?.status === "done" && st.mission?.day === today();
+    const list = [];
+    for (let k = 0; k < 14; k++) {
+      const at = new Date(); at.setDate(at.getDate() + k); at.setHours(h, mi, 0, 0);
+      if (at <= new Date() || (k === 0 && doneToday)) continue;
+      list.push({ id: 7001 + k, title: t("name"), body: t("remBody"), schedule: { at, allowWhileIdle: true } });
+    }
+    if (list.length) await LocalNotifications.schedule({ notifications: list });
+  } catch { /* notifications unavailable */ }
+}
+function reminderCard() {
+  const r = store.get(remKey()) || { on: false, time: "19:00" };
+  if (!canNotify()) return `<div class="card"><h3>${t("reminder")}</h3><p class="muted">${t("remWeb")}</p></div>`;
+  return `<div class="card"><h3>${t("reminder")}</h3><p class="muted">${t("reminderD")}</p>
+    <div class="row2"><input id="rtm" type="time" value="${esc(r.time)}" aria-label="${t("remTime")}"><button class="${r.on ? "ghost" : "primary"} slim" id="ron">${r.on ? t("remOff") : t("remOn")}</button></div>
+    <div class="err" id="rer" hidden></div></div>`;
+}
+function bindReminder() {
+  if (!$("ron")) return;
+  $("rtm").onchange = () => { const r = store.get(remKey()) || { on: false }; r.time = $("rtm").value || "19:00"; store.set(remKey(), r); scheduleReminders(); };
+  $("ron").onclick = async () => {
+    const r = store.get(remKey()) || { on: false, time: "19:00" };
+    r.time = $("rtm").value || r.time;
+    if (!r.on) {
+      try {
+        let p = await LocalNotifications.checkPermissions();
+        if (p.display !== "granted") p = await LocalNotifications.requestPermissions();
+        if (p.display !== "granted") { $("rer").textContent = t("remDenied"); $("rer").hidden = false; return; }
+      } catch { $("rer").textContent = t("remDenied"); $("rer").hidden = false; return; }
+    }
+    r.on = !r.on; store.set(remKey(), r); await scheduleReminders(); tools();
+  };
+}
+
 /* ---------------- daily goal + streak ---------------- */
 const goalKey = () => `goal:${st.user.id}`;
 const goalOf = () => store.get(goalKey()) || 20;
-function streakOf(rows) {
-  const by = new Set((rows || []).filter((r) => r.n > 0).map((r) => r.day));
-  let d = new Date(today() + "T00:00Z"), n = 0;
-  if (!by.has(d.toISOString().slice(0, 10))) d = new Date(d - 864e5);
-  while (by.has(d.toISOString().slice(0, 10))) { n++; d = new Date(d - 864e5); }
-  return n;
-}
 function goalCard(rows) {
   const g = goalOf(), td = (rows || []).find((r) => r.day === today())?.n || 0, s = streakOf(rows), p = Math.min(100, pctOf(td, g));
   const dl = daysLeft(), left = Math.max(0, totals().n - totals().done);
@@ -842,6 +1026,10 @@ function bindGoal(rows) {
 /* ---------------- smart review ---------------- */
 async function smartReview() {
   loading();
+  try {
+    const due = await api.dueReviews(st.user.id, TR(), BATCH);
+    if (due.length) return practice({ kind: "ids", ids: due.map((r) => r.question_id) });
+  } catch { /* older database: fall back to answer history */ }
   let hist = [];
   try { hist = await api.answerHistory(st.user.id, TR()); } catch (e) { flash(errMsg(e), true); return route(); }
   const now = Date.now(), H = 36e5, age = (r) => now - new Date(r.answered_at).getTime();

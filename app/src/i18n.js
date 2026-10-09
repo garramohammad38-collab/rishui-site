@@ -173,3 +173,24 @@ Object.assign(T.he, {
   examWhenD: "נחשב כמה ימים נשארו ונציע קצב יומי.", pace: "כדי לסיים את כל השאלות עד המבחן:", perDay: "ביום",
   solution: "פתרון", newQ: "שאלה חדשה", score: "ניקוד", close: "סגירה",
 });
+
+Object.assign(T.en, {
+  mission: "Your mission today", startMission: "Start today's mission", contMission: "Continue the mission", left: "Left",
+  kReview: "review", kWeak: "weak topics", kMix: "mixed", missionDone: "Today's mission is done", missionDoneD: "A new mission is waiting tomorrow.",
+  seeResults: "Results", bravo: "Well done! You finished today's mission", rightN: "correct", wrongN: "wrong",
+  reviewTopics: "Worth reviewing:", allGood: "No mistakes. Excellent!", morePractice: "Keep practicing", finishMission: "Finish the mission",
+  missionErr: "Couldn't load today's mission.", streakNote: "You can miss one day a week without losing your streak.",
+  reminder: "Daily reminder", reminderD: "One reminder a day for your mission. It isn't sent if you already finished.",
+  remOn: "Turn on", remOff: "Turn off", remTime: "Time", remBody: "Your mission for today is waiting: 10 questions, about 10 minutes.",
+  remDenied: "Allow notifications for the app in your phone settings.", remWeb: "Reminders work in the phone app.",
+});
+Object.assign(T.he, {
+  mission: "המשימה שלך להיום", startMission: "התחלת משימת היום", contMission: "המשך המשימה", left: "נשארו",
+  kReview: "חזרה על טעויות", kWeak: "נושאים לחיזוק", kMix: "תרגול מגוון", missionDone: "המשימה של היום הושלמה", missionDoneD: "מחר מחכה לך משימה חדשה.",
+  seeResults: "לתוצאות", bravo: "כל הכבוד! סיימת את משימת היום", rightN: "נכונות", wrongN: "שגויות",
+  reviewTopics: "כדאי לחזור על:", allGood: "בלי טעויות. מצוין!", morePractice: "להמשיך לתרגל", finishMission: "סיום המשימה",
+  missionErr: "לא הצלחנו לטעון את משימת היום.", streakNote: "אפשר לפספס יום אחד בשבוע בלי לאבד את הרצף.",
+  reminder: "תזכורת יומית", reminderD: "תזכורת אחת ביום למשימה. לא נשלחת אם כבר סיימת.",
+  remOn: "הפעלה", remOff: "כיבוי", remTime: "שעה", remBody: "המשימה של היום מחכה לך: 10 שאלות, בערך 10 דקות.",
+  remDenied: "צריך לאשר התראות לאפליקציה בהגדרות הטלפון.", remWeb: "התזכורות עובדות באפליקציה בטלפון.",
+});

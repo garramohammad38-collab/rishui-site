@@ -333,3 +333,34 @@ body{-webkit-tap-highlight-color:transparent}
 .sheet-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
 @media (min-width: 900px){.sheet{align-items:center}.sheet-in{border-radius:22px}}
 .grid .tile span:not(.n){font-size:13px;color:var(--muted);line-height:1.35}
+/* daily mission */
+.mission{background:var(--accent);background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 70%,#0B2A55));color:var(--on-accent);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow);animation:rise .35s ease-out}
+.mission .eyebrow{color:inherit;opacity:.85}
+.mission h2{font-size:26px}
+.mission .muted{color:inherit;opacity:.85}
+.mission .gbar{background:rgba(255,255,255,.25)}
+.mission .gbar i{background:#fff}
+.mission .primary{background:#fff;color:var(--accent)}
+.mission .ghost{background:transparent;color:inherit;border-color:rgba(255,255,255,.5)}
+.mission-h{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.mission-h > div{display:flex;flex-direction:column;gap:2px}
+.mleft{background:rgba(255,255,255,.18);border-radius:12px;padding:6px 12px;font-size:14px;white-space:nowrap}
+.mleft b{font-size:18px}
+.mkinds{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;opacity:.95}
+.mission.done{background:var(--ok-soft);color:var(--ink);flex-direction:row;align-items:center;justify-content:space-between}
+.mission.done .ghost{color:var(--ok);border-color:var(--ok)}
+.mission.done .muted{color:var(--muted);opacity:1;font-size:13px}
+.badge-ok{flex:none;width:40px;height:40px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px}
+.mission.done .mission-h{justify-content:flex-start}
+.mission.sk{min-height:120px;justify-content:center}
+.tag.kind{background:var(--bg);color:var(--muted);font-size:12px}
+.celebrate{text-align:center;align-items:center}
+.big-emoji{font-size:54px;line-height:1;animation:pop .5s ease-out}
+.rw{display:flex;gap:10px;width:100%;justify-content:center}
+.rw > div{flex:1;max-width:120px;background:var(--bg);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center}
+.rw b{font:700 24px var(--display)}
+.rw span{font-size:13px;color:var(--muted)}
+input[type=time]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px;font:inherit;flex:1}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.mission,.big-emoji{animation:none}}

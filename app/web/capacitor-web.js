@@ -7,3 +7,4 @@ export const Device = {
   getInfo: async () => ({ platform: "web", model: (navigator.userAgent.match(/\(([^;)]+)/) || [])[1] || "browser" }),
 };
 export const Purchases = {};
+export const LocalNotifications = { getPending: async () => ({ notifications: [] }), cancel: async () => {}, schedule: async () => {}, checkPermissions: async () => ({ display: "denied" }), requestPermissions: async () => ({ display: "denied" }) };
