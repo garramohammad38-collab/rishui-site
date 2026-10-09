@@ -522,16 +522,39 @@ function pick(k) {
   if (S.src.kind === "seq") store.set(posKey(), q.id);
   feedback(k);
 }
+// Split an explanation into general text + a reason per option ("✓ ג – ..." / "✗ A – ...")
+function parseExp(e, lang) {
+  const per = {}, gen = [];
+  String(e || "").split(/\n+/).forEach((line) => {
+    const m = line.match(/^\s*([✓✔✗✘xX])\s*([A-Da-dא-ד])\s*[–—\-:.)]\s*(.+)$/);
+    const k = m ? LET.en.indexOf(m[2].toUpperCase()) >= 0 ? LET.en.indexOf(m[2].toUpperCase()) : LET.he.indexOf(m[2]) : -1;
+    if (k >= 0) per[k] = m[3].trim(); else if (line.trim()) gen.push(line.trim());
+  });
+  return { per, gen: gen.join("\n") };
+}
+// Mark the options right/wrong and write the reason under each one; returns the explanation box html
+function reveal(q, k) {
+  const c = q[st.lang], ok = k === q.answer, { per, gen } = parseExp(c.e, st.lang);
+  app.querySelectorAll(".opt").forEach((b) => {
+    const n = +b.dataset.k; b.disabled = true;
+    if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong");
+    if (per[n] && !b.querySelector(".why")) b.children[1].insertAdjacentHTML("beforeend", `<small class="why">${n === q.answer ? "✓" : "✗"} ${esc(per[n])}</small>`);
+  });
+  const hasPer = Object.keys(per).length > 0;
+  return `<div class="explain"><b>${ok ? t("correct") : t("wrong")}</b>
+    <div class="rans">${t("rightAns")}: <strong>${LET[st.lang][q.answer]} – ${esc(c.o[q.answer])}</strong></div>
+    ${hasPer ? (gen ? `<span>${esc(gen)}</span>` : "") : `<span>${esc(c.e)}</span>`}
+    ${hasPer ? `<div class="muted" style="font-size:13px">${t("whyEach")}</div>` : ""}
+    <div class="ref"><strong>${t("source")}:</strong> <bdi dir="ltr">${esc(q.source)}</bdi></div></div>`;
+}
 function feedback(k) {
-  const q = S.items[S.i], ok = k === q.answer, last = S.i === S.items.length - 1;
-  app.querySelectorAll(".opt").forEach((b) => { const n = +b.dataset.k; b.disabled = true; if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong"); });
-  $("fb").innerHTML = `<div class="explain"><b>${ok ? t("correct") : t("wrong")}</b><span>${esc(q[st.lang].e)}</span>
-    <div class="ref"><strong>${t("source")}:</strong> <bdi dir="ltr">${esc(q.source)}</bdi></div></div>
+  const q = S.items[S.i], last = S.i === S.items.length - 1;
+  $("fb").innerHTML = `${reveal(q, k)}
   <div class="qtools" style="margin-top:10px"><button class="tool" id="rp">⚑ ${t("report")}</button></div>
   <button class="primary" id="nx" style="margin-top:12px">${last ? t("result") : t("next")}</button>`;
   $("rp").onclick = () => { api.report(st.user.id, q.id).catch(() => {}); $("rp").textContent = t("reported"); $("rp").disabled = true; };
   $("nx").onclick = () => { if (last) result(); else { S.i++; question(); } };
-  requestAnimationFrame(() => $("fb")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
 /* ---------------- mock exam ---------------- */
@@ -539,7 +562,7 @@ const MOCK_MAX = 180;
 const mockKey = () => `mock:${st.user.id}:${TR()}`;
 function saveMock() {
   if (S?.mode !== "mock") return;
-  store.set(mockKey(), { ids: S.items.map((q) => q.id), picked: S.picked, i: S.i, used: Math.floor((Date.now() - S.start) / 1000), limit: S.limit });
+  store.set(mockKey(), { ids: S.items.map((q) => q.id), picked: S.picked, i: S.i, instant: !!S.instant, used: Math.floor((Date.now() - S.start) / 1000), limit: S.limit });
 }
 async function resumeMock() {
   const m = store.get(mockKey()); if (!m?.ids?.length) return home();
@@ -548,7 +571,7 @@ async function resumeMock() {
     const items = await api.questionsByIds(TR(), m.ids);
     if (!items.length) { store.set(mockKey(), null); return home(); }
     keepTerms(items);
-    S = { mode: "mock", items, i: Math.min(m.i || 0, items.length - 1), picked: m.picked?.length === items.length ? m.picked : Array(items.length).fill(null), start: Date.now() - (m.used || 0) * 1000, limit: m.limit || items.length * MOCK_SECONDS_PER_Q, tick: null, back: route };
+    S = { mode: "mock", items, i: Math.min(m.i || 0, items.length - 1), picked: m.picked?.length === items.length ? m.picked : Array(items.length).fill(null), start: Date.now() - (m.used || 0) * 1000, limit: m.limit || items.length * MOCK_SECONDS_PER_Q, instant: !!m.instant, tick: null, back: route };
     mockQ();
   } catch (e) {
     frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route;
@@ -567,12 +590,14 @@ function mock() {
       <h2>${t("mockHow")}</h2>
       <div class="chips">${opts.map((o) => `<button class="chip ${o === n ? "cool" : ""}" data-n="${o}" style="cursor:pointer;min-height:44px;padding-inline:16px">${o}</button>`).join("")}</div>
       <div class="field"><label for="mn">${t("mockCustom")} (1–${avail})</label><input id="mn" type="number" inputmode="numeric" min="1" max="${avail}" value="${n}" dir="ltr"></div>
+      <label class="check"><input type="checkbox" id="mi" ${store.get("mock-instant") ? "checked" : ""}> <span>${t("instant")}</span></label>
       <p class="muted">${t("mockTime")}: ${Math.round((n * MOCK_SECONDS_PER_Q) / 60)} ${t("min")} · ${totals().n} ${t("qs")} ${t("mockAvail")}</p>
       <button class="primary" id="ms">${t("mockStart")} ${fwd()}</button>
     </div>`);
     $("bk").onclick = route;
     app.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { n = +b.dataset.n; draw(); }));
     $("mn").onchange = () => { n = Math.max(1, Math.min(avail, Math.round(+$("mn").value || 1))); draw(); };
+    $("mi").onchange = () => store.set("mock-instant", $("mi").checked);
     $("ms").onclick = () => { store.set("mock-n", n); startMock(n); };
   };
   draw();
@@ -584,7 +609,7 @@ async function startMock(n) {
     if (!ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
     const items = await api.questionsByIds(TR(), ids);
     keepTerms(items);
-    S = { mode: "mock", items, i: 0, picked: Array(items.length).fill(null), start: Date.now(), limit: items.length * MOCK_SECONDS_PER_Q, tick: null, back: route };
+    S = { mode: "mock", items, i: 0, picked: Array(items.length).fill(null), start: Date.now(), limit: items.length * MOCK_SECONDS_PER_Q, instant: !!store.get("mock-instant"), tick: null, back: route };
     saveMock();
     mockQ();
   } catch (e) {
@@ -598,13 +623,19 @@ function mockQ() {
   <div class="card">${qBody(q, S.i + 1, tot)}
     <div class="opts">${c.o.map((o, k) => `<button class="opt ${sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
     <div class="mocknav"><button class="ghost" id="pv" ${S.i === 0 ? "disabled" : ""}>${bwd()} ${t("prev")}</button>${S.i < tot - 1 ? `<button class="primary" id="nx">${t("next")} ${fwd()}</button>` : `<button class="primary" id="fin">${t("finish")}</button>`}</div>
+    ${S.instant ? `<div id="fb" style="margin-top:12px"></div>` : ""}
     <p class="muted">${S.picked.filter((x) => x == null).length} ${t("unanswered")}</p>
   </div>`, { protect: true });
   const el = $("tm"), upd = () => { if (S?.screen !== mockQ) return; const left = S.limit - Math.floor((Date.now() - S.start) / 1000); if (left <= 0) return mockEnd(); clock(el, left); };
   upd(); S.tick = setInterval(upd, 1000);
   $("bk").onclick = () => { saveMock(); route(); }; bindMark(q);
   S.back = () => { saveMock(); route(); };
-  app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.picked[S.i] = +b.dataset.k; saveMock(); app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b)); }));
+  app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => {
+    S.picked[S.i] = +b.dataset.k; saveMock();
+    if (S.instant) { $("fb").innerHTML = reveal(q, S.picked[S.i]); requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" })); }
+    else app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b));
+  }));
+  if (S.instant && sel != null) $("fb").innerHTML = reveal(q, sel);
   $("pv").onclick = () => { S.i--; saveMock(); mockQ(); };
   if ($("nx")) $("nx").onclick = () => { S.i++; saveMock(); mockQ(); };
   if ($("fin")) $("fin").onclick = mockEnd;
@@ -638,7 +669,7 @@ function result() {
   </div>
   <div class="section-title">${t("strengths")}</div>
   <div class="card bars">${Object.entries(by).map(([k, [a, b]]) => { const r = a / b, cc = r >= 0.8 ? "var(--ok)" : r >= 0.5 ? "var(--amber)" : "var(--bad)"; return `<div class="bar-row"><div class="lbl"><span>${esc(topicName(k, st.lang))}</span><span>${a}/${b}</span></div><div class="bar"><i style="width:${r * 100}%;background:${cc}"></i></div></div>`; }).join("")}</div>
-  ${isMock ? `<div class="section-title">${t("review")}</div><div class="review protect">${S.items.map((q, i) => { const pk = S.picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted">${esc(c2.e)}</span></div>`; }).join("")}</div>` : ""}
+  ${isMock ? `<div class="section-title">${t("review")}</div><div class="review protect">${S.items.map((q, i) => { const pk = S.picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted" style="white-space:pre-line">${esc(c2.e)}</span></div>`; }).join("")}</div>` : ""}
   <div class="actions">${canMore ? `<button class="primary" id="more">${t("cont2")}</button>` : `<button class="primary" id="ag">${t("again")}</button>`}<button class="ghost" id="hm">${t("home")}</button></div>`, { protect: isMock });
   if ($("more")) $("more").onclick = () => (S.src.kind === "seq" || S.src.kind === "unanswered" ? practice(S.src) : topicNext(S.src.topic, S.items.at(-1).id));
   if ($("ag")) $("ag").onclick = () => {
