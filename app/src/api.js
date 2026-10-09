@@ -21,8 +21,8 @@ const qcache = new Map();
 export const auth = {
   session: async () => (await supabase.auth.getSession()).data.session,
   signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-  resend: (email) => supabase.auth.resend({ type: "signup", email }),
-  signUp: (email, password) => supabase.auth.signUp({ email, password }),
+  resend: (email) => supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" } }),
+  signUp: (email, password) => supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" } }),
   // the link in the email opens the web app, where the student picks a new password
   reset: (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" }),
   setPassword: (password) => supabase.auth.updateUser({ password }),
