@@ -5,6 +5,18 @@ const KEY = window.__env.VITE_SUPABASE_ANON_KEY;
 export const supabase = createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 function must({ data, error }) { if (error) throw error; return data; }
+// the server returns at most 1000 rows per request, so long lists are read page by page
+async function pageAll(make, max = 20000) {
+  const out = [];
+  for (let from = 0; from < max; from += 1000) {
+    const rows = must(await make().range(from, from + 999));
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+// questions already loaded in this session are kept in memory (saves time and the daily limit)
+const qcache = new Map();
 
 export const auth = {
   session: async () => (await supabase.auth.getSession()).data.session,
@@ -50,10 +62,14 @@ export async function questions({ track, topic = null, afterId = 0, limit = 20, 
   return must(await supabase.rpc("get_questions", { p_track: track, p_topic: topic, p_after_id: afterId, p_limit: limit, p_ids: ids }));
 }
 export async function questionsByIds(track, ids) {
-  const out = [];
-  for (let i = 0; i < ids.length; i += 25) out.push(...(await questions({ track, ids: ids.slice(i, i + 25), limit: 25 })));
-  const order = new Map(ids.map((id, i) => [id, i]));
-  return out.sort((a, b) => order.get(a.id) - order.get(b.id));
+  const need = [...new Set(ids)].filter((id) => !qcache.has(id));
+  const parts = []; for (let i = 0; i < need.length; i += 25) parts.push(need.slice(i, i + 25));
+  // 3 requests at a time instead of one after another
+  for (let i = 0; i < parts.length; i += 3) {
+    const got = await Promise.all(parts.slice(i, i + 3).map((p) => questions({ track, ids: p, limit: 25 })));
+    got.flat().forEach((q) => qcache.set(q.id, q));
+  }
+  return ids.map((id) => qcache.get(id)).filter(Boolean);
 }
 export async function unansweredIds(track, n = 20) {
   return must(await supabase.rpc("unanswered_ids", { p_track: track, p_n: n }));
@@ -63,13 +79,13 @@ export async function mockIds(track, n = 50) {
 }
 export async function myAnswers(uid, track) {
   // up to 5000 rows: id + correct only
-  return must(await supabase.from("answers").select("question_id, correct").eq("user_id", uid).eq("track", track).limit(5000));
+  return pageAll(() => supabase.from("answers").select("question_id, correct").eq("user_id", uid).eq("track", track).order("question_id"));
 }
 export async function saveAnswer(uid, track, qid, picked, correct) {
   must(await supabase.from("answers").upsert({ user_id: uid, track, question_id: qid, picked, correct, answered_at: new Date().toISOString() }));
 }
 export async function myBookmarks(uid, track) {
-  return must(await supabase.from("bookmarks").select("question_id").eq("user_id", uid).eq("track", track).limit(5000)).map((r) => r.question_id);
+  return (await pageAll(() => supabase.from("bookmarks").select("question_id").eq("user_id", uid).eq("track", track).order("question_id"))).map((r) => r.question_id);
 }
 export async function setBookmark(uid, track, qid, on) {
   if (on) must(await supabase.from("bookmarks").upsert({ user_id: uid, track, question_id: qid }));
@@ -117,8 +133,9 @@ export async function activity(uid, track, days = 14) {
   catch { return []; }
 }
 export async function answerHistory(uid, track) {
-  try { return must(await supabase.from("answers").select("question_id,picked,correct,first_correct,attempts,answered_at").eq("user_id", uid).eq("track", track).order("answered_at", { ascending: false }).limit(5000)); }
-  catch { return must(await supabase.from("answers").select("question_id,picked,correct,answered_at").eq("user_id", uid).eq("track", track).order("answered_at", { ascending: false }).limit(5000)); }
+  const q = (cols) => () => supabase.from("answers").select(cols).eq("user_id", uid).eq("track", track).order("answered_at", { ascending: false }).order("question_id");
+  try { return await pageAll(q("question_id,picked,correct,first_correct,attempts,answered_at")); }
+  catch { return pageAll(q("question_id,picked,correct,answered_at")); }
 }
 export async function resetProgress(track) {
   must(await supabase.rpc("reset_my_progress", { p_track: track }));
@@ -178,4 +195,7 @@ export async function finishFriend(code) { return must(await supabase.rpc("finis
 export const appUrl = window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/";
 export async function examCount(track, topics, pool) {
   return must(await supabase.rpc("exam_count", { p_track: track, p_topics: topics?.length ? topics : null, p_pool: pool }));
+}
+export async function browseQuestions(track, { q = "", topic = null, status = "all", offset = 0, limit = 30 } = {}) {
+  return must(await supabase.rpc("browse_questions", { p_track: track, p_q: q, p_topic: topic || null, p_status: status, p_offset: offset, p_limit: limit }));
 }

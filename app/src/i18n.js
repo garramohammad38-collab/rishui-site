@@ -157,7 +157,7 @@ Object.assign(T.en, {
   smart: "Smart review", smartD: "Questions you got wrong, at the right time to review", smartNone: "Nothing to review right now. Well done!",
   calcT: "Dosage practice", calcD: "New numbers every time", refT: "Reference sheet", refD: "Lab values, formulas, conversions",
   refNote: "Ranges differ slightly between labs and textbooks. Follow your local protocol.",
-  search: "Search", searchD: "Search all questions", searchPh: "A word or term, e.g. digoxin", noResults: "No questions found.",
+  search: "Search", searchD: "Search and browse the question bank", searchPh: "A word or term, e.g. digoxin", noResults: "No questions found.",
   searchNeed: "Search needs a database update.", goal: "Daily goal", goalOf: "questions today", streak: "day streak",
   changeGoal: "Change goal", goalDone: "Goal reached today! 🎉", examWhen: "When is your exam?",
   examWhenD: "We'll count the days left and suggest a daily pace.", pace: "To finish every question by the exam:", perDay: "a day",
@@ -167,7 +167,7 @@ Object.assign(T.he, {
   smart: "חזרה חכמה", smartD: "שאלות שטעית בהן, בזמן הנכון לחזור עליהן", smartNone: "אין כרגע שאלות לחזרה. כל הכבוד!",
   calcT: "תרגול חישובים", calcD: "מספרים חדשים בכל פעם", refT: "דף עזר", refD: "ערכי מעבדה, נוסחאות, המרות",
   refNote: "הטווחים משתנים מעט בין מעבדות וספרים. פועלים לפי הנהלים במקום.",
-  search: "חיפוש", searchD: "חיפוש בכל השאלות", searchPh: "מילה או מושג, למשל: דיגוקסין", noResults: "לא נמצאו שאלות.",
+  search: "חיפוש", searchD: "חיפוש ודפדוף בבנק השאלות", searchPh: "מילה או מושג, למשל: דיגוקסין", noResults: "לא נמצאו שאלות.",
   searchNeed: "החיפוש דורש עדכון במסד הנתונים.", goal: "יעד יומי", goalOf: "שאלות היום", streak: "ימים ברצף",
   changeGoal: "שינוי יעד", goalDone: "עמדת ביעד היום! 🎉", examWhen: "מתי המבחן שלך?",
   examWhenD: "נחשב כמה ימים נשארו ונציע קצב יומי.", pace: "כדי לסיים את כל השאלות עד המבחן:", perDay: "ביום",
@@ -308,4 +308,13 @@ Object.assign(T.he, {
   in3T: "לומדים מהטעויות", in3D: "כל טעות חוזרת לחזרה בזמן הנכון. „חזרה חכמה” במסך הראשי.",
   in4T: "משימת היום וסטטיסטיקה", in4D: "משימה קצרה בכל יום, ובלשונית הסטטיסטיקה רואים את ההתקדמות לפי נושא.",
   inGo: "יאללה מתחילים", skip: "דילוג",
+});
+
+Object.assign(T.en, {
+  bankT: "Question bank", stNew: "new", stNewF: "New", stAnswered: "Answered", tryOther: "Try another word, topic or filter.",
+  offline: "No internet connection. Your answers are kept on the phone and will be sent when you're back online.",
+});
+Object.assign(T.he, {
+  bankT: "בנק השאלות", stNew: "חדשה", stNewF: "חדשות", stAnswered: "נענו", tryOther: "אפשר לנסות מילה, נושא או סינון אחר.",
+  offline: "אין חיבור לאינטרנט. התשובות נשמרות בטלפון ויישלחו כשהחיבור יחזור.",
 });

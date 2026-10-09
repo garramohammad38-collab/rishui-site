@@ -118,7 +118,23 @@ function bindLegal() {
 document.addEventListener("contextmenu", (e) => { if (e.target.closest?.(".protect")) e.preventDefault(); });
 document.addEventListener("copy", (e) => { if (e.target?.closest?.(".protect")) e.preventDefault(); });
 
-document.addEventListener("visibilitychange", () => { if (document.hidden) saveExam(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return saveExam();
+  // back in the app after a while: refresh question totals (new questions may have been added)
+  if (st.user && st.profile?.track && Date.now() - (st.loadedAt || 0) > 10 * 60e3) {
+    st.loadedAt = Date.now();
+    api.counts(TR()).then((c) => { st.counts = Object.fromEntries(c.map((r) => [r.topic, Number(r.n)])); if (S?.screen === home) home(); }).catch(() => {});
+  }
+});
+// a small bar while there is no internet; answers are kept and sent again when it is back
+function netBar() {
+  let el = document.getElementById("netbar");
+  if (navigator.onLine) { el?.remove(); return; }
+  if (!el) { el = document.createElement("div"); el.id = "netbar"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.textContent = t("offline");
+}
+window.addEventListener("offline", netBar);
+window.addEventListener("online", netBar);
 
 /* ---------------- boot ---------------- */
 async function boot() {
@@ -169,6 +185,7 @@ async function loadUserData() {
   if (profile.lang && !store.get("lang")) st.lang = profile.lang;
   st.answers = new Map(answers.map((r) => [r.question_id, r.correct]));
   st.marks = new Set(marks);
+  st.loadedAt = Date.now();
   st.counts = Object.fromEntries(counts.map((r) => [r.topic, Number(r.n)]));
   st.best = best;
 }
@@ -1637,29 +1654,47 @@ function calcTrainer(back = route, keep) {
   else app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => { C.picked = +b.dataset.k; C.total++; if (C.picked === q.answer) C.right++; show(C.picked); $("bk").closest(".qbar").querySelector(".timer").textContent = `${t("score")} ${C.right}/${C.total}`; }));
 }
 
-/* ---------------- search all questions ---------------- */
-function searchPage(back = route, keep) {
-  const Q = keep || { term: "", res: null, err: null };
-  S = { screen: () => searchPage(back, Q), back };
-  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("search")}</h2></div>
-  <form class="card" id="sf"><div class="row2"><input id="sq" type="search" placeholder="${t("searchPh")}" value="${esc(Q.term)}" aria-label="${t("search")}" enterkeyhint="search"><button class="primary slim" type="submit">${t("search")}</button></div></form>
+/* ---------------- question bank: search + topic + status filters (state kept while the app is open) ---------------- */
+function searchPage(back = route) {
+  const Q = st.bank || (st.bank = { term: "", topic: "", status: "all", res: null, more: false, err: null, busy: false });
+  S = { screen: () => searchPage(back), back };
+  const topics = Object.keys(st.counts).sort();
+  const badge = (r) => `${r.status === "right" ? `<span class="sb ok">✓</span>` : r.status === "wrong" ? `<span class="sb bad">✗</span>` : `<span class="sb new">${t("stNew")}</span>`}${r.saved ? `<span class="sb">★</span>` : ""}`;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("bankT")}</h2></div>
+  <form class="card bankf" id="sf" role="search">
+    <div class="row2"><input id="sq" type="search" placeholder="${t("searchPh")}" value="${esc(Q.term)}" aria-label="${t("search")}" enterkeyhint="search"><button class="primary slim" type="submit">${t("search")}</button></div>
+    <div class="row2"><select id="stp" aria-label="${t("topicsL")}"><option value="">${t("allTopics")}</option>${topics.map((k) => `<option value="${esc(k)}" ${Q.topic === k ? "selected" : ""}>${esc(topicName(k, st.lang))} (${st.counts[k]})</option>`).join("")}</select></div>
+    <div class="chips">${[["all", "fAll"], ["new", "stNewF"], ["answered", "stAnswered"], ["wrong", "fWrong"], ["saved", "fSaved"]].map(([v, l]) => `<button type="button" class="chip pick ${Q.status === v ? "cool" : ""}" data-st="${v}">${t(l)}</button>`).join("")}</div>
+  </form>
   ${Q.err ? `<div class="banner bad">${esc(Q.err)}</div>` : ""}
-  ${Q.res && !Q.res.length ? `<div class="card"><p class="muted">${t("noResults")}</p></div>` : ""}
-  <div class="qlist protect">${(Q.res || []).map((r) => `<button class="qrow" data-q="${r.id}"><span class="qn"><small>#${r.id}</small></span><span class="qq">${esc(st.lang === "he" ? r.q_he : r.q_en)}</span><span class="qk"><small>${esc(topicName(r.topic, st.lang))}</small></span><span class="qv">${t("view")} ${fwd()}</span></button>`).join("")}</div>`, { wide: true });
+  ${Q.busy && !Q.res ? `<div class="loading"><div class="spin"></div></div>` : ""}
+  ${Q.res && !Q.res.length ? `<div class="card empty"><p>🔎 ${t("noResults")}</p><p class="muted">${t("tryOther")}</p></div>` : ""}
+  <div class="qlist protect">${(Q.res || []).map((r) => `<button class="qrow" data-q="${r.id}"><span class="qn">${badge(r)}<small>#${r.id}</small></span><span class="qq">${esc((st.lang === "he" ? r.q_he : r.q_en) || r.q_he)}</span><span class="qk"><small>${esc(topicName(r.topic, st.lang))}</small></span><span class="qv">${t("view")} ${fwd()}</span></button>`).join("")}</div>
+  ${Q.more ? `<button class="ghost" id="more" ${Q.busy ? "disabled" : ""}>${t("loadMore")}</button>` : ""}`, { wide: true });
   $("bk").onclick = () => back();
-  if (!Q.res) $("sq").focus();
-  $("sf").onsubmit = async (e) => {
-    e.preventDefault();
-    Q.term = $("sq").value.trim(); if (Q.term.length < 2) return;
-    try { Q.res = await api.searchQuestions(TR(), Q.term); Q.err = null; }
-    catch (x) { Q.res = null; Q.err = /search_questions|function/i.test(x?.message || "") ? t("searchNeed") : errMsg(x); }
-    searchPage(back, Q);
+  const PAGE = 30;
+  const run = async (append) => {
+    Q.busy = true; if (!append) { Q.res = null; } searchPage(back);
+    try {
+      const rows = await api.browseQuestions(TR(), { q: Q.term, topic: Q.topic, status: Q.status, offset: append ? Q.res.length : 0, limit: PAGE });
+      Q.res = append ? [...Q.res, ...rows] : rows; Q.more = rows.length === PAGE; Q.err = null;
+    } catch (x) {
+      // older database: plain search only
+      try { if (!Q.term || Q.term.length < 2) throw x; Q.res = (await api.searchQuestions(TR(), Q.term)).map((r) => ({ ...r, status: "new" })); Q.more = false; Q.err = null; }
+      catch (y) { Q.res = Q.res || []; Q.err = /browse_questions|search_questions|function/i.test(y?.message || "") ? t("searchNeed") : errMsg(y); }
+    }
+    Q.busy = false; if (S?.screen && $("sf")) searchPage(back);
   };
+  $("sf").onsubmit = (e) => { e.preventDefault(); Q.term = $("sq").value.trim(); run(false); };
+  $("stp").onchange = () => { Q.topic = $("stp").value; Q.term = $("sq").value.trim(); run(false); };
+  app.querySelectorAll("[data-st]").forEach((b) => (b.onclick = () => { Q.status = b.dataset.st; Q.term = $("sq").value.trim(); run(false); }));
+  if ($("more")) $("more").onclick = () => run(true);
   app.querySelectorAll("[data-q]").forEach((b) => (b.onclick = async () => {
     const id = +b.dataset.q; loading();
-    try { const [q] = await api.questionsByIds(TR(), [id]); if (q) return viewQuestion(q, null, () => searchPage(back, Q)); } catch (x) { Q.err = errMsg(x); }
-    searchPage(back, Q);
+    try { const [q] = await api.questionsByIds(TR(), [id]); if (q) return viewQuestion(q, null, () => searchPage(back)); } catch (x) { Q.err = errMsg(x); }
+    searchPage(back);
   }));
+  if (!Q.res && !Q.busy && !Q.err) run(false);
 }
 
 /* ---------------- practice ---------------- */
