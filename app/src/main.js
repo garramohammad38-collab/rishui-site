@@ -253,7 +253,16 @@ function login() {
         u.signup = false; flash(t("checkEmail")); return login();
       }
       const { data, error } = await api.auth.signIn(em, pw);
-      if (error) return err(String(error.message).includes("fetch") ? t("netErr") : t("wrongLogin"));
+      if (error) {
+        const m = String(error.message || "");
+        if (/not confirmed/i.test(m)) {
+          err(st.lang === "he" ? "עוד לא אישרת את האימייל. פתח את המייל מ-Supabase (בדוק גם בספאם) ולחץ על הקישור." : "You haven't confirmed your email yet. Open the email (check spam too) and tap the link.");
+          $("er").insertAdjacentHTML("beforeend", ` <button type="button" class="link" id="rs2">${st.lang === "he" ? "שלח שוב" : "Send again"}</button>`);
+          $("rs2").onclick = async () => { const r = await api.auth.resend(em).catch((x) => ({ error: x })); err(r?.error ? authMsg(r.error) : (st.lang === "he" ? "שלחנו שוב. בדוק את המייל." : "Sent again. Check your email.")); };
+          return;
+        }
+        return err(m.includes("fetch") ? t("netErr") : t("wrongLogin"));
+      }
       await afterLogin(data.user);
     } catch (ex) { err(authMsg(ex)); } finally { if ($("sb")) $("sb").disabled = false; }
   };
