@@ -4,6 +4,8 @@ import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
 import * as api from "./api.js";
 import { T, topicName as fallbackTopic } from "./i18n.js";
+import { REF } from "./reference.js";
+import { calcQuestion } from "./calc.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
 
 /* ---------------- state ---------------- */
@@ -451,6 +453,7 @@ function home() {
   <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
+  ${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}
   <div class="home-main">
   <div class="hero">
     <div class="hero-row">
@@ -467,10 +470,15 @@ function home() {
   <div class="grid">
     <button class="tile" id="mis"><b>${t("mistakes")}</b><span class="n">${tt.wrong}</span></button>
     <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
+    <button class="tile" id="smr"><b>${t("smart")}</b><span>${t("smartD")}</span></button>
     <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
+    <button class="tile" id="clc"><b>${t("calcT")}</b><span>${t("calcD")}</span></button>
+    <button class="tile" id="rfp"><b>${t("refT")}</b><span>${t("refD")}</span></button>
+    <button class="tile" id="srch"><b>🔍 ${t("search")}</b><span>${t("searchD")}</span></button>
     <button class="tile" id="fl"><b>${t("flash")}</b><span>EN · עב</span></button>
   </div>
   </div>
+  <div class="card"><div id="goalw">${goalCard([])}</div></div>
   <div class="card"><div class="card-h"><h3>${t("activityL")}</h3><span class="muted">${t("last14")}</span></div><div id="actc"><div class="spin sm"></div></div></div>
   <div class="section-title">${t("bytopic")}</div>
   <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
@@ -488,7 +496,10 @@ function home() {
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   // async parts: activity chart + an unfinished exam to continue
-  api.activity(st.user.id, TR()).then((rows) => { if (S?.screen === home && $("actc")) $("actc").innerHTML = activityChart(rows); }).catch(() => {});
+  bindGoal([]);
+  $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
+  if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
+  api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("actc")) $("actc").innerHTML = activityChart(rows); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
   api.myExams(st.user.id, TR()).then((list) => {
     const x = list.find((r) => r.status === "open"); if (!x || S?.screen !== home || !$("openx")) return;
     const done = (x.picked || []).filter((v) => v != null).length;
@@ -781,6 +792,9 @@ function tools() {
   frame(`${msgHtml()}<h2 class="page-h">${t("navTools")}</h2>
   <div class="tools-grid">
     <div class="card"><h3>${t("acct")}</h3><p class="muted">${t("acctD")}</p><button class="primary" id="ac">${t("acct")}</button></div>
+    <div class="card"><h3>${t("refT")}</h3><p class="muted">${t("refD")}</p><button class="primary" id="rfp">${t("refT")}</button></div>
+    <div class="card"><h3>${t("calcT")}</h3><p class="muted">${t("calcD")}</p><button class="primary" id="clc">${t("calcT")}</button></div>
+    <div class="card"><h3>${t("search")}</h3><p class="muted">${t("searchD")}</p><button class="primary" id="srch">${t("search")}</button></div>
     <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
     <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
@@ -788,6 +802,7 @@ function tools() {
   ${legalLinks()}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null;
   $("ac").onclick = account; $("hp").onclick = () => contact(tools);
+  $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
     if (!st.ui.resetArmed) { st.ui.resetArmed = true; return tools(); }
@@ -796,6 +811,132 @@ function tools() {
     catch (e) { flash(errMsg(e), true); }
     tools();
   };
+}
+
+/* ---------------- daily goal + streak ---------------- */
+const goalKey = () => `goal:${st.user.id}`;
+const goalOf = () => store.get(goalKey()) || 20;
+function streakOf(rows) {
+  const by = new Set((rows || []).filter((r) => r.n > 0).map((r) => r.day));
+  let d = new Date(today() + "T00:00Z"), n = 0;
+  if (!by.has(d.toISOString().slice(0, 10))) d = new Date(d - 864e5);
+  while (by.has(d.toISOString().slice(0, 10))) { n++; d = new Date(d - 864e5); }
+  return n;
+}
+function goalCard(rows) {
+  const g = goalOf(), td = (rows || []).find((r) => r.day === today())?.n || 0, s = streakOf(rows), p = Math.min(100, pctOf(td, g));
+  const dl = daysLeft(), left = Math.max(0, totals().n - totals().done);
+  return `<div class="goalc">
+    <div class="goal-row"><div><span class="eyebrow">${t("goal")}</span><div class="bignum"><b>${td}</b><span>/</span><b>${g}</b></div><span class="muted">${t("goalOf")}</span></div>
+      <div class="streak"><span class="fire" aria-hidden="true">🔥</span><b>${s}</b><span>${t("streak")}</span></div></div>
+    <div class="gbar"><i style="width:${p}%"></i></div>
+    ${td >= g ? `<span class="okline">${t("goalDone")}</span>` : ""}
+    ${dl ? `<span class="muted" style="font-size:13px">${t("pace")} <b>${Math.ceil(left / Math.max(1, dl))}</b> ${t("qs")} ${t("perDay")}</span>` : ""}
+    <div class="chips">${[10, 20, 30, 50, 100].map((n) => `<button class="chip pick ${n === g ? "cool" : ""}" data-goal="${n}">${n}</button>`).join("")}</div>
+  </div>`;
+}
+function bindGoal(rows) {
+  app.querySelectorAll("[data-goal]").forEach((b) => (b.onclick = () => { store.set(goalKey(), +b.dataset.goal); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }));
+}
+
+/* ---------------- smart review ---------------- */
+async function smartReview() {
+  loading();
+  let hist = [];
+  try { hist = await api.answerHistory(st.user.id, TR()); } catch (e) { flash(errMsg(e), true); return route(); }
+  const now = Date.now(), H = 36e5, age = (r) => now - new Date(r.answered_at).getTime();
+  const oldest = (a, b) => new Date(a.answered_at) - new Date(b.answered_at);
+  const wrong = hist.filter((r) => !r.correct && age(r) > H).sort(oldest);
+  const shaky = hist.filter((r) => r.correct && r.first_correct === false && age(r) > 72 * H).sort(oldest);
+  const ids = [...wrong, ...shaky].map((r) => r.question_id).slice(0, BATCH);
+  if (!ids.length) {
+    S = { screen: smartReview, back: route };
+    frame(`<div class="card"><h2>${t("smart")}</h2><p class="muted">${t("smartNone")}</p><button class="ghost" id="hm">${t("home")}</button></div>`);
+    $("hm").onclick = route; return;
+  }
+  practice({ kind: "ids", ids });
+}
+
+/* ---------------- reference sheet (page + pop-up inside questions) ---------------- */
+let refTab = "lab";
+function refHtml() {
+  const sec = REF.find((x) => x.id === refTab) || REF[0];
+  return `<div class="chips">${REF.map((x) => `<button class="chip pick ${x.id === sec.id ? "cool" : ""}" data-ref="${x.id}">${x[st.lang]}</button>`).join("")}</div>
+  <table class="reft"><tbody>${sec.rows.map((r) => `<tr><th>${esc(st.lang === "he" ? r[0] : r[1])}</th><td><bdi dir="ltr">${esc(r[2])}</bdi></td></tr>`).join("")}</tbody></table>
+  <p class="muted" style="font-size:12px">${t("refNote")}</p>`;
+}
+function bindRef(root, redraw) {
+  root.querySelectorAll("[data-ref]").forEach((b) => (b.onclick = () => { refTab = b.dataset.ref; redraw(); }));
+}
+function refPage(back = route) {
+  S = { screen: () => refPage(back), back };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("refT")}</h2></div>
+  <div class="card" id="refw">${refHtml()}</div>`, { wide: true });
+  $("bk").onclick = () => back();
+  bindRef(app, () => { $("refw").innerHTML = refHtml(); bindRef($("refw"), () => refPage(back)); });
+}
+function refSheet() {
+  document.querySelector(".sheet")?.remove();
+  const el = document.createElement("div");
+  el.className = "sheet"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.dir = t("dir");
+  const draw = () => {
+    el.innerHTML = `<div class="sheet-in"><div class="sheet-h"><h2>${t("refT")}</h2><button class="ghost slim" id="rfx">${t("close")}</button></div>${refHtml()}</div>`;
+    el.querySelector("#rfx").onclick = close; bindRef(el, draw);
+  };
+  const close = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  el.onclick = (e) => { if (e.target === el) close(); };
+  document.addEventListener("keydown", onKey);
+  draw(); document.body.appendChild(el);
+  el.querySelector("#rfx").focus();
+}
+
+/* ---------------- dosage-calculation trainer ---------------- */
+function calcTrainer(back = route, keep) {
+  const C = keep || { q: calcQuestion(st.lang), picked: null, right: 0, total: 0 };
+  S = { screen: () => calcTrainer(back, C), back };
+  const q = C.q;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("calcT")}</h2><span class="timer">${t("score")} ${C.right}/${C.total}</span></div>
+  <div class="card">
+    <div class="qtools"><button class="tool" id="rf">📋 ${t("refT")}</button></div>
+    <div class="qtext">${esc(q.q)}</div>
+    <div class="opts">${q.o.map((o, k) => `<button class="opt" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span><bdi>${esc(o)}</bdi></span></button>`).join("")}</div>
+    <div id="fb"></div>
+  </div>`);
+  $("bk").onclick = () => back(); $("rf").onclick = refSheet;
+  const show = (k) => {
+    app.querySelectorAll(".opt").forEach((b) => { const n = +b.dataset.k; b.disabled = true; if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong"); });
+    $("fb").innerHTML = `<div class="explain"><b>${k === q.answer ? t("correct") : t("wrong")}</b><div>${t("solution")}: <bdi dir="ltr">${esc(q.sol)}</bdi></div><div>${t("rightAns")}: <b><bdi>${esc(q.o[q.answer])}</bdi></b></div></div>
+    <button class="primary" id="nq" style="margin-top:12px">${t("newQ")} ${fwd()}</button>`;
+    $("nq").onclick = () => calcTrainer(back, { q: calcQuestion(st.lang), picked: null, right: C.right, total: C.total });
+  };
+  if (C.picked != null) show(C.picked);
+  else app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => { C.picked = +b.dataset.k; C.total++; if (C.picked === q.answer) C.right++; show(C.picked); $("bk").closest(".qbar").querySelector(".timer").textContent = `${t("score")} ${C.right}/${C.total}`; }));
+}
+
+/* ---------------- search all questions ---------------- */
+function searchPage(back = route, keep) {
+  const Q = keep || { term: "", res: null, err: null };
+  S = { screen: () => searchPage(back, Q), back };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("search")}</h2></div>
+  <form class="card" id="sf"><div class="row2"><input id="sq" type="search" placeholder="${t("searchPh")}" value="${esc(Q.term)}" aria-label="${t("search")}" enterkeyhint="search"><button class="primary slim" type="submit">${t("search")}</button></div></form>
+  ${Q.err ? `<div class="banner bad">${esc(Q.err)}</div>` : ""}
+  ${Q.res && !Q.res.length ? `<div class="card"><p class="muted">${t("noResults")}</p></div>` : ""}
+  <div class="qlist protect">${(Q.res || []).map((r) => `<button class="qrow" data-q="${r.id}"><span class="qn"><small>#${r.id}</small></span><span class="qq">${esc(st.lang === "he" ? r.q_he : r.q_en)}</span><span class="qk"><small>${esc(topicName(r.topic, st.lang))}</small></span><span class="qv">${t("view")} ${fwd()}</span></button>`).join("")}</div>`, { wide: true });
+  $("bk").onclick = () => back();
+  if (!Q.res) $("sq").focus();
+  $("sf").onsubmit = async (e) => {
+    e.preventDefault();
+    Q.term = $("sq").value.trim(); if (Q.term.length < 2) return;
+    try { Q.res = await api.searchQuestions(TR(), Q.term); Q.err = null; }
+    catch (x) { Q.res = null; Q.err = /search_questions|function/i.test(x?.message || "") ? t("searchNeed") : errMsg(x); }
+    searchPage(back, Q);
+  };
+  app.querySelectorAll("[data-q]").forEach((b) => (b.onclick = async () => {
+    const id = +b.dataset.q; loading();
+    try { const [q] = await api.questionsByIds(TR(), [id]); if (q) return viewQuestion(q, null, () => searchPage(back, Q)); } catch (x) { Q.err = errMsg(x); }
+    searchPage(back, Q);
+  }));
 }
 
 /* ---------------- practice ---------------- */
@@ -832,11 +973,12 @@ function qHead(num, tot) {
 function qBody(q, num, tot) {
   const c = q[st.lang], on = st.marks.has(q.id);
   return `<div class="qmeta"><span class="tag">${esc(topicName(q.topic, st.lang))}</span><span>${t("q")} ${num} ${t("of")} ${tot}</span></div>
-  <div class="qtools"><button class="tool ${on ? "on" : ""}" id="mk">${on ? "★ " + t("saved") : "☆ " + t("save")}</button></div>
+  <div class="qtools"><button class="tool ${on ? "on" : ""}" id="mk">${on ? "★ " + t("saved") : "☆ " + t("save")}</button>${S?.mode === "exam" && !S.guided ? "" : `<button class="tool" id="rf">📋 ${t("refT")}</button>`}</div>
   <div class="qtext">${esc(c.q)}</div>
   ${q.terms?.length ? `<div class="terms">${q.terms.map((x) => `<span class="term"><bdi>${esc(x[0])}</bdi> · <bdi>${esc(x[1])}</bdi></span>`).join("")}</div>` : ""}`;
 }
 function bindMark(q) {
+  if ($("rf")) $("rf").onclick = refSheet;
   $("mk").onclick = () => {
     const on = !st.marks.has(q.id);
     if (on) st.marks.add(q.id); else st.marks.delete(q.id);

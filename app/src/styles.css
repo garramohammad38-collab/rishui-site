@@ -312,3 +312,24 @@ body{-webkit-tap-highlight-color:transparent}
 }
 .hero .row2 .ghost{flex:none;white-space:nowrap}
 .act{max-width:640px;margin-inline:auto}
+/* daily goal */
+.goalc{display:flex;flex-direction:column;gap:10px}
+.goal-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.streak{display:flex;flex-direction:column;align-items:center;background:var(--amber-soft);color:var(--amber);border-radius:16px;padding:8px 14px;min-width:84px}
+.streak .fire{font-size:22px;line-height:1}
+.streak b{font:700 24px var(--display)}
+.streak span:last-child{font-size:12px;font-weight:600}
+.gbar{height:10px;border-radius:5px;background:var(--accent-soft);overflow:hidden}
+.gbar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.exq{border:2px dashed var(--accent)}
+.exq input[type=date]{flex:1}
+/* reference */
+.reft{width:100%;border-collapse:collapse;font-size:15px}
+.reft th,.reft td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}
+.reft th{font-weight:500}
+.reft td{font-weight:700;white-space:nowrap;color:var(--accent)}
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(10,20,35,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--surface);color:var(--ink);width:100%;max-width:640px;max-height:85vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+@media (min-width: 900px){.sheet{align-items:center}.sheet-in{border-radius:22px}}
+.grid .tile span:not(.n){font-size:13px;color:var(--muted);line-height:1.35}

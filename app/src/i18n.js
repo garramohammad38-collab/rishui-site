@@ -152,3 +152,24 @@ Object.assign(T.he, {
   helpT: "עזרה ויצירת קשר", helpD: "שאלות, בעיות או רעיונות? כתבו לנו.", cardsD: "מושגים עברית ↔ אנגלית מתוך השאלות",
   acctD: "תאריך מבחן, מנוי, יציאה", legalT: "תנאים ופרטיות", newExamGo: "ליצירת מבחן חדש",
 });
+
+Object.assign(T.en, {
+  smart: "Smart review", smartD: "Questions you got wrong, at the right time to review", smartNone: "Nothing to review right now. Well done!",
+  calcT: "Dosage practice", calcD: "New numbers every time", refT: "Reference sheet", refD: "Lab values, formulas, conversions",
+  refNote: "Ranges differ slightly between labs and textbooks. Follow your local protocol.",
+  search: "Search", searchD: "Search all questions", searchPh: "A word or term, e.g. digoxin", noResults: "No questions found.",
+  searchNeed: "Search needs a database update.", goal: "Daily goal", goalOf: "questions today", streak: "day streak",
+  changeGoal: "Change goal", goalDone: "Goal reached today! 🎉", examWhen: "When is your exam?",
+  examWhenD: "We'll count the days left and suggest a daily pace.", pace: "To finish every question by the exam:", perDay: "a day",
+  solution: "Solution", newQ: "New question", score: "Score", close: "Close",
+});
+Object.assign(T.he, {
+  smart: "חזרה חכמה", smartD: "שאלות שטעית בהן, בזמן הנכון לחזור עליהן", smartNone: "אין כרגע שאלות לחזרה. כל הכבוד!",
+  calcT: "תרגול חישובים", calcD: "מספרים חדשים בכל פעם", refT: "דף עזר", refD: "ערכי מעבדה, נוסחאות, המרות",
+  refNote: "הטווחים משתנים מעט בין מעבדות וספרים. פועלים לפי הנהלים במקום.",
+  search: "חיפוש", searchD: "חיפוש בכל השאלות", searchPh: "מילה או מושג, למשל: דיגוקסין", noResults: "לא נמצאו שאלות.",
+  searchNeed: "החיפוש דורש עדכון במסד הנתונים.", goal: "יעד יומי", goalOf: "שאלות היום", streak: "ימים ברצף",
+  changeGoal: "שינוי יעד", goalDone: "עמדת ביעד היום! 🎉", examWhen: "מתי המבחן שלך?",
+  examWhenD: "נחשב כמה ימים נשארו ונציע קצב יומי.", pace: "כדי לסיים את כל השאלות עד המבחן:", perDay: "ביום",
+  solution: "פתרון", newQ: "שאלה חדשה", score: "ניקוד", close: "סגירה",
+});

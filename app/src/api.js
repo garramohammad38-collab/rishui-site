@@ -126,3 +126,6 @@ export async function resetProgress(track) {
 export async function topicStats(track) {
   return must(await supabase.rpc("my_topic_stats", { p_track: track }));
 }
+export async function searchQuestions(track, q) {
+  return must(await supabase.rpc("search_questions", { p_track: track, p_q: q }));
+}
