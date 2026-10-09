@@ -121,7 +121,7 @@ async function start() {
 
 /* ---------- layout ---------- */
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["stats","أرقام"]];
+  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["stats","أرقام"]];
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
@@ -129,7 +129,7 @@ function render() {
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, stats: viewStats })[tab]();
 }
 
 /* ---------- list ---------- */
@@ -423,6 +423,33 @@ function viewTracks() {
     if (error) msg(error.message, false); else { msg("انضاف المسار"); curTrack = id; localStorage.setItem("rs-track", id); }
     await loadMeta(); render();
   };
+}
+
+/* ---------- users ---------- */
+let userState = { q: "", page: 0 };
+const fmtDT = d => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+async function viewUsers() {
+  const s = userState, PAGE = 50;
+  $("body").innerHTML = `<div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
+    <div class="muted" id="ucount">بحمّل…</div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
+  const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
+  $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
+  let q = sb.from("profiles").select("email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
+  if (s.q) q = q.ilike("email", `%${s.q}%`);
+  const { data, count, error } = await q;
+  if (error) { $("rows").innerHTML = `<tr><td colspan="6" class="msg bad">${esc(error.message)}</td></tr>`; return; }
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+  const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
+  $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
+  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
+  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="muted">ما في مستخدمين</td></tr>`;
+  const pages = Math.max(1, Math.ceil((count || 0) / PAGE));
+  $("upg").textContent = `صفحة ${s.page + 1} من ${pages}`;
+  $("upr").disabled = s.page === 0; $("unx").disabled = s.page + 1 >= pages;
+  $("upr").onclick = () => { s.page--; viewUsers(); }; $("unx").onclick = () => { s.page++; viewUsers(); };
 }
 
 /* ---------- stats ---------- */
