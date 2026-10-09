@@ -318,3 +318,6 @@ Object.assign(T.he, {
   bankT: "בנק השאלות", stNew: "חדשה", stNewF: "חדשות", stAnswered: "נענו", tryOther: "אפשר לנסות מילה, נושא או סינון אחר.",
   offline: "אין חיבור לאינטרנט. התשובות נשמרות בטלפון ויישלחו כשהחיבור יחזור.",
 });
+
+Object.assign(T.en, { introAgain: "Quick tour", introAgainD: "See the short introduction to the app again." });
+Object.assign(T.he, { introAgain: "הדרכה קצרה", introAgainD: "לראות שוב את ההסבר הקצר על האפליקציה." });

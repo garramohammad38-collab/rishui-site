@@ -910,6 +910,7 @@ function tools() {
     <div class="card"><h3>${t("calcT")}</h3><p class="muted">${t("calcD")}</p><button class="primary" id="clc">${t("calcT")}</button></div>
     <div class="card"><h3>${t("search")}</h3><p class="muted">${t("searchD")}</p><button class="primary" id="srch">${t("search")}</button></div>
     <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
+    <div class="card"><h3>👋 ${t("introAgain")}</h3><p class="muted">${t("introAgainD")}</p><button class="ghost" id="ina">${t("introAgain")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
     <div class="card"><h3>${t("jTitle")}</h3><p class="muted">${t("jBuildD")}</p><button class="primary" id="jt">${t("jTitle")}</button></div>
     <div class="card"><h3>🏆 ${t("league")}</h3><p class="muted">${t("leagueJoinD")}</p><button class="primary" id="lgt2">${t("league")}</button></div>
@@ -919,7 +920,7 @@ function tools() {
   ${legalLinks()}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("lgt2").onclick = league;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("lgt2").onclick = league;
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
