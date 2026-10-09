@@ -496,3 +496,8 @@ button,.chip.pick,.tab,.tile{-webkit-tap-highlight-color:transparent}
 .plan.soon .soonicon{font-size:22px;flex:none;width:28px;text-align:center}
 .soontag{margin-inline-start:auto;flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--amber-soft,#FBEBCF);color:#8a5a0a}
 .soonbox{gap:8px}.soonbox .chips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* no text selection / copying anywhere except typing fields */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable=true]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+img{-webkit-user-drag:none;user-drag:none}

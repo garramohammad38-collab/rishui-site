@@ -115,8 +115,10 @@ function bindLegal() {
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
   if ($("lg-p")) $("lg-p").onclick = () => openUrl(`${LEGAL}/privacy-${st.lang}.html`);
 }
-document.addEventListener("contextmenu", (e) => { if (e.target.closest?.(".protect")) e.preventDefault(); });
-document.addEventListener("copy", (e) => { if (e.target?.closest?.(".protect")) e.preventDefault(); });
+// no copying anything from the app (typing fields excepted): no selecting, copy/cut, long-press menu or dragging
+const editable = (el) => !!el?.closest?.("input, textarea, select, [contenteditable=true]");
+for (const ev of ["copy", "cut", "contextmenu", "selectstart", "dragstart"])
+  document.addEventListener(ev, (e) => { if (!editable(e.target)) e.preventDefault(); });
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return saveExam();
