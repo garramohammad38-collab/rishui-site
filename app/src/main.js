@@ -115,6 +115,8 @@ function bindLegal() {
 document.addEventListener("contextmenu", (e) => { if (e.target.closest?.(".protect")) e.preventDefault(); });
 document.addEventListener("copy", (e) => { if (e.target?.closest?.(".protect")) e.preventDefault(); });
 
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveMock(); });
+
 /* ---------------- boot ---------------- */
 async function boot() {
   loading();
@@ -404,7 +406,10 @@ function home() {
   const addedTotal = Object.values(added).reduce((a, b) => a + b, 0);
   const newBox = addedTotal ? `<div class="newbox" role="status"><div class="newbox-h"><b>${st.lang === "he" ? `נוספו ${addedTotal} שאלות חדשות` : `${addedTotal} ${t("newQs")}`}</b><button class="link" id="nok">${t("gotIt")}</button></div>
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
-  frame(`${msgHtml()}${newBox}
+  const um = store.get(mockKey());
+  const umBox = um?.ids?.length ? `<div class="newbox"><div class="newbox-h"><b>${t("unfinished")}</b><span class="muted">${um.picked.filter((x) => x != null).length}/${um.ids.length} ${t("answeredOf")}</span></div>
+    <div class="row2"><button class="primary" id="umr">${t("resume")} ${fwd()}</button><button class="ghost" id="umd">${t("discard")}</button></div></div>` : "";
+  frame(`${msgHtml()}${newBox}${umBox}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
@@ -423,6 +428,7 @@ function home() {
   <div class="grid">
     <button class="tile" id="mk"><b>${t("mock")}</b><span>${t("mockD")}</span></button>
     <button class="tile" id="mis"><b>${t("mistakes")}</b><span class="n">${tt.wrong}</span></button>
+    <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
     <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
     <button class="tile" id="fl"><b>${t("flash")}</b><span>EN · עב</span></button>
     <button class="tile" id="sts"><b>${t("stats")}</b><span>${tt.done ? Math.round((tt.right / tt.done) * 100) : 0}% ${t("accuracy")}</span></button>
@@ -434,6 +440,9 @@ function home() {
   ${legalLinks()}`, { wide: true });
   bindLegal();
   st.ui.msg = null;
+  if ($("umr")) $("umr").onclick = resumeMock;
+  if ($("umd")) $("umd").onclick = () => { store.set(mockKey(), null); home(); };
+  $("una").onclick = () => practice({ kind: "unanswered" });
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
   if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
@@ -453,7 +462,10 @@ async function practice(src) {
   loading();
   try {
     let items;
-    if (src.kind === "ids") {
+    if (src.kind === "unanswered") {
+      const ids = await api.unansweredIds(TR(), BATCH);
+      items = ids.length ? await api.questionsByIds(TR(), ids) : [];
+    } else if (src.kind === "ids") {
       if (!src.ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
       items = await api.questionsByIds(TR(), src.ids.slice(0, BATCH));
     } else {
@@ -519,10 +531,29 @@ function feedback(k) {
   <button class="primary" id="nx" style="margin-top:12px">${last ? t("result") : t("next")}</button>`;
   $("rp").onclick = () => { api.report(st.user.id, q.id).catch(() => {}); $("rp").textContent = t("reported"); $("rp").disabled = true; };
   $("nx").onclick = () => { if (last) result(); else { S.i++; question(); } };
+  requestAnimationFrame(() => $("fb")?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
 /* ---------------- mock exam ---------------- */
 const MOCK_MAX = 180;
+const mockKey = () => `mock:${st.user.id}:${TR()}`;
+function saveMock() {
+  if (S?.mode !== "mock") return;
+  store.set(mockKey(), { ids: S.items.map((q) => q.id), picked: S.picked, i: S.i, used: Math.floor((Date.now() - S.start) / 1000), limit: S.limit });
+}
+async function resumeMock() {
+  const m = store.get(mockKey()); if (!m?.ids?.length) return home();
+  loading();
+  try {
+    const items = await api.questionsByIds(TR(), m.ids);
+    if (!items.length) { store.set(mockKey(), null); return home(); }
+    keepTerms(items);
+    S = { mode: "mock", items, i: Math.min(m.i || 0, items.length - 1), picked: m.picked?.length === items.length ? m.picked : Array(items.length).fill(null), start: Date.now() - (m.used || 0) * 1000, limit: m.limit || items.length * MOCK_SECONDS_PER_Q, tick: null, back: route };
+    mockQ();
+  } catch (e) {
+    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route;
+  }
+}
 function mock() {
   // setup: the student picks how many questions (up to 180, or what the bank has)
   const avail = Math.min(MOCK_MAX, totals().n || MOCK_MAX);
@@ -554,6 +585,7 @@ async function startMock(n) {
     const items = await api.questionsByIds(TR(), ids);
     keepTerms(items);
     S = { mode: "mock", items, i: 0, picked: Array(items.length).fill(null), start: Date.now(), limit: items.length * MOCK_SECONDS_PER_Q, tick: null, back: route };
+    saveMock();
     mockQ();
   } catch (e) {
     frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route;
@@ -570,14 +602,16 @@ function mockQ() {
   </div>`, { protect: true });
   const el = $("tm"), upd = () => { if (S?.screen !== mockQ) return; const left = S.limit - Math.floor((Date.now() - S.start) / 1000); if (left <= 0) return mockEnd(); clock(el, left); };
   upd(); S.tick = setInterval(upd, 1000);
-  $("bk").onclick = route; bindMark(q);
-  app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.picked[S.i] = +b.dataset.k; app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b)); }));
-  $("pv").onclick = () => { S.i--; mockQ(); };
-  if ($("nx")) $("nx").onclick = () => { S.i++; mockQ(); };
+  $("bk").onclick = () => { saveMock(); route(); }; bindMark(q);
+  S.back = () => { saveMock(); route(); };
+  app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.picked[S.i] = +b.dataset.k; saveMock(); app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b)); }));
+  $("pv").onclick = () => { S.i--; saveMock(); mockQ(); };
+  if ($("nx")) $("nx").onclick = () => { S.i++; saveMock(); mockQ(); };
   if ($("fin")) $("fin").onclick = mockEnd;
 }
 function mockEnd() {
   stopTimer();
+  store.set(mockKey(), null);
   S.ans = S.items.map((q, i) => S.picked[i] === q.answer);
   S.items.forEach((q, i) => { if (S.picked[i] != null) { st.answers.set(q.id, S.ans[i]); api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], S.ans[i]).catch(() => {}); } });
   const score = S.ans.filter(Boolean).length;
@@ -606,7 +640,7 @@ function result() {
   <div class="card bars">${Object.entries(by).map(([k, [a, b]]) => { const r = a / b, cc = r >= 0.8 ? "var(--ok)" : r >= 0.5 ? "var(--amber)" : "var(--bad)"; return `<div class="bar-row"><div class="lbl"><span>${esc(topicName(k, st.lang))}</span><span>${a}/${b}</span></div><div class="bar"><i style="width:${r * 100}%;background:${cc}"></i></div></div>`; }).join("")}</div>
   ${isMock ? `<div class="section-title">${t("review")}</div><div class="review protect">${S.items.map((q, i) => { const pk = S.picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted">${esc(c2.e)}</span></div>`; }).join("")}</div>` : ""}
   <div class="actions">${canMore ? `<button class="primary" id="more">${t("cont2")}</button>` : `<button class="primary" id="ag">${t("again")}</button>`}<button class="ghost" id="hm">${t("home")}</button></div>`, { protect: isMock });
-  if ($("more")) $("more").onclick = () => (S.src.kind === "seq" ? practice(S.src) : topicNext(S.src.topic, S.items.at(-1).id));
+  if ($("more")) $("more").onclick = () => (S.src.kind === "seq" || S.src.kind === "unanswered" ? practice(S.src) : topicNext(S.src.topic, S.items.at(-1).id));
   if ($("ag")) $("ag").onclick = () => {
     if (isMock) return mock();
     Object.assign(S, { i: 0, ans: [], picked: [], start: Date.now() });

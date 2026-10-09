@@ -55,6 +55,9 @@ export async function questionsByIds(track, ids) {
   const order = new Map(ids.map((id, i) => [id, i]));
   return out.sort((a, b) => order.get(a.id) - order.get(b.id));
 }
+export async function unansweredIds(track, n = 20) {
+  return must(await supabase.rpc("unanswered_ids", { p_track: track, p_n: n }));
+}
 export async function mockIds(track, n = 50) {
   return must(await supabase.rpc("mock_ids", { p_track: track, p_n: n }));
 }
