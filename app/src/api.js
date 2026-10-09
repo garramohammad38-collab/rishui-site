@@ -94,3 +94,35 @@ export async function redeem(code) {
 export async function deleteAccount() {
   must(await supabase.rpc("delete_my_account"));
 }
+
+/* ---------- exams, activity, history ---------- */
+export async function examIds(track, n, topics = null, pool = "all") {
+  return must(await supabase.rpc("exam_ids", { p_track: track, p_n: n, p_topics: topics?.length ? topics : null, p_pool: pool }));
+}
+export async function createExam(row) {
+  return must(await supabase.from("exams").insert(row).select("*").single());
+}
+export async function updateExam(id, patch) {
+  must(await supabase.from("exams").update(patch).eq("id", id));
+}
+export async function deleteExam(id) {
+  must(await supabase.from("exams").delete().eq("id", id));
+}
+export async function myExams(uid, track) {
+  return must(await supabase.from("exams").select("*").eq("user_id", uid).eq("track", track).order("created_at", { ascending: false }).limit(500));
+}
+export async function activity(uid, track, days = 14) {
+  const from = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10);
+  try { return must(await supabase.from("activity").select("day,n,correct").eq("user_id", uid).eq("track", track).gte("day", from).order("day")); }
+  catch { return []; }
+}
+export async function answerHistory(uid, track) {
+  try { return must(await supabase.from("answers").select("question_id,picked,correct,first_correct,attempts,answered_at").eq("user_id", uid).eq("track", track).order("answered_at", { ascending: false }).limit(5000)); }
+  catch { return must(await supabase.from("answers").select("question_id,picked,correct,answered_at").eq("user_id", uid).eq("track", track).order("answered_at", { ascending: false }).limit(5000)); }
+}
+export async function resetProgress(track) {
+  must(await supabase.rpc("reset_my_progress", { p_track: track }));
+}
+export async function topicStats(track) {
+  return must(await supabase.rpc("my_topic_stats", { p_track: track }));
+}

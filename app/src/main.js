@@ -11,7 +11,6 @@ const app = document.getElementById("app");
 const wm = document.getElementById("wm");
 const LEGAL = window.__env.VITE_LEGAL_BASE || "";
 const SUPPORT = window.__env.VITE_SUPPORT_EMAIL || "";
-const MOCK_N = 50, MOCK_SECONDS_PER_Q = 90;
 
 function storeGetter() {
   return {
@@ -83,15 +82,16 @@ function watermark(on) {
   wm.hidden = !on;
   if (on) $("wm-text").innerHTML = Array(120).fill(`<span>${esc(st.user?.email || "")}</span>`).join("");
 }
-function frame(inner, { protect = false, wide = false } = {}) {
+function frame(inner, { protect = false, wide = false, nav = null } = {}) {
   stopTimer();
   watermark(false);
   applyTheme();
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
-  app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "");
+  app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "") + (nav ? " has-nav" : "");
   app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
-  <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${inner}`;
+  <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${nav ? navHtml(nav) : ""}${inner}`;
+  if (nav) bindNav();
   app.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
     st.lang = b.dataset.l; store.set("lang", st.lang);
     if (st.user) api.updateProfile(st.lang, null).catch(() => {});
@@ -115,7 +115,7 @@ function bindLegal() {
 document.addEventListener("contextmenu", (e) => { if (e.target.closest?.(".protect")) e.preventDefault(); });
 document.addEventListener("copy", (e) => { if (e.target?.closest?.(".protect")) e.preventDefault(); });
 
-document.addEventListener("visibilitychange", () => { if (document.hidden) saveMock(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveExam(); });
 
 /* ---------------- boot ---------------- */
 async function boot() {
@@ -395,9 +395,48 @@ function totals() {
   let right = 0; st.answers.forEach((c) => { if (c) right++; });
   return { n, done: st.answers.size, right, wrong: st.answers.size - right };
 }
+/* ---------------- navigation (6 sections) ---------------- */
+const ICON = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  newx: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M12 10v6M9 13h6"/>',
+  exams: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/>',
+  qs: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5v.01"/>',
+  stats: '<path d="M3 21h18M6 17v-5M11 17V6M16 17V9M20 17v-3"/>',
+  tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+};
+const NAV = [["home", "navHome", () => home()], ["newx", "navNew", () => newExam()], ["exams", "navExams", () => myExams()], ["qs", "navQs", () => myQuestions()], ["stats", "navStats", () => stats()], ["tools", "navTools", () => tools()]];
+function navHtml(on) {
+  return `<nav class="tabs" aria-label="${t("name")}">${NAV.map(([k, label]) => `<button class="tab ${k === on ? "on" : ""}" data-nav="${k}" ${k === on ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg><span>${t(label)}</span></button>`).join("")}</nav>`;
+}
+function bindNav() {
+  app.querySelectorAll("[data-nav]").forEach((b) => (b.onclick = () => NAV.find((x) => x[0] === b.dataset.nav)[2]()));
+}
+const fmtDate = (d) => { const x = new Date(d); return `${String(x.getDate()).padStart(2, "0")}.${String(x.getMonth() + 1).padStart(2, "0")}.${x.getFullYear()}`; };
+const fmtTime = (d) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
+const pctOf = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+function ringSvg(p, size = 120, label = `${p}%`) {
+  const R = 50, C = 2 * Math.PI * R, col = p >= 80 ? "var(--ok)" : p >= 60 ? "var(--amber)" : p > 0 ? "var(--accent)" : "var(--line)";
+  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--line)" stroke-width="11"/>
+  <circle cx="60" cy="60" r="${R}" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - p / 100)}" transform="rotate(-90 60 60)"/>
+  <text x="60" y="68" text-anchor="middle" font-size="24" font-weight="700" fill="var(--ink)" font-family="Rubik, sans-serif">${label}</text></svg>`;
+}
+// bars for the last 14 days of answers
+function activityChart(rows, days = 14) {
+  const by = Object.fromEntries((rows || []).map((r) => [r.day, r]));
+  const list = [...Array(days)].map((_, i) => { const d = new Date(Date.now() - (days - 1 - i) * 864e5).toISOString().slice(0, 10); return { d, n: by[d]?.n || 0, c: by[d]?.correct || 0 }; });
+  const max = Math.max(5, ...list.map((x) => x.n)), W = 300, H = 110, bw = W / days;
+  return `<svg class="act" viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="${t("activityL")}">
+    ${list.map((x, i) => { const h = (x.n / max) * H, hc = (x.c / max) * H, xx = i * bw + 3; return `<rect x="${xx}" y="${H - h}" width="${bw - 6}" height="${h}" rx="3" fill="var(--accent-soft)"><title>${x.d}: ${x.n}</title></rect><rect x="${xx}" y="${H - hc}" width="${bw - 6}" height="${hc}" rx="3" fill="var(--accent)"/>${i % 2 === days % 2 ? "" : `<text x="${xx + (bw - 6) / 2}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--muted)">${x.d.slice(8)}.${x.d.slice(5, 7)}</text>`}`; }).join("")}
+    <line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="var(--line)"/></svg>`;
+}
+function topicBars(rows) {
+  return `<div class="card bars">${rows.map(({ k, a, b, sub, acc }) => { const r = b ? a / b : 0, q = acc ?? r, cc = q >= 0.8 ? "var(--ok)" : q >= 0.5 ? "var(--amber)" : "var(--bad)"; return `<div class="bar-row"><div class="lbl"><span>${esc(topicName(k, st.lang))}</span><span>${sub ?? `${a}/${b}`}</span></div><div class="bar"><i style="width:${r * 100}%;background:${b ? cc : "transparent"}"></i></div></div>`; }).join("")}</div>`;
+}
+
+/* ---------------- home ---------------- */
 function home() {
   S = { screen: home };
-  const tt = totals(), pct = tt.n ? Math.round((tt.done / tt.n) * 100) : 0, dl = daysLeft();
+  const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
   // "what's new": compare published counts per topic with what this student saw last time
   const seenKey = `seen-counts:${st.user.id}:${TR()}`;
   let seen = store.get(seenKey);
@@ -406,11 +445,10 @@ function home() {
   const addedTotal = Object.values(added).reduce((a, b) => a + b, 0);
   const newBox = addedTotal ? `<div class="newbox" role="status"><div class="newbox-h"><b>${st.lang === "he" ? `נוספו ${addedTotal} שאלות חדשות` : `${addedTotal} ${t("newQs")}`}</b><button class="link" id="nok">${t("gotIt")}</button></div>
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
-  const um = store.get(mockKey());
-  const umBox = um?.ids?.length ? `<div class="newbox"><div class="newbox-h"><b>${t("unfinished")}</b><span class="muted">${um.picked.filter((x) => x != null).length}/${um.ids.length} ${t("answeredOf")}</span></div>
-    <div class="row2"><button class="primary" id="umr">${t("resume")} ${fwd()}</button><button class="ghost" id="umd">${t("discard")}</button></div></div>` : "";
-  frame(`${msgHtml()}${newBox}${umBox}
+  const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
+  frame(`${msgHtml()}${newBox}<div id="openx"></div>
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
+  <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div class="home-main">
@@ -419,41 +457,345 @@ function home() {
       <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
       <div class="hero-txt">
         <span class="eyebrow">${t("progress")}</span>
-        <h2>${tt.done} ${t("of")} ${tt.n} ${t("qs")}</h2>
-        ${tt.done ? `<span class="okline">${t("accuracy")} ${Math.round((tt.right / tt.done) * 100)}%</span>` : ""}
+        <div class="bignum"><b>${tt.done}</b><span>/</span><b>${tt.n}</b></div>
+        <span class="muted">${t("solved")} · ${t("inBank")}</span>
+        ${tt.done ? `<span class="okline">${t("accuracy")} ${pctOf(tt.right, tt.done)}%</span>` : ""}
       </div>
     </div>
-    <button class="primary" id="go">${t("cont2")} ${fwd()}</button>
+    <div class="row2"><button class="primary" id="go">${t("cont2")} ${fwd()}</button><button class="ghost" id="nx2">${t("navNew")}</button></div>
   </div>
   <div class="grid">
-    <button class="tile" id="mk"><b>${t("mock")}</b><span>${t("mockD")}</span></button>
     <button class="tile" id="mis"><b>${t("mistakes")}</b><span class="n">${tt.wrong}</span></button>
     <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
     <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
     <button class="tile" id="fl"><b>${t("flash")}</b><span>EN · עב</span></button>
-    <button class="tile" id="sts"><b>${t("stats")}</b><span>${tt.done ? Math.round((tt.right / tt.done) * 100) : 0}% ${t("accuracy")}</span></button>
-    <button class="tile" id="ac"><b>${t("acct")}</b><span><bdi dir="ltr">${esc(st.user.email)}</bdi></span></button>
   </div>
   </div>
+  <div class="card"><div class="card-h"><h3>${t("activityL")}</h3><span class="muted">${t("last14")}</span></div><div id="actc"><div class="spin sm"></div></div></div>
   <div class="section-title">${t("bytopic")}</div>
   <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
-  ${legalLinks()}`, { wide: true });
+  ${legalLinks()}`, { wide: true, nav: "home" });
   bindLegal();
   st.ui.msg = null;
-  if ($("umr")) $("umr").onclick = resumeMock;
-  if ($("umd")) $("umd").onclick = () => { store.set(mockKey(), null); home(); };
   $("una").onclick = () => practice({ kind: "unanswered" });
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
   if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
-  $("mk").onclick = mock;
+  $("nx2").onclick = newExam;
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
   $("bm").onclick = () => practice({ kind: "ids", ids: [...st.marks] });
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
-  $("sts").onclick = stats;
-  $("ac").onclick = account;
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
+  // async parts: activity chart + an unfinished exam to continue
+  api.activity(st.user.id, TR()).then((rows) => { if (S?.screen === home && $("actc")) $("actc").innerHTML = activityChart(rows); }).catch(() => {});
+  api.myExams(st.user.id, TR()).then((list) => {
+    const x = list.find((r) => r.status === "open"); if (!x || S?.screen !== home || !$("openx")) return;
+    const done = (x.picked || []).filter((v) => v != null).length;
+    $("openx").innerHTML = `<div class="newbox"><div class="newbox-h"><b>${t("unfinished")}</b><span class="muted">${done}/${x.ids.length} ${t("answeredOf")}</span></div>
+      <div class="row2"><button class="primary" id="umr">${t("resume")} ${fwd()}</button><button class="ghost" id="uml">${t("navExams")}</button></div></div>`;
+    $("umr").onclick = () => runExam(x); $("uml").onclick = myExams;
+  }).catch(() => {});
+}
+
+/* ---------------- new exam (builder) ---------------- */
+const EXAM_SECONDS_PER_Q = 90, EXAM_MAX = 180;
+function newExam() {
+  const saved = store.get("exam-cfg") || {};
+  const cfg = { n: saved.n || 50, timed: saved.timed ?? true, guided: saved.guided ?? false, topics: saved.topics || [], pool: saved.pool || "all" };
+  S = { screen: newExam };
+  const topics = Object.keys(st.counts).sort();
+  const draw = () => {
+    const avail = Math.min(EXAM_MAX, cfg.topics.length ? cfg.topics.reduce((a, k) => a + (st.counts[k] || 0), 0) : totals().n) || 0;
+    if (cfg.n > avail && avail) cfg.n = avail;
+    const opts = [10, 25, 50, 100, 150, 180].filter((n) => n <= avail);
+    const seg = (id, a, b, on) => `<div class="seg" role="group"><button class="segb ${on ? "on" : ""}" data-s="${id}" data-v="1"><b>${a[0]}</b>${a[1] ? `<small>${a[1]}</small>` : ""}</button><button class="segb ${!on ? "on" : ""}" data-s="${id}" data-v="0"><b>${b[0]}</b>${b[1] ? `<small>${b[1]}</small>` : ""}</button></div>`;
+    frame(`<h2 class="page-h">${t("navNew")}</h2>
+    <div class="card exb">
+      <h3>${t("exSettings")}</h3>
+      <div class="exgrid">
+        <div class="field"><label>${t("timing")}</label>${seg("timed", [t("timed"), `${EXAM_SECONDS_PER_Q} ${t("sec")} / ${t("q")}`], [t("untimed"), ""], cfg.timed)}</div>
+        <div class="field"><label>${t("solutions")}</label>${seg("guided", [t("guided"), t("guidedD")], [t("unguided"), t("unguidedD")], cfg.guided)}</div>
+      </div>
+      <div class="field"><label>${t("pool")}</label><div class="chips">${[["all", "poolAll"], ["unanswered", "poolUn"], ["wrong", "poolWrong"], ["saved", "poolSaved"]].map(([v, l]) => `<button class="chip pick ${cfg.pool === v ? "cool" : ""}" data-pool="${v}">${t(l)}</button>`).join("")}</div></div>
+      <div class="field"><label>${t("topicsL")}</label><div class="chips"><button class="chip pick ${!cfg.topics.length ? "cool" : ""}" data-tp="">${t("allTopics")}</button>${topics.map((k) => `<button class="chip pick ${cfg.topics.includes(k) ? "cool" : ""}" data-tp="${esc(k)}">${esc(topicName(k, st.lang))} <span class="muted">${st.counts[k]}</span></button>`).join("")}</div></div>
+      <div class="field"><label>${t("qCount")} <span class="muted">(${avail} ${t("maxAvail")})</span></label>
+        <div class="chips">${opts.map((o) => `<button class="chip pick ${o === cfg.n ? "cool" : ""}" data-n="${o}">${o}</button>`).join("")}</div>
+        <input id="mn" type="number" inputmode="numeric" min="1" max="${avail}" value="${cfg.n}" dir="ltr" aria-label="${t("mockCustom")}"></div>
+      ${cfg.timed ? `<p class="muted">${t("mockTime")}: ${Math.round((cfg.n * EXAM_SECONDS_PER_Q) / 60)} ${t("min")}</p>` : ""}
+      <div class="err" id="er" hidden></div>
+      <button class="primary" id="ms" ${avail ? "" : "disabled"}>${t("create")} ${fwd()}</button>
+    </div>`, { wide: true, nav: "newx" });
+    app.querySelectorAll("[data-s]").forEach((b) => (b.onclick = () => { cfg[b.dataset.s] = b.dataset.v === "1"; draw(); }));
+    app.querySelectorAll("[data-pool]").forEach((b) => (b.onclick = () => { cfg.pool = b.dataset.pool; draw(); }));
+    app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => {
+      const k = b.dataset.tp; if (!k) cfg.topics = [];
+      else cfg.topics = cfg.topics.includes(k) ? cfg.topics.filter((x) => x !== k) : [...cfg.topics, k];
+      draw();
+    }));
+    app.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { cfg.n = +b.dataset.n; draw(); }));
+    $("mn").onchange = () => { cfg.n = Math.max(1, Math.min(avail || 1, Math.round(+$("mn").value || 1))); draw(); };
+    $("ms").onclick = async () => {
+      store.set("exam-cfg", cfg);
+      $("ms").disabled = true;
+      try {
+        const ids = await api.examIds(TR(), cfg.n, cfg.topics, cfg.pool);
+        if (!ids.length) { $("er").textContent = t("noneMatch"); $("er").hidden = false; $("ms").disabled = false; return; }
+        const row = await api.createExam({ track: TR(), settings: { timed: cfg.timed, guided: cfg.guided, topics: cfg.topics, pool: cfg.pool }, ids, picked: ids.map(() => null), time_limit: cfg.timed ? ids.length * EXAM_SECONDS_PER_Q : null });
+        runExam(row);
+      } catch (e) { $("er").textContent = errMsg(e); $("er").hidden = false; $("ms").disabled = false; }
+    };
+  };
+  draw();
+}
+
+/* ---------------- exam engine (saved on the server) ---------------- */
+async function runExam(row) {
+  loading();
+  try {
+    const items = await api.questionsByIds(TR(), row.ids);
+    if (!items.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
+    keepTerms(items);
+    const at = new Map(row.ids.map((id, i) => [id, i]));
+    const picked = items.map((q) => { const v = row.picked?.[at.get(q.id)]; return v == null ? null : +v; });
+    S = { mode: "exam", ex: row, items, picked, saved: picked.map((v) => v != null), i: Math.min(row.i || 0, items.length - 1), start: Date.now() - (row.used || 0) * 1000, limit: row.time_limit || null, guided: !!row.settings?.guided, tick: null, back: () => { saveExam(); myExams(); } };
+    examQ();
+  } catch (e) {
+    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`);
+    $("rt").onclick = () => runExam(row); $("hm").onclick = route;
+  }
+}
+function examUsed() { return Math.floor((Date.now() - S.start) / 1000); }
+function saveExam() {
+  if (S?.mode !== "exam" || S.ended) return;
+  const ids = S.items.map((q) => q.id);
+  api.updateExam(S.ex.id, { ids, picked: S.picked, i: S.i, used: examUsed() }).catch(() => {});
+}
+function examQ() {
+  S.screen = examQ;
+  const q = S.items[S.i], c = q[st.lang], tot = S.items.length, sel = S.picked[S.i];
+  const locked = S.guided && sel != null;
+  frame(`${qHead(S.i + 1, tot)}
+  <div class="card">${qBody(q, S.i + 1, tot)}
+    <div class="opts">${c.o.map((o, k) => `<button class="opt ${!S.guided && sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    ${S.guided ? `<div id="fb" style="margin-top:12px"></div>` : ""}
+    <div class="mocknav"><button class="ghost" id="pv" ${S.i === 0 ? "disabled" : ""}>${bwd()} ${t("prev")}</button>${S.i < tot - 1 ? `<button class="primary" id="nx">${t("next")} ${fwd()}</button>` : `<button class="primary" id="fin">${t("finish")}</button>`}</div>
+    <p class="muted">${S.picked.filter((x) => x == null).length} ${t("unanswered")}</p>
+  </div>`, { protect: true });
+  const el = $("tm"), upd = () => {
+    if (S?.screen !== examQ) return;
+    const used = examUsed();
+    if (S.limit) { const left = S.limit - used; if (left <= 0) return examEnd(); clock(el, left); } else clock(el, used);
+  };
+  upd(); S.tick = setInterval(upd, 1000);
+  $("bk").onclick = () => S.back(); bindMark(q);
+  if (locked) $("fb").innerHTML = reveal(q, sel);
+  else app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => {
+    const k = +b.dataset.k; S.picked[S.i] = k;
+    if (S.guided) {
+      const ok = k === q.answer; st.answers.set(q.id, ok); S.saved[S.i] = true;
+      api.saveAnswer(st.user.id, TR(), q.id, k, ok).catch(() => {});
+      $("fb").innerHTML = reveal(q, k);
+      requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    } else app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b));
+    saveExam();
+  }));
+  $("pv").onclick = () => { S.i--; saveExam(); examQ(); };
+  if ($("nx")) $("nx").onclick = () => { S.i++; saveExam(); examQ(); };
+  if ($("fin")) $("fin").onclick = examEnd;
+}
+async function examEnd() {
+  stopTimer();
+  const used = Math.min(examUsed(), S.limit || 1e9);
+  S.ended = true;
+  const ans = S.items.map((q, i) => S.picked[i] === q.answer);
+  S.items.forEach((q, i) => {
+    if (S.picked[i] == null || S.saved[i]) return;
+    st.answers.set(q.id, ans[i]); api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], ans[i]).catch(() => {});
+  });
+  const score = ans.filter(Boolean).length, p = pctOf(score, S.items.length);
+  if (st.best == null || p > st.best) st.best = p;
+  const ex = { ...S.ex, ids: S.items.map((q) => q.id), picked: S.picked, used, status: "done", score, finished_at: new Date().toISOString() };
+  api.updateExam(ex.id, { ids: ex.ids, picked: ex.picked, i: S.i, used, status: "done", score, finished_at: ex.finished_at }).catch(() => {});
+  api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
+  examResult(ex, S.items, "all");
+}
+// result / view / analysis of one exam
+function examResult(ex, items, part = "all") {
+  const picked = items.map((q) => { const i = ex.ids.indexOf(q.id); const v = ex.picked?.[i]; return v == null ? null : +v; });
+  const n = items.length, c = items.filter((q, i) => picked[i] === q.answer).length, p = pctOf(c, n), s = ex.used || 0;
+  const by = {}; items.forEach((q, i) => { by[q.topic] = by[q.topic] || [0, 0]; by[q.topic][1]++; if (picked[i] === q.answer) by[q.topic][0]++; });
+  const answered = picked.filter((v) => v != null).length;
+  S = { screen: () => examResult(ex, items, part), back: myExams, ex, items };
+  const showA = part !== "review", showR = part !== "analysis";
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("examNo")} #${ex.id}</h2></div>
+  <div class="card score">${ringSvg(p, 130)}
+    <h2>${p >= 80 ? t("r80") : p >= 60 ? t("r60") : t("r0")}</h2>
+    <p class="muted">${c} ${t("of")} ${n} ${t("ofCorrect")} · ${Math.floor(s / 60)} ${t("min")} ${s % 60} ${t("sec")}</p>
+  </div>
+  ${showA ? `<div class="section-title">${t("strengths")}</div>
+  ${topicBars(Object.entries(by).map(([k, [a, b]]) => ({ k, a, b })))}
+  <div class="big-stat"><div class="tile"><span>${t("avgPerQ")}</span><span class="n">${answered ? Math.round(s / answered) : 0} ${t("sec")}</span><span class="muted">${t("recPerQ")}</span></div>
+  <div class="tile"><span>${t("answeredL")}</span><span class="n">${answered}/${n}</span></div></div>` : ""}
+  ${showR ? `<div class="section-title">${t("review")}</div><div class="review protect">${items.map((q, i) => { const pk = picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted" style="white-space:pre-line">${esc(c2.e)}</span></div>`; }).join("")}</div>` : ""}
+  <div class="actions"><button class="primary" id="nw">${t("newExamGo")}</button><button class="ghost" id="ml">${t("navExams")}</button></div>`, { protect: showR });
+  $("bk").onclick = myExams; $("nw").onclick = newExam; $("ml").onclick = myExams;
+}
+async function openExam(ex, part) {
+  loading();
+  try { examResult(ex, await api.questionsByIds(TR(), ex.ids), part); }
+  catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = myExams; }
+}
+
+/* ---------------- my exams ---------------- */
+async function myExams() {
+  S = { screen: myExams };
+  frame(`<h2 class="page-h">${t("navExams")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "exams" });
+  let list;
+  try { list = await api.myExams(st.user.id, TR()); }
+  catch (e) { if (S?.screen !== myExams) return; frame(`<h2 class="page-h">${t("navExams")}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button></div>`, { wide: true, nav: "exams" }); $("rt").onclick = myExams; return; }
+  if (S?.screen !== myExams) return;
+  let armed = null;
+  const draw = () => {
+    frame(`<div class="page-hrow"><h2 class="page-h">${t("navExams")}</h2><button class="primary slim" id="nw">+ ${t("navNew")}</button></div>
+    <p class="muted">${list.length} ${t("examsFound")}</p>
+    ${!list.length ? `<div class="card"><p class="muted">${t("noExams")}</p><button class="primary" id="nw2">${t("newExamGo")}</button></div>` : ""}
+    <div class="xlist">${list.map((x) => {
+      const n = x.ids.length, done = x.status === "done", ans = (x.picked || []).filter((v) => v != null).length, set = x.settings || {};
+      return `<div class="xrow">
+        <div class="xmain"><b>${t("examNo")} #${x.id}</b><span class="muted">${fmtDate(x.created_at)} · ${fmtTime(x.created_at)}</span>
+          <span class="xtags"><span class="tag">${set.timed ? "⏱ " + t("timed") : t("untimed")}</span><span class="tag">${set.guided ? t("guided") : t("unguided")}</span></span></div>
+        <div class="xstat ${done ? "okline" : ""}">${done ? `${t("doneSt")} · <b>${pctOf(x.score, n)}%</b> <span class="muted">(${x.score}/${n})</span>` : `${t("openSt")} · ${ans}/${n}`}</div>
+        <div class="xact">${done ? `<button class="ghost slim" data-v="${x.id}">${t("view")}</button><button class="ghost slim" data-a="${x.id}">${t("analysis")}</button>` : `<button class="primary slim" data-c="${x.id}">${t("contExam")}</button>`}
+          <button class="link danger-l" data-d="${x.id}">${armed === x.id ? t("deleteSure") : t("delete")}</button></div>
+      </div>`; }).join("")}</div>`, { wide: true, nav: "exams" });
+    const get = (id) => list.find((x) => x.id === +id);
+    if ($("nw")) $("nw").onclick = newExam; if ($("nw2")) $("nw2").onclick = newExam;
+    app.querySelectorAll("[data-c]").forEach((b) => (b.onclick = () => runExam(get(b.dataset.c))));
+    app.querySelectorAll("[data-v]").forEach((b) => (b.onclick = () => openExam(get(b.dataset.v), "review")));
+    app.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => openExam(get(b.dataset.a), "analysis")));
+    app.querySelectorAll("[data-d]").forEach((b) => (b.onclick = async () => {
+      const id = +b.dataset.d;
+      if (armed !== id) { armed = id; return draw(); }
+      armed = null; list = list.filter((x) => x.id !== id); draw();
+      api.deleteExam(id).catch(() => {});
+    }));
+  };
+  draw();
+}
+
+/* ---------------- my questions (solved) ---------------- */
+async function myQuestions(keep) {
+  const Q = keep || { filter: "all", shown: 20, rows: null, cache: new Map() };
+  S = { screen: () => myQuestions(Q) };
+  if (!Q.rows) {
+    frame(`<h2 class="page-h">${t("navQs")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
+    try { Q.rows = await api.answerHistory(st.user.id, TR()); }
+    catch (e) { frame(`<h2 class="page-h">${t("navQs")}</h2><div class="card"><p>${esc(errMsg(e))}</p></div>`, { wide: true, nav: "qs" }); return; }
+  }
+  const rows = Q.rows.filter((r) => Q.filter === "all" || (Q.filter === "right" && r.correct) || (Q.filter === "wrong" && !r.correct) || (Q.filter === "saved" && st.marks.has(r.question_id)));
+  const page = rows.slice(0, Q.shown), need = page.map((r) => r.question_id).filter((id) => !Q.cache.has(id));
+  if (need.length) {
+    frame(`<h2 class="page-h">${t("navQs")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
+    try { (await api.questionsByIds(TR(), need)).forEach((q) => Q.cache.set(q.id, q)); } catch { /* show what we have */ }
+  }
+  const keyPoint = (q) => { const { per, gen } = parseExp(q[st.lang].e); return (per[q.answer] || gen || "").split("\n")[0]; };
+  frame(`<h2 class="page-h">${t("navQs")}</h2>
+  <p class="muted">${Q.rows.length} ${t("qsSolved")}</p>
+  <div class="chips">${[["all", "fAll"], ["right", "fRight"], ["wrong", "fWrong"], ["saved", "fSaved"]].map(([v, l]) => `<button class="chip pick ${Q.filter === v ? "cool" : ""}" data-f="${v}">${t(l)}</button>`).join("")}</div>
+  ${!rows.length ? `<div class="card"><p class="muted">${t("noItems")}</p></div>` : ""}
+  <div class="qlist protect">${page.map((r) => { const q = Q.cache.get(r.question_id); if (!q) return ""; return `<button class="qrow" data-q="${q.id}">
+    <span class="qn ${r.correct ? "okc" : "badc"}">${r.correct ? "✓" : "✗"} <small>#${q.id}</small></span>
+    <span class="qq">${esc(q[st.lang].q)}</span>
+    <span class="qk"><small>${t("remember")}</small>${esc(keyPoint(q))}</span>
+    <span class="qv">${t("view")} ${fwd()}</span></button>`; }).join("")}</div>
+  ${rows.length > Q.shown ? `<button class="ghost" id="more">${t("loadMore")} (${rows.length - Q.shown})</button>` : ""}`, { wide: true, nav: "qs" });
+  app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { Q.filter = b.dataset.f; Q.shown = 20; myQuestions(Q); }));
+  if ($("more")) $("more").onclick = () => { Q.shown += 20; myQuestions(Q); };
+  app.querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => viewQuestion(Q.cache.get(+b.dataset.q), Q.rows.find((r) => r.question_id === +b.dataset.q)?.picked, () => myQuestions(Q))));
+}
+function viewQuestion(q, picked, back) {
+  S = { screen: () => viewQuestion(q, picked, back), back };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">#${q.id}</h2></div>
+  <div class="card">${qBody(q, 1, 1)}
+    <div class="opts">${q[st.lang].o.map((o, k) => `<button class="opt" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div id="fb"></div>
+    <button class="ghost" id="again">${t("again")}</button>
+  </div>`, { protect: true });
+  app.querySelector(".qmeta span:last-child")?.remove();
+  $("bk").onclick = back; bindMark(q);
+  const show = (k) => { $("fb").innerHTML = reveal(q, k); };
+  if (picked != null) show(+picked);
+  else app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => show(+b.dataset.k)));
+  $("again").onclick = () => {
+    app.querySelectorAll(".opt").forEach((b) => { b.disabled = false; b.className = "opt"; b.querySelector(".why")?.remove(); b.onclick = () => {
+      const k = +b.dataset.k, ok = k === q.answer; st.answers.set(q.id, ok); api.saveAnswer(st.user.id, TR(), q.id, k, ok).catch(() => {}); show(k);
+    }; });
+    $("fb").innerHTML = "";
+  };
+}
+
+/* ---------------- statistics ---------------- */
+async function stats() {
+  S = { screen: stats };
+  frame(`<h2 class="page-h">${t("navStats")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "stats" });
+  const [hist, act, exams] = await Promise.all([api.answerHistory(st.user.id, TR()).catch(() => []), api.activity(st.user.id, TR(), 14), api.myExams(st.user.id, TR()).catch(() => [])]);
+  if (S?.screen !== stats) return;
+  const tt = totals(), done = hist.length || tt.done;
+  const right = hist.length ? hist.filter((r) => r.correct).length : tt.right;
+  const first = hist.filter((r) => (r.first_correct ?? r.correct)).length;
+  const level = tt.n ? Math.min(5, (right / tt.n) * 5) : 0;
+  const fin = exams.filter((x) => x.status === "done");
+  const exQ = fin.reduce((a, x) => a + (x.picked || []).filter((v) => v != null).length, 0), exS = fin.reduce((a, x) => a + (x.used || 0), 0);
+  const best = fin.length ? Math.max(...fin.map((x) => pctOf(x.score, x.ids.length))) : st.best;
+  const byT = Object.keys(st.counts).sort().map((k) => ({ k, b: st.counts[k] }));
+  frame(`<h2 class="page-h">${t("navStats")}</h2>
+  <div class="stat-top">
+    <div class="card st-main">${ringSvg(pctOf(done, tt.n), 110)}<div><div class="bignum"><b>${done}</b><span>/</span><b>${tt.n}</b></div><span class="muted">${t("solved")} · ${t("inBank")}</span></div></div>
+    <div class="card st-box"><span class="muted">${t("firstTry")}</span><span class="pct">${pctOf(first, done)}%</span><span>${first} / ${done} ${t("correctAns")}</span></div>
+    <div class="card st-box"><span class="muted">${t("curAvg")}</span><span class="pct">${pctOf(right, done)}%</span><span>${right} / ${done} ${t("correctAns")}</span></div>
+    <div class="card st-box"><span class="muted">${t("level")}</span><span class="pct">${level.toFixed(1)}<small>/5</small></span><div class="lvl"><i style="left:${(level / 5) * 100}%"></i></div><span class="muted" style="font-size:12px">${t("levelD")}</span></div>
+  </div>
+  <div class="card"><div class="card-h"><h3>${t("activityL")}</h3><span class="muted">${t("last14")}</span></div>${activityChart(act)}</div>
+  <div class="section-title">${t("byTopicA")}</div>
+  <div id="bytopic"><div class="spin sm"></div></div>
+  <div class="section-title">${t("timeMgmt")}</div>
+  <div class="big-stat"><div class="tile"><span>${t("avgPerQ")}</span><span class="n">${exQ ? Math.round(exS / exQ) : "—"} ${exQ ? t("sec") : ""}</span><span class="muted">${t("recPerQ")}</span></div>
+  <div class="tile"><span>${t("examsDone")}</span><span class="n">${fin.length}</span><span class="muted">${t("bestExam")}: ${best == null ? "—" : best + "%"}</span></div></div>`, { wide: true, nav: "stats" });
+  let agg = {};
+  try { (await api.topicStats(TR())).forEach((r) => (agg[r.topic] = [r.answered, r.correct])); }
+  catch {
+    // older database without my_topic_stats: look the topics up from the questions
+    const known = st.qTopic || (st.qTopic = new Map());
+    const need = hist.map((r) => r.question_id).filter((id) => !known.has(id)).slice(0, 300);
+    try { if (need.length) (await api.questionsByIds(TR(), need)).forEach((q) => known.set(q.id, q.topic)); } catch { /* partial */ }
+    hist.forEach((r) => { const k = known.get(r.question_id); if (!k) return; agg[k] = agg[k] || [0, 0]; agg[k][0]++; if (r.correct) agg[k][1]++; });
+  }
+  if (S?.screen !== stats || !$("bytopic")) return;
+  $("bytopic").innerHTML = topicBars(byT.map(({ k, b }) => { const [a, c] = agg[k] || [0, 0]; return { k, a, b, acc: a ? c / a : 0, sub: `${a}/${b} ${t("answeredL")} · ${pctOf(c, a)}%` }; }));
+}
+
+/* ---------------- tools ---------------- */
+function tools() {
+  S = { screen: tools };
+  frame(`${msgHtml()}<h2 class="page-h">${t("navTools")}</h2>
+  <div class="tools-grid">
+    <div class="card"><h3>${t("acct")}</h3><p class="muted">${t("acctD")}</p><button class="primary" id="ac">${t("acct")}</button></div>
+    <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
+    <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
+    <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
+  </div>
+  ${legalLinks()}`, { wide: true, nav: "tools" });
+  bindLegal(); st.ui.msg = null;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools);
+  $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
+  $("rs").onclick = async () => {
+    if (!st.ui.resetArmed) { st.ui.resetArmed = true; return tools(); }
+    st.ui.resetArmed = false;
+    try { await api.resetProgress(TR()); st.answers = new Map(); st.best = null; st.qTopic = null; store.set(posKey(), 0); flash(t("resetDone")); }
+    catch (e) { flash(errMsg(e), true); }
+    tools();
+  };
 }
 
 /* ---------------- practice ---------------- */
@@ -557,101 +899,6 @@ function feedback(k) {
   requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
-/* ---------------- mock exam ---------------- */
-const MOCK_MAX = 180;
-const mockKey = () => `mock:${st.user.id}:${TR()}`;
-function saveMock() {
-  if (S?.mode !== "mock") return;
-  store.set(mockKey(), { ids: S.items.map((q) => q.id), picked: S.picked, i: S.i, instant: !!S.instant, used: Math.floor((Date.now() - S.start) / 1000), limit: S.limit });
-}
-async function resumeMock() {
-  const m = store.get(mockKey()); if (!m?.ids?.length) return home();
-  loading();
-  try {
-    const items = await api.questionsByIds(TR(), m.ids);
-    if (!items.length) { store.set(mockKey(), null); return home(); }
-    keepTerms(items);
-    S = { mode: "mock", items, i: Math.min(m.i || 0, items.length - 1), picked: m.picked?.length === items.length ? m.picked : Array(items.length).fill(null), start: Date.now() - (m.used || 0) * 1000, limit: m.limit || items.length * MOCK_SECONDS_PER_Q, instant: !!m.instant, tick: null, back: route };
-    mockQ();
-  } catch (e) {
-    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route;
-  }
-}
-function mock() {
-  // setup: the student picks how many questions (up to 180, or what the bank has)
-  const avail = Math.min(MOCK_MAX, totals().n || MOCK_MAX);
-  const opts = [10, 25, 50, 100, 150, 180].filter((n) => n <= avail);
-  if (!opts.includes(avail) && avail < 180) opts.push(avail);
-  let n = Math.min(store.get("mock-n") || 50, avail) || avail;
-  S = { screen: mock, back: route };
-  const draw = () => {
-    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("mock")}</h2></div>
-    <div class="card">
-      <h2>${t("mockHow")}</h2>
-      <div class="chips">${opts.map((o) => `<button class="chip ${o === n ? "cool" : ""}" data-n="${o}" style="cursor:pointer;min-height:44px;padding-inline:16px">${o}</button>`).join("")}</div>
-      <div class="field"><label for="mn">${t("mockCustom")} (1–${avail})</label><input id="mn" type="number" inputmode="numeric" min="1" max="${avail}" value="${n}" dir="ltr"></div>
-      <label class="check"><input type="checkbox" id="mi" ${store.get("mock-instant") ? "checked" : ""}> <span>${t("instant")}</span></label>
-      <p class="muted">${t("mockTime")}: ${Math.round((n * MOCK_SECONDS_PER_Q) / 60)} ${t("min")} · ${totals().n} ${t("qs")} ${t("mockAvail")}</p>
-      <button class="primary" id="ms">${t("mockStart")} ${fwd()}</button>
-    </div>`);
-    $("bk").onclick = route;
-    app.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { n = +b.dataset.n; draw(); }));
-    $("mn").onchange = () => { n = Math.max(1, Math.min(avail, Math.round(+$("mn").value || 1))); draw(); };
-    $("mi").onchange = () => store.set("mock-instant", $("mi").checked);
-    $("ms").onclick = () => { store.set("mock-n", n); startMock(n); };
-  };
-  draw();
-}
-async function startMock(n) {
-  loading();
-  try {
-    const ids = await api.mockIds(TR(), n);
-    if (!ids.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
-    const items = await api.questionsByIds(TR(), ids);
-    keepTerms(items);
-    S = { mode: "mock", items, i: 0, picked: Array(items.length).fill(null), start: Date.now(), limit: items.length * MOCK_SECONDS_PER_Q, instant: !!store.get("mock-instant"), tick: null, back: route };
-    saveMock();
-    mockQ();
-  } catch (e) {
-    frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route;
-  }
-}
-function mockQ() {
-  S.screen = mockQ;
-  const q = S.items[S.i], c = q[st.lang], tot = S.items.length, sel = S.picked[S.i];
-  frame(`${qHead(S.i + 1, tot)}
-  <div class="card">${qBody(q, S.i + 1, tot)}
-    <div class="opts">${c.o.map((o, k) => `<button class="opt ${sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
-    <div class="mocknav"><button class="ghost" id="pv" ${S.i === 0 ? "disabled" : ""}>${bwd()} ${t("prev")}</button>${S.i < tot - 1 ? `<button class="primary" id="nx">${t("next")} ${fwd()}</button>` : `<button class="primary" id="fin">${t("finish")}</button>`}</div>
-    ${S.instant ? `<div id="fb" style="margin-top:12px"></div>` : ""}
-    <p class="muted">${S.picked.filter((x) => x == null).length} ${t("unanswered")}</p>
-  </div>`, { protect: true });
-  const el = $("tm"), upd = () => { if (S?.screen !== mockQ) return; const left = S.limit - Math.floor((Date.now() - S.start) / 1000); if (left <= 0) return mockEnd(); clock(el, left); };
-  upd(); S.tick = setInterval(upd, 1000);
-  $("bk").onclick = () => { saveMock(); route(); }; bindMark(q);
-  S.back = () => { saveMock(); route(); };
-  app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => {
-    S.picked[S.i] = +b.dataset.k; saveMock();
-    if (S.instant) { $("fb").innerHTML = reveal(q, S.picked[S.i]); requestAnimationFrame(() => app.querySelector(".opts")?.scrollIntoView({ behavior: "smooth", block: "start" })); }
-    else app.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b));
-  }));
-  if (S.instant && sel != null) $("fb").innerHTML = reveal(q, sel);
-  $("pv").onclick = () => { S.i--; saveMock(); mockQ(); };
-  if ($("nx")) $("nx").onclick = () => { S.i++; saveMock(); mockQ(); };
-  if ($("fin")) $("fin").onclick = mockEnd;
-}
-function mockEnd() {
-  stopTimer();
-  store.set(mockKey(), null);
-  S.ans = S.items.map((q, i) => S.picked[i] === q.answer);
-  S.items.forEach((q, i) => { if (S.picked[i] != null) { st.answers.set(q.id, S.ans[i]); api.saveAnswer(st.user.id, TR(), q.id, S.picked[i], S.ans[i]).catch(() => {}); } });
-  const score = S.ans.filter(Boolean).length;
-  api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
-  const p = Math.round((score / S.items.length) * 100);
-  if (st.best == null || p > st.best) st.best = p;
-  result();
-}
-
 /* ---------------- result ---------------- */
 function result() {
   S.screen = result;
@@ -659,7 +906,7 @@ function result() {
   const s = Math.min(Math.floor((Date.now() - S.start) / 1000), S.limit || 1e9);
   const by = {}; S.items.forEach((q, i) => { by[q.topic] = by[q.topic] || [0, 0]; by[q.topic][1]++; if (S.ans[i]) by[q.topic][0]++; });
   const R = 60, C = 2 * Math.PI * R, col = p >= 80 ? "var(--ok)" : p >= 60 ? "var(--amber)" : "var(--bad)";
-  const isMock = S.mode === "mock", canMore = S.mode === "practice" && S.src.kind !== "ids" && n === BATCH;
+  const isMock = false, canMore = S.mode === "practice" && S.src.kind !== "ids" && n === BATCH;
   frame(`<div class="card score">
     <svg class="ring" viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--line)" stroke-width="12"/>
       <circle cx="70" cy="70" r="${R}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - p / 100)}" transform="rotate(-90 70 70)"/>
@@ -673,7 +920,6 @@ function result() {
   <div class="actions">${canMore ? `<button class="primary" id="more">${t("cont2")}</button>` : `<button class="primary" id="ag">${t("again")}</button>`}<button class="ghost" id="hm">${t("home")}</button></div>`, { protect: isMock });
   if ($("more")) $("more").onclick = () => (S.src.kind === "seq" || S.src.kind === "unanswered" ? practice(S.src) : topicNext(S.src.topic, S.items.at(-1).id));
   if ($("ag")) $("ag").onclick = () => {
-    if (isMock) return mock();
     Object.assign(S, { i: 0, ans: [], picked: [], start: Date.now() });
     question();
   };
@@ -715,16 +961,6 @@ function cards() {
   $("nx").onclick = () => { st.ui.flashI = (i + 1) % list.length; st.ui.flashBack = false; cards(); };
 }
 
-/* ---------------- stats ---------------- */
-function stats() {
-  S = { screen: stats, back: route };
-  const tt = totals();
-  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("stats")}</h2></div>
-  <div class="big-stat"><div class="tile"><span>${t("answered")}</span><span class="n">${tt.done}/${tt.n}</span></div><div class="tile"><span>${t("accuracy")}</span><span class="n">${tt.done ? Math.round((tt.right / tt.done) * 100) : 0}%</span></div></div>
-  <div class="big-stat"><div class="tile"><span>${t("bestMock")}</span><span class="n">${st.best == null ? "—" : st.best + "%"}</span></div><div class="tile"><span>${t("mistakes")}</span><span class="n">${tt.wrong}</span></div></div>`);
-  $("bk").onclick = route;
-}
-
 /* ---------------- contact ---------------- */
 function contact(from) {
   const back = from || route;
@@ -756,7 +992,7 @@ function contact(from) {
 
 /* ---------------- account ---------------- */
 function account() {
-  S = { screen: account, back: route };
+  S = { screen: account, back: tools };
   const p = st.profile;
   const e = ent();
   const plan = isAdmin() ? t("admin") : !e ? t("planNone") : e.plan === "month" ? t("planM") : e.plan === "code" ? t("planC") : t("planE");
@@ -775,7 +1011,7 @@ function account() {
   ${legalLinks()}`);
   bindLegal();
   st.ui.msg = null;
-  $("bk").onclick = route;
+  $("bk").onclick = tools;
   if ($("pl")) $("pl").onclick = plans;
   $("sx").onclick = async () => { const v = $("ex").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; flash("✓"); account(); };
   if ($("mg")) $("mg").onclick = () => openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions");
