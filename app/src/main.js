@@ -455,7 +455,7 @@ function home() {
   <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
   <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
-  ${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}
+  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
   <div class="home-main">
   <div class="hero">
     <div class="hero-row">
@@ -499,7 +499,7 @@ function home() {
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   // async parts: activity chart + an unfinished exam to continue
   bindGoal([]);
-  fillMission();
+  fillMission().then(fillJourney);
   $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
   api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("actc")) $("actc").innerHTML = activityChart(rows); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
@@ -800,11 +800,13 @@ function tools() {
     <div class="card"><h3>${t("search")}</h3><p class="muted">${t("searchD")}</p><button class="primary" id="srch">${t("search")}</button></div>
     <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
+    <div class="card"><h3>${t("jTitle")}</h3><p class="muted">${t("jBuildD")}</p><button class="primary" id="jt">${t("jTitle")}</button></div>
     ${reminderCard()}
     <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
   </div>
   ${legalLinks()}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder();
+  $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("ac").onclick = account; $("hp").onclick = () => contact(tools);
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
@@ -1002,6 +1004,182 @@ function bindReminder() {
     }
     r.on = !r.on; store.set(remKey(), r); await scheduleReminders(); tools();
   };
+}
+
+/* ---------------- road to the licensing exam (study plan) ---------------- */
+const addDays = (s, k) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + k); return d.toLocaleDateString("en-CA"); };
+const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+const localDay = (ts) => new Date(ts).toLocaleDateString("en-CA");
+const REST_ORDER = [6, 5, 2, 4, 1, 3, 0]; // rest days are taken from Saturday, Friday, Tuesday... first
+const planN = (p) => Math.min(30, Math.max(5, Math.round(p.minutes / 1.5)));
+function planPhase(left) { return left <= 7 ? "final" : left <= 21 ? "review" : "build"; }
+// one day of the plan: what to do on `date`
+function planDay(p, date) {
+  const left = daysBetween(date, p.exam_date), wd = new Date(date + "T12:00:00").getDay();
+  const rest = new Set(REST_ORDER.slice(0, 7 - p.days_per_week));
+  if (left < 0) return { date, type: "after" };
+  if (left === 0) return { date, type: "exam" };
+  if (left === 1) return { date, type: "light", mission: Math.min(10, planN(p)) };
+  if (rest.has(wd)) return { date, type: "rest" };
+  const phase = planPhase(left);
+  const studyDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !rest.has(d));
+  const mockDays = phase === "build" ? studyDays.slice(-1) : phase === "review" ? [studyDays[1] ?? studyDays[0], studyDays.at(-1)] : studyDays.filter((_, i) => i % 2 === 1);
+  const size = Math.min(totals().n || 50, phase === "build" ? 50 : phase === "review" ? 100 : 150);
+  return { date, type: "study", mission: planN(p), mock: mockDays.includes(wd) ? size : 0 };
+}
+function planProgress(p, mdays) {
+  const start = localDay(p.created_at), end = today() < p.exam_date ? today() : p.exam_date;
+  let expected = 0;
+  for (let d = start; d <= end; d = addDays(d, 1)) { const x = planDay(p, d); if (x.type === "study" || x.type === "light") expected++; }
+  const done = (mdays || []).filter((m) => m.status === "done" && m.day >= start).length;
+  return { expected, done, pct: expected ? Math.min(100, pctOf(done, expected)) : 0 };
+}
+function weeklyAccuracy(rows, weeks = 8) {
+  const out = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const end = addDays(today(), -7 * w), start = addDays(end, -6);
+    const r = (rows || []).filter((x) => x.day >= start && x.day <= end);
+    const n = r.reduce((a, x) => a + x.n, 0), c = r.reduce((a, x) => a + x.correct, 0);
+    out.push({ label: `${end.slice(8)}.${end.slice(5, 7)}`, n, p: n ? Math.round((c / n) * 100) : null });
+  }
+  return out;
+}
+function trendChart(pts) {
+  const W = 300, H = 120, pad = 18, xs = (i) => pad + (i * (W - 2 * pad)) / Math.max(1, pts.length - 1), ys = (p) => H - pad - (p / 100) * (H - 2 * pad);
+  const real = pts.map((x, i) => ({ ...x, i })).filter((x) => x.p != null);
+  if (!real.length) return `<p class="muted">${t("noTrend")}</p>`;
+  const path = real.map((x, k) => `${k ? "L" : "M"}${xs(x.i).toFixed(1)},${ys(x.p).toFixed(1)}`).join(" ");
+  return `<svg class="trend" viewBox="0 0 ${W} ${H + 14}" role="img" aria-label="${t("trendL")}">
+    ${[0, 50, 100].map((g) => `<line x1="${pad}" x2="${W - pad}" y1="${ys(g)}" y2="${ys(g)}" stroke="var(--line)" stroke-dasharray="${g ? "3 4" : ""}"/><text x="2" y="${ys(g) + 3}" font-size="8" fill="var(--muted)">${g}%</text>`).join("")}
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${real.map((x) => `<circle cx="${xs(x.i)}" cy="${ys(x.p)}" r="4" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"><title>${x.label}: ${x.p}% (${x.n})</title></circle>`).join("")}
+    ${pts.map((x, i) => (i % 2 === pts.length % 2 ? `<text x="${xs(i)}" y="${H + 10}" text-anchor="middle" font-size="8" fill="var(--muted)">${x.label}</text>` : "")).join("")}
+  </svg>`;
+}
+function journeyCard(p, prog) {
+  if (!p) return `<button class="jcta" id="jgo"><span class="jicon" aria-hidden="true">🧭</span><span><b>${t("jBuild")}</b><small>${t("jBuildD")}</small></span><span aria-hidden="true">${fwd()}</span></button>`;
+  const left = Math.max(0, daysBetween(today(), p.exam_date));
+  return `<button class="jcta" id="jgo"><span class="jdays"><b>${left}</b><small>${t("daysLeft")}</small></span><span><b>${t("jTitle")}</b><small>${t("jPlanDone")} ${prog.pct}%</small><span class="gbar"><i style="width:${prog.pct}%"></i></span></span><span aria-hidden="true">${fwd()}</span></button>`;
+}
+async function fillJourney() {
+  const w = $("journeyw"); if (!w) return;
+  let p;
+  try { p = await api.getPlan(st.user.id, TR()); } catch { return; } // database not updated yet: keep the simple exam-date box
+  st.plan = p;
+  if (S?.screen !== home || !$("journeyw")) return;
+  const days = st.missionDays || (await api.missionDays(st.user.id, TR()).catch(() => []));
+  $("journeyw").innerHTML = journeyCard(p, p ? planProgress(p, days) : null);
+  $("jgo").onclick = () => (p ? journey() : planSetup());
+}
+
+function planSetup(back = route) {
+  const p = st.plan || {};
+  const f = { exam: p.exam_date || st.profile.exam_date || "", minutes: p.minutes || 30, days: p.days_per_week || 5, weak: [...(p.weak_topics || [])] };
+  S = { screen: () => planSetup(back), back };
+  const topics = Object.keys(st.counts).sort();
+  const draw = () => {
+    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("jTitle")}</h2></div>
+    <div class="card exb">
+      <p class="muted">${t("jSetupD")}</p>
+      <div class="field"><label for="pe">${t("jExam")}</label><input id="pe" type="date" min="${today()}" value="${esc(f.exam)}"></div>
+      <div class="field"><label>${t("jMinutes")}</label><div class="chips">${[15, 30, 45, 60, 90].map((m) => `<button class="chip pick ${m === f.minutes ? "cool" : ""}" data-m="${m}">${m} ${t("min")}</button>`).join("")}</div>
+        <span class="muted" style="font-size:13px">≈ ${Math.min(30, Math.max(5, Math.round(f.minutes / 1.5)))} ${t("qs")} ${t("perDay")}</span></div>
+      <div class="field"><label>${t("jDays")}</label><div class="chips">${[3, 4, 5, 6, 7].map((d) => `<button class="chip pick ${d === f.days ? "cool" : ""}" data-d="${d}">${d}</button>`).join("")}</div></div>
+      <div class="field"><label>${t("jWeak")}</label><div class="chips">${topics.map((k) => `<button class="chip pick ${f.weak.includes(k) ? "cool" : ""}" data-w="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>
+        <span class="muted" style="font-size:13px">${t("jWeakD")}</span></div>
+      <div class="err" id="er" hidden></div>
+      <button class="primary" id="ps">${st.plan ? t("jSave") : t("jCreate")} ${fwd()}</button>
+    </div>`, { wide: true });
+    $("bk").onclick = () => back();
+    $("pe").onchange = () => (f.exam = $("pe").value);
+    app.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { f.minutes = +b.dataset.m; draw(); }));
+    app.querySelectorAll("[data-d]").forEach((b) => (b.onclick = () => { f.days = +b.dataset.d; draw(); }));
+    app.querySelectorAll("[data-w]").forEach((b) => (b.onclick = () => { const k = b.dataset.w; f.weak = f.weak.includes(k) ? f.weak.filter((x) => x !== k) : [...f.weak, k]; draw(); }));
+    $("ps").onclick = async () => {
+      f.exam = $("pe").value;
+      const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
+      if (!f.exam || f.exam < today()) return err(t("jBadDate"));
+      $("ps").disabled = true;
+      try {
+        st.plan = await api.savePlan(TR(), f.exam, f.minutes, f.days, f.weak);
+        st.profile.exam_date = f.exam; st.mission = null;
+        journey();
+      } catch (e) { $("ps").disabled = false; err(/bad exam date/.test(e?.message || "") ? t("jBadDate") : errMsg(e)); }
+    };
+  };
+  draw();
+}
+
+async function journey() {
+  S = { screen: journey, back: route };
+  frame(`<h2 class="page-h">${t("jTitle")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true });
+  let p, mission, mdays, act, tstats, exams, due;
+  try {
+    p = st.plan || (await api.getPlan(st.user.id, TR()));
+    if (!p) return planSetup();
+    st.plan = p;
+    [mission, mdays, act, tstats, exams, due] = await Promise.all([
+      api.dailyMission(TR()).catch(() => null), api.missionDays(st.user.id, TR(), 120), api.activity(st.user.id, TR(), 56),
+      api.topicStats(TR()).catch(() => []), api.myExams(st.user.id, TR()).catch(() => []), api.dueReviews(st.user.id, TR(), 50).catch(() => []),
+    ]);
+  } catch (e) {
+    frame(`<h2 class="page-h">${t("jTitle")}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`, { wide: true });
+    $("rt").onclick = journey; $("hm").onclick = route; return;
+  }
+  if (S?.screen !== journey) return;
+  st.mission = mission; st.missionDays = mdays;
+  const left = Math.max(0, daysBetween(today(), p.exam_date)), phase = planPhase(left), prog = planProgress(p, mdays);
+  const td = planDay(p, today());
+  const doneDays = new Set(mdays.filter((m) => m.status === "done").map((m) => m.day));
+  const mockDone = new Set(exams.filter((x) => x.status === "done" && x.finished_at).map((x) => localDay(x.finished_at)));
+  const studied = new Set(act.filter((r) => r.n > 0).map((r) => r.day));
+  const missed = !studied.has(today()) && !studied.has(addDays(today(), -1)) && !studied.has(addDays(today(), -2)) && daysBetween(localDay(p.created_at), today()) >= 2;
+  // topics: mastered / to improve / not started yet
+  const by = Object.fromEntries((tstats || []).map((r) => [r.topic, r]));
+  const rows = Object.keys(st.counts).sort().map((k) => { const r = by[k] || { answered: 0, correct: 0 }; return { k, a: r.answered, c: r.correct, acc: r.answered ? r.correct / r.answered : 0 }; });
+  const mastered = rows.filter((r) => r.a >= 5 && r.acc >= 0.8);
+  const improve = rows.filter((r) => (r.a >= 3 && r.acc < 0.65) || (r.a < 3 && (p.weak_topics || []).includes(r.k)));
+  const week = [...Array(7)].map((_, i) => planDay(p, addDays(today(), i))).filter((d) => d.type !== "after");
+  const dayName = (d) => new Date(d + "T12:00:00").toLocaleDateString(st.lang === "he" ? "he-IL" : "en-GB", { weekday: "short" });
+  const mDone = mission?.status === "done", mStarted = (mission?.picked || []).some((v) => v != null);
+  const chip = (x) => x.type === "rest" ? `<span class="wk rest">☕ ${t("jRest")}</span>` : x.type === "exam" ? `<span class="wk exam">🎓 ${t("jExamDay")}</span>`
+    : `${x.type === "light" ? `<span class="wk">🔁 ${t("jLight")}</span>` : `<span class="wk">📝 ${x.mission} ${t("qs")}</span>`}${x.mock ? `<span class="wk mock">⏱ ${t("mock")} ${x.mock}</span>` : ""}`;
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("jTitle")}</h2><button class="ghost slim" id="ped">${t("jEdit")}</button></div>
+  <div class="jhero">
+    <div class="jcount"><b>${left}</b><span>${left === 0 ? t("jExamDay") : t("daysLeft")}</span><small>${fmtDate(p.exam_date + "T12:00:00")}</small></div>
+    <div class="jprog">${ringSvg(prog.pct, 96)}<span>${t("jPlanDone")}</span><small class="muted">${prog.done}/${prog.expected} ${t("jSessions")}</small></div>
+  </div>
+  <div class="banner jphase">${t("jPhase_" + phase)}</div>
+  ${missed ? `<div class="banner">${t("jMissed")}</div>` : ""}
+  <div class="section-title">${t("jToday")}</div>
+  <div class="card jtoday">
+    ${td.type === "rest" ? `<p>☕ ${t("jRestToday")}</p>` : td.type === "exam" ? `<p>🎓 ${t("jGood")}</p>` : ""}
+    ${mission ? `<div class="jtask ${mDone ? "ok" : ""}"><span>${mDone ? "✓" : "📝"} ${t("mission")} · ${mission.ids.length} ${t("qs")}</span><button class="${mDone ? "ghost" : "primary"} slim" id="jm">${mDone ? t("seeResults") : mStarted ? t("contMission") : t("startMission")}</button></div>` : ""}
+    ${td.mock ? `<div class="jtask ${mockDone.has(today()) ? "ok" : ""}"><span>${mockDone.has(today()) ? "✓" : "⏱"} ${t("mock")} · ${td.mock} ${t("qs")}</span>${mockDone.has(today()) ? "" : `<button class="ghost slim" id="jx">${t("mockStart")}</button>`}</div>` : ""}
+    ${due.length ? `<div class="jtask"><span>🔁 ${due.length} ${t("jDue")}</span><button class="ghost slim" id="jr">${t("smart")}</button></div>` : ""}
+  </div>
+  <div class="section-title">${t("jWeek")}</div>
+  <div class="card jweek">${week.map((x) => `<div class="wrow ${x.date === today() ? "now" : ""}"><span class="wd"><b>${dayName(x.date)}</b><small>${x.date.slice(8)}.${x.date.slice(5, 7)}</small></span><span class="wc">${chip(x)}</span><span class="wst">${doneDays.has(x.date) ? "✓" : ""}</span></div>`).join("")}</div>
+  <div class="jtopics">
+    <div class="card"><h3>✅ ${t("jMastered")}</h3>${mastered.length ? `<div class="chips">${mastered.map((r) => `<span class="chip ok">${esc(topicName(r.k, st.lang))} ${Math.round(r.acc * 100)}%</span>`).join("")}</div>` : `<p class="muted">${t("jNoneYet")}</p>`}</div>
+    <div class="card"><h3>🎯 ${t("jImprove")}</h3>${improve.length ? `<div class="chips">${improve.map((r) => `<button class="chip pick warm" data-tp="${esc(r.k)}">${esc(topicName(r.k, st.lang))}${r.a ? ` ${Math.round(r.acc * 100)}%` : ""}</button>`).join("")}</div>` : `<p class="muted">${t("jNoImprove")}</p>`}</div>
+  </div>
+  <div class="card"><div class="card-h"><h3>${t("trendL")}</h3><span class="muted">${t("jWeeks")}</span></div>${trendChart(weeklyAccuracy(act))}</div>
+  <p class="muted" style="font-size:12px;text-align:center">${t("jNote")}</p>`, { wide: true });
+  $("bk").onclick = route; $("ped").onclick = () => planSetup(journey);
+  if ($("jm")) $("jm").onclick = () => (mDone ? missionFinish() : missionRun(mission));
+  if ($("jx")) $("jx").onclick = () => planMock(td.mock);
+  if ($("jr")) $("jr").onclick = smartReview;
+  app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.tp })));
+}
+async function planMock(n) {
+  loading();
+  try {
+    const ids = await api.examIds(TR(), n, [], "all");
+    if (!ids.length) throw new Error(t("noneMatch"));
+    const row = await api.createExam({ track: TR(), settings: { timed: true, guided: false, topics: [], pool: "all", plan: true }, ids, picked: ids.map(() => null), time_limit: ids.length * EXAM_SECONDS_PER_Q });
+    runExam(row);
+  } catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = journey; }
 }
 
 /* ---------------- daily goal + streak ---------------- */

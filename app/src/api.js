@@ -152,3 +152,12 @@ export async function missionDays(uid, track, days = 60) {
 export async function dueReviews(uid, track, limit = 20) {
   return must(await supabase.from("review_items").select("question_id,box,due").eq("user_id", uid).eq("track", track).lte("due", new Date().toLocaleDateString("en-CA")).order("due").limit(limit));
 }
+
+/* ---------- study plan ---------- */
+export async function getPlan(uid, track) {
+  // throws when the database has no plan table yet (the app then hides the feature)
+  return must(await supabase.from("study_plans").select("*").eq("user_id", uid).eq("track", track).maybeSingle());
+}
+export async function savePlan(track, exam, minutes, days, weak) {
+  return must(await supabase.rpc("save_study_plan", { p_track: track, p_exam: exam, p_minutes: minutes, p_days: days, p_weak: weak }));
+}

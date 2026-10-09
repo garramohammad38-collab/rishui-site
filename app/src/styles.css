@@ -364,3 +364,43 @@ input[type=time]{border:1px solid var(--line);background:var(--bg);color:var(--i
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){.mission,.big-emoji{animation:none}}
+/* road to the exam */
+.jcta{display:flex;align-items:center;gap:14px;width:100%;text-align:start;background:var(--surface);border:1px solid var(--cardline);box-shadow:var(--shadow);border-radius:18px;padding:14px 16px;cursor:pointer;animation:rise .35s ease-out}
+.jcta > span:nth-child(2){flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.jcta small{color:var(--muted);font-size:13px}
+.jcta .gbar{height:6px}
+.jicon{font-size:28px}
+.jdays{display:flex;flex-direction:column;align-items:center;background:var(--accent-soft);color:var(--accent);border-radius:14px;padding:6px 12px;min-width:64px}
+.jdays b{font:700 24px var(--display);line-height:1.1}
+.jdays small{color:inherit;font-size:11px}
+.jhero{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.jcount,.jprog{background:var(--surface);border:1px solid var(--cardline);box-shadow:var(--shadow);border-radius:18px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center}
+.jcount b{font:700 48px var(--display);color:var(--accent);line-height:1}
+.jcount span{font-weight:600}
+.jcount small{color:var(--muted);font-size:13px}
+.jprog span{font-weight:600;font-size:14px}
+.jphase{background:var(--accent-soft);color:var(--ink);border:0}
+.jtoday{gap:10px}
+.jtask{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--bg)}
+.jtask.ok{background:var(--ok-soft)}
+.jtask span{font-weight:600}
+.jweek{padding:8px 12px;gap:0}
+.wrow{display:grid;grid-template-columns:62px 1fr 20px;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
+.wrow:last-child{border-bottom:0}
+.wrow.now{background:var(--accent-soft);border-radius:12px;border-bottom-color:transparent}
+.wd{display:flex;flex-direction:column;line-height:1.2}
+.wd small{color:var(--muted);font-size:12px}
+.wc{display:flex;flex-wrap:wrap;gap:6px}
+.wk{font-size:13px;background:var(--bg);border-radius:999px;padding:3px 10px;font-weight:600}
+.wrow.now .wk{background:var(--surface)}
+.wk.rest{color:var(--muted)}
+.wk.mock{color:var(--amber);background:var(--amber-soft)}
+.wk.exam{color:var(--accent)}
+.wst{color:var(--ok);font-weight:700}
+.jtopics{display:grid;gap:12px}
+.jtopics h3{font-size:16px}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.warm.pick{cursor:pointer}
+.trend{width:100%;height:auto;max-width:640px;margin-inline:auto;display:block}
+@media (min-width: 900px){.jhero{grid-template-columns:1fr 1fr}.jtopics{grid-template-columns:1fr 1fr}}
+.jtask .slim{white-space:nowrap;flex:none}

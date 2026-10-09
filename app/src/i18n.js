@@ -194,3 +194,36 @@ Object.assign(T.he, {
   remOn: "הפעלה", remOff: "כיבוי", remTime: "שעה", remBody: "המשימה של היום מחכה לך: 10 שאלות, בערך 10 דקות.",
   remDenied: "צריך לאשר התראות לאפליקציה בהגדרות הטלפון.", remWeb: "התזכורות עובדות באפליקציה בטלפון.",
 });
+
+Object.assign(T.en, {
+  jBuild: "Build your road to the exam", jBuildD: "A personal plan based on your exam date and your time", jTitle: "My road to the licensing exam",
+  jPlanDone: "of the plan done", jSetupD: "A few quick questions and we'll build your daily and weekly plan up to the exam.",
+  jExam: "When is the exam?", jMinutes: "How many minutes a day can you study?", jDays: "How many days a week?",
+  jWeak: "Which topics feel hard for you?", jWeakD: "Optional. The plan also learns from your answers.", jSave: "Save the plan", jCreate: "Build my plan",
+  jBadDate: "Choose an exam date in the future.", jEdit: "Edit", jSessions: "study days",
+  jPhase_build: "Building the base: lots of practice in your weak topics and a mock exam once a week.",
+  jPhase_review: "Review stage: more review of mistakes and two mock exams a week.",
+  jPhase_final: "Final week: review and full mock exams. The day before the exam: light review and rest.",
+  jMissed: "Missed a few days? That's fine. The plan doesn't pile up what you missed. We continue from today.",
+  jToday: "Today", jRestToday: "A rest day in your plan. You can still practice if you like.", jGood: "Good luck in the exam! 💙",
+  jDue: "mistakes waiting for review", jWeek: "This week's plan", jRest: "Rest", jExamDay: "Exam day", jLight: "Light review",
+  jMastered: "Topics you've mastered", jImprove: "Topics to improve", jNoneYet: "None yet: you need at least 5 answers in a topic with 80% correct.",
+  jNoImprove: "No weak topic right now. Well done!", trendL: "Accuracy over time", jWeeks: "by week",
+  noTrend: "Not enough data yet. After a few days of practice a chart will show here.", jNote: "The plan helps you stay organized. It doesn't promise an exam score.",
+});
+Object.assign(T.he, {
+  jBuild: "בניית המסע שלך למבחן", jBuildD: "תוכנית אישית לפי תאריך המבחן והזמן שלך", jTitle: "המסע שלי למבחן הרישוי",
+  jPlanDone: "מהתוכנית בוצע", jSetupD: "כמה שאלות קצרות, ונבנה לך תוכנית יומית ושבועית עד המבחן.",
+  jExam: "מתי המבחן?", jMinutes: "כמה דקות ביום אפשר ללמוד?", jDays: "כמה ימים בשבוע?",
+  jWeak: "באילו נושאים קשה לך?", jWeakD: "לא חובה. התוכנית לומדת גם מהתשובות שלך.", jSave: "שמירת התוכנית", jCreate: "בניית התוכנית",
+  jBadDate: "צריך לבחור תאריך מבחן עתידי.", jEdit: "עריכה", jSessions: "ימי לימוד",
+  jPhase_build: "שלב בניית הבסיס: הרבה תרגול בנושאים החלשים ומבחן תרגול פעם בשבוע.",
+  jPhase_review: "שלב החזרה: יותר חזרה על טעויות ושני מבחני תרגול בשבוע.",
+  jPhase_final: "שבוע אחרון: חזרה ומבחנים מלאים. ביום שלפני המבחן: חזרה קלה ומנוחה.",
+  jMissed: "פספסת כמה ימים? לא נורא. התוכנית לא מעמיסה עליך את מה שפספסת. ממשיכים מהיום.",
+  jToday: "מה עושים היום", jRestToday: "היום יום מנוחה לפי התוכנית. אפשר לתרגל אם בא לך.", jGood: "בהצלחה במבחן! 💙",
+  jDue: "טעויות מחכות לחזרה", jWeek: "התוכנית לשבוע", jRest: "מנוחה", jExamDay: "יום המבחן", jLight: "חזרה קלה",
+  jMastered: "נושאים שכבר שולטים בהם", jImprove: "נושאים לשיפור", jNoneYet: "עוד אין: צריך לפחות 5 תשובות בנושא עם 80% הצלחה.",
+  jNoImprove: "אין כרגע נושא חלש. כל הכבוד!", trendL: "התקדמות הדיוק", jWeeks: "לפי שבועות",
+  noTrend: "עוד אין מספיק נתונים. אחרי כמה ימי תרגול יופיע כאן גרף.", jNote: "התוכנית עוזרת להתארגן. היא לא מבטיחה ציון במבחן.",
+});
