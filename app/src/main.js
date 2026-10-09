@@ -184,6 +184,7 @@ function route() {
   // opened from a friend's challenge link (?c=CODE)
   const fcode = new URLSearchParams(location.search).get("c");
   if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
+  if (!store.get(`intro:${st.user.id}`)) return intro();
   home();
 }
 
@@ -400,7 +401,8 @@ function daysLeft() {
 function totals() {
   const n = Object.values(st.counts).reduce((a, b) => a + b, 0);
   let right = 0; st.answers.forEach((c) => { if (c) right++; });
-  return { n, done: st.answers.size, right, wrong: st.answers.size - right };
+  // unique questions answered (answering again doesn't add); never more than the bank
+  return { n, done: Math.min(st.answers.size, n || st.answers.size), right, wrong: st.answers.size - right };
 }
 /* ---------------- navigation (6 sections) ---------------- */
 const ICON = {
@@ -453,13 +455,14 @@ function home() {
   const newBox = addedTotal ? `<div class="newbox" role="status"><div class="newbox-h"><b>${st.lang === "he" ? `נוספו ${addedTotal} שאלות חדשות` : `${addedTotal} ${t("newQs")}`}</b><button class="link" id="nok">${t("gotIt")}</button></div>
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
   const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
-  frame(`${msgHtml()}${newBox}<div id="missionw">${missionCard(null, "loading")}</div><div id="openx"></div>
+  const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
+  frame(`${msgHtml()}${newBox}
   ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
-  <div class="pkgline"><h2>${t("pkg")}</h2><span class="${hasAccess() ? "okline" : "muted"}">${pkg}</span></div>
-  <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">${dl} ${t("daysLeft")}</span>` : ""}</div>
+  <div class="welcome"><h2>${greet} 👋</h2>
+    <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}<span class="chip ${hasAccess() ? "ok" : ""}">${pkg}</span></div></div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
-  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div><div id="leaguew"></div>
-  <div class="home-main">
+  <div id="openx"><button class="examcta" id="nx2"><span class="jicon" aria-hidden="true">📝</span><span><b>${t("startExam")}</b><small>${t("startExamD")}</small></span><span aria-hidden="true">${fwd()}</span></button></div>
+  <div id="missionw">${missionCard(null, "loading")}</div>
   <div class="hero">
     <div class="hero-row">
       <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
@@ -470,23 +473,24 @@ function home() {
         ${tt.done ? `<span class="okline">${t("accuracy")} ${pctOf(tt.right, tt.done)}%</span>` : ""}
       </div>
     </div>
-    <div class="row2"><button class="primary" id="go">${t("cont2")} ${fwd()}</button><button class="ghost" id="nx2">${t("navNew")}</button></div>
+    <button class="primary" id="go">${t("cont2")} ${fwd()}</button>
   </div>
+  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
+  <div id="leaguew"></div>
+  <div class="section-title">${t("quick")}</div>
   <div class="grid">
     <button class="tile" id="mis"><b>${t("mistakes")}</b><span class="n">${tt.wrong}</span></button>
-    <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
     <button class="tile" id="smr"><b>${t("smart")}</b><span>${t("smartD")}</span></button>
+    <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
     <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
+    <button class="tile" id="srch"><b>🔍 ${t("search")}</b><span>${t("searchD")}</span></button>
     <button class="tile" id="clc"><b>${t("calcT")}</b><span>${t("calcD")}</span></button>
     <button class="tile" id="rfp"><b>${t("refT")}</b><span>${t("refD")}</span></button>
-    <button class="tile" id="srch"><b>🔍 ${t("search")}</b><span>${t("searchD")}</span></button>
     <button class="tile" id="fl"><b>${t("flash")}</b><span>EN · עב</span></button>
   </div>
-  </div>
   <div class="card"><div id="goalw">${goalCard([])}</div></div>
-  <div class="card"><div class="card-h"><h3>${t("activityL")}</h3><span class="muted">${t("last14")}</span></div><div id="actc"><div class="spin sm"></div></div></div>
-  <div class="section-title">${t("bytopic")}</div>
-  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>
+  <details class="topics-d"><summary>${t("bytopic")} <span class="muted">(${Object.keys(st.counts).length})</span></summary>
+  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div></details>
   ${legalLinks()}`, { wide: true, nav: "home" });
   bindLegal();
   st.ui.msg = null;
@@ -505,13 +509,13 @@ function home() {
   fillMission().then(fillJourney).then(fillLeague);
   $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
-  api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("actc")) $("actc").innerHTML = activityChart(rows); if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
+  api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
   api.myExams(st.user.id, TR()).then((list) => {
     const x = list.find((r) => r.status === "open"); if (!x || S?.screen !== home || !$("openx")) return;
     const done = (x.picked || []).filter((v) => v != null).length;
     $("openx").innerHTML = `<div class="newbox"><div class="newbox-h"><b>${t("unfinished")}</b><span class="muted">${done}/${x.ids.length} ${t("answeredOf")}</span></div>
-      <div class="row2"><button class="primary" id="umr">${t("resume")} ${fwd()}</button><button class="ghost" id="uml">${t("navExams")}</button></div></div>`;
-    $("umr").onclick = () => runExam(x); $("uml").onclick = myExams;
+      <div class="row2"><button class="primary" id="umr">${t("contExam")} ${fwd()}</button><button class="ghost" id="nx3">${t("startExam")}</button></div></div>`;
+    $("umr").onclick = () => runExam(x); $("nx3").onclick = newExam;
   }).catch(() => {});
 }
 
@@ -522,9 +526,20 @@ function newExam() {
   const cfg = { n: saved.n || 50, timed: saved.timed ?? true, guided: saved.guided ?? false, topics: saved.topics || [], pool: saved.pool || "all" };
   S = { screen: newExam };
   const topics = Object.keys(st.counts).sort();
+  const counts = new Map(); let note = "";
+  const key = () => `${[...cfg.topics].sort().join(",")}|${cfg.pool}`;
+  // how many questions match the filters: counted on the server (falls back to the topic totals)
+  const ensureCount = () => {
+    const k = key(); if (counts.has(k)) return;
+    counts.set(k, null);
+    api.examCount(TR(), cfg.topics, cfg.pool).then((n) => { counts.set(k, n); if (S?.screen === newExam && key() === k) draw(); })
+      .catch(() => counts.set(k, undefined));
+  };
   const draw = () => {
-    const avail = Math.min(EXAM_MAX, cfg.topics.length ? cfg.topics.reduce((a, k) => a + (st.counts[k] || 0), 0) : totals().n) || 0;
-    if (cfg.n > avail && avail) cfg.n = avail;
+    ensureCount();
+    const est = cfg.topics.length ? cfg.topics.reduce((a, k) => a + (st.counts[k] || 0), 0) : totals().n;
+    const real = counts.get(key()), match = real ?? est, avail = Math.min(EXAM_MAX, match) || 0;
+    if (cfg.n > avail && avail) { if (real != null) note = `${t("askedFor")} ${cfg.n}, ${t("onlyAvail")} ${avail}`; cfg.n = avail; }
     const opts = [10, 25, 50, 100, 150, 180].filter((n) => n <= avail);
     const seg = (id, a, b, on) => `<div class="seg" role="group"><button class="segb ${on ? "on" : ""}" data-s="${id}" data-v="1"><b>${a[0]}</b>${a[1] ? `<small>${a[1]}</small>` : ""}</button><button class="segb ${!on ? "on" : ""}" data-s="${id}" data-v="0"><b>${b[0]}</b>${b[1] ? `<small>${b[1]}</small>` : ""}</button></div>`;
     frame(`<h2 class="page-h">${t("navNew")}</h2>
@@ -536,13 +551,16 @@ function newExam() {
       </div>
       <div class="field"><label>${t("pool")}</label><div class="chips">${[["all", "poolAll"], ["unanswered", "poolUn"], ["wrong", "poolWrong"], ["saved", "poolSaved"]].map(([v, l]) => `<button class="chip pick ${cfg.pool === v ? "cool" : ""}" data-pool="${v}">${t(l)}</button>`).join("")}</div></div>
       <div class="field"><label>${t("topicsL")}</label><div class="chips"><button class="chip pick ${!cfg.topics.length ? "cool" : ""}" data-tp="">${t("allTopics")}</button>${topics.map((k) => `<button class="chip pick ${cfg.topics.includes(k) ? "cool" : ""}" data-tp="${esc(k)}">${esc(topicName(k, st.lang))} <span class="muted">${st.counts[k]}</span></button>`).join("")}</div></div>
-      <div class="field"><label>${t("qCount")} <span class="muted">(${avail} ${t("maxAvail")})</span></label>
+      <div class="availbox ${real === 0 ? "bad" : ""}">${real == null ? `<span class="spin sm"></span>` : ""}<b>${match}</b> ${t("matchQs")}${match > EXAM_MAX ? ` · ${t("maxPer")} ${EXAM_MAX}` : ""}</div>
+      ${note ? `<div class="banner">${esc(note)}</div>` : ""}
+      <div class="field"><label>${t("qCount")}</label>
         <div class="chips">${opts.map((o) => `<button class="chip pick ${o === cfg.n ? "cool" : ""}" data-n="${o}">${o}</button>`).join("")}</div>
         <input id="mn" type="number" inputmode="numeric" min="1" max="${avail}" value="${cfg.n}" dir="ltr" aria-label="${t("mockCustom")}"></div>
       ${cfg.timed ? `<p class="muted">${t("mockTime")}: ${Math.round((cfg.n * EXAM_SECONDS_PER_Q) / 60)} ${t("min")}</p>` : ""}
       <div class="err" id="er" hidden></div>
-      <button class="primary" id="ms" ${avail ? "" : "disabled"}>${t("create")} ${fwd()}</button>
+      <button class="primary" id="ms" ${avail ? "" : "disabled"}>${t("next")} ${fwd()}</button>
     </div>`, { wide: true, nav: "newx" });
+    note = "";
     app.querySelectorAll("[data-s]").forEach((b) => (b.onclick = () => { cfg[b.dataset.s] = b.dataset.v === "1"; draw(); }));
     app.querySelectorAll("[data-pool]").forEach((b) => (b.onclick = () => { cfg.pool = b.dataset.pool; draw(); }));
     app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => {
@@ -552,13 +570,34 @@ function newExam() {
     }));
     app.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { cfg.n = +b.dataset.n; draw(); }));
     $("mn").onchange = () => { cfg.n = Math.max(1, Math.min(avail || 1, Math.round(+$("mn").value || 1))); draw(); };
+    $("ms").onclick = () => summary(avail);
+  };
+  // summary of the chosen settings before the exam starts
+  const summary = (avail) => {
+    const tl = cfg.topics.length ? cfg.topics.map((k) => topicName(k, st.lang)).join(", ") : t("allTopics");
+    const pl = t({ all: "poolAll", unanswered: "poolUn", wrong: "poolWrong", saved: "poolSaved" }[cfg.pool]);
+    frame(`<h2 class="page-h">${t("navNew")}</h2>
+    <div class="card exb"><h3>${t("summaryT")}</h3>
+      <dl class="sumlist">
+        <dt>${t("qCount")}</dt><dd>${cfg.n}</dd>
+        <dt>${t("timing")}</dt><dd>${cfg.timed ? `${t("timed")} · ${Math.round((cfg.n * EXAM_SECONDS_PER_Q) / 60)} ${t("min")}` : t("untimed")}</dd>
+        <dt>${t("solutions")}</dt><dd>${cfg.guided ? t("guided") : t("unguided")}</dd>
+        <dt>${t("pool")}</dt><dd>${esc(pl)}</dd>
+        <dt>${t("topicsL")}</dt><dd>${esc(tl)}</dd>
+      </dl>
+      ${cfg.timed ? `<p class="muted" style="font-size:13px">⏱ ${t("timerPolicy")}</p>` : ""}
+      <div class="err" id="er" hidden></div>
+      <div class="row2"><button class="primary" id="ms">${t("create")} ${fwd()}</button><button class="ghost" id="chg">${t("change")}</button></div>
+    </div>`, { wide: true, nav: "newx" });
+    $("chg").onclick = draw;
     $("ms").onclick = async () => {
       store.set("exam-cfg", cfg);
       $("ms").disabled = true;
       try {
         const ids = await api.examIds(TR(), cfg.n, cfg.topics, cfg.pool);
         if (!ids.length) { $("er").textContent = t("noneMatch"); $("er").hidden = false; $("ms").disabled = false; return; }
-        const row = await api.createExam({ track: TR(), settings: { timed: cfg.timed, guided: cfg.guided, topics: cfg.topics, pool: cfg.pool }, ids, picked: ids.map(() => null), time_limit: cfg.timed ? ids.length * EXAM_SECONDS_PER_Q : null });
+        const limit = cfg.timed ? ids.length * EXAM_SECONDS_PER_Q : null;
+        const row = await api.createExam({ track: TR(), settings: { timed: cfg.timed, guided: cfg.guided, topics: cfg.topics, pool: cfg.pool, deadline: limit ? new Date(Date.now() + limit * 1000).toISOString() : null }, ids, picked: ids.map(() => null), time_limit: limit });
         runExam(row);
       } catch (e) { $("er").textContent = errMsg(e); $("er").hidden = false; $("ms").disabled = false; }
     };
@@ -573,20 +612,47 @@ async function runExam(row) {
     const items = await api.questionsByIds(TR(), row.ids);
     if (!items.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
     keepTerms(items);
-    const at = new Map(row.ids.map((id, i) => [id, i]));
-    const picked = items.map((q) => { const v = row.picked?.[at.get(q.id)]; return v == null ? null : +v; });
-    S = { mode: "exam", ex: row, items, picked, saved: picked.map((v) => v != null), i: Math.min(row.i || 0, items.length - 1), start: Date.now() - (row.used || 0) * 1000, limit: row.time_limit || null, guided: !!row.settings?.guided, tick: null, back: () => { saveExam(); myExams(); } };
+    // the copy saved on this phone wins when it has more answers (e.g. the last save didn't reach the server)
+    const bk = store.get(`exb:${row.id}`), answeredIn = (arr) => (arr || []).filter((v) => v != null).length;
+    const src = bk && bk.ids?.join() === row.ids.join() && answeredIn(bk.picked) >= answeredIn(row.picked) ? { ...row, picked: bk.picked, i: bk.i, used: Math.max(bk.used || 0, row.used || 0) } : row;
+    const at = new Map(src.ids.map((id, i) => [id, i]));
+    const picked = items.map((q) => { const v = src.picked?.[at.get(q.id)]; return v == null ? null : +v; });
+    // timer policy: a timed exam has a fixed end time. Closing the app does not stop or reset the clock.
+    const deadline = row.time_limit && row.settings?.deadline ? Date.parse(row.settings.deadline) : null;
+    S = { mode: "exam", ex: row, items, picked, saved: picked.map((v) => v != null && !!row.settings?.guided), i: Math.min(src.i || 0, items.length - 1),
+      start: deadline ? deadline - row.time_limit * 1000 : Date.now() - (src.used || 0) * 1000, deadline, limit: row.time_limit || null, guided: !!row.settings?.guided, tick: null, back: () => { saveExam(); myExams(); } };
+    if (S.limit && examUsed() >= S.limit) { S.expired = true; return examEnd(); }
     examQ();
   } catch (e) {
     frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`);
     $("rt").onclick = () => runExam(row); $("hm").onclick = route;
   }
 }
-function examUsed() { return Math.floor((Date.now() - S.start) / 1000); }
+function examUsed() { const u = Math.floor((Date.now() - S.start) / 1000); return S.limit ? Math.min(S.limit, u) : u; }
+// every change is kept on the phone first, then sent to the server; if the network is down it is sent again later
 function saveExam() {
   if (S?.mode !== "exam" || S.ended) return;
-  const ids = S.items.map((q) => q.id);
-  api.updateExam(S.ex.id, { ids, picked: S.picked, i: S.i, used: examUsed() }).catch(() => {});
+  const ids = S.items.map((q) => q.id), body = { ids, picked: S.picked, i: S.i, used: examUsed() }, id = S.ex.id;
+  store.set(`exb:${id}`, { ...body, ts: Date.now() });
+  api.updateExam(id, body).then(() => { st.unsynced = null; }).catch(() => { st.unsynced = { id, body }; });
+}
+window.addEventListener("online", () => {
+  const u = st.unsynced; if (!u) return;
+  api.updateExam(u.id, u.body).then(() => { if (st.unsynced === u) st.unsynced = null; }).catch(() => {});
+});
+// finish now, with a confirmation that says how many questions are still unanswered
+function confirmFinish() {
+  document.querySelector(".sheet")?.remove();
+  const left = S.picked.filter((x) => x == null).length;
+  const el = document.createElement("div");
+  el.className = "sheet"; el.dir = t("dir"); el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
+  el.innerHTML = `<div class="sheet-in"><h2>${t("finishQ")}</h2><p>${left ? `${left} ${t("unanswered")}. ${t("finishLeft")}` : t("finishAll")}</p>
+    <div class="row2"><button class="primary" id="cf1">${t("finish")}</button><button class="ghost" id="cf0">${t("keepGoing")}</button></div></div>`;
+  document.body.appendChild(el);
+  const close = () => el.remove();
+  el.querySelector("#cf0").onclick = close; el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector("#cf1").onclick = () => { close(); examEnd(); };
+  el.querySelector("#cf0").focus();
 }
 function examQ() {
   S.screen = examQ;
@@ -596,13 +662,14 @@ function examQ() {
   <div class="card">${qBody(q, S.i + 1, tot)}
     <div class="opts">${c.o.map((o, k) => `<button class="opt ${!S.guided && sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
     ${S.guided ? `<div id="fb" style="margin-top:12px"></div>` : ""}
-    <div class="mocknav"><button class="ghost" id="pv" ${S.i === 0 ? "disabled" : ""}>${bwd()} ${t("prev")}</button>${S.i < tot - 1 ? `<button class="primary" id="nx">${t("next")} ${fwd()}</button>` : `<button class="primary" id="fin">${t("finish")}</button>`}</div>
-    <p class="muted">${S.picked.filter((x) => x == null).length} ${t("unanswered")}</p>
+    <div class="mocknav stickynav"><button class="ghost" id="pv" ${S.i === 0 ? "disabled" : ""}>${bwd()} ${t("prev")}</button>${S.i < tot - 1 ? `<button class="primary" id="nx">${t("next")} ${fwd()}</button>` : `<button class="primary" id="fin">${t("finish")}</button>`}</div>
+    <div class="exfoot"><span class="muted">${S.picked.filter((x) => x == null).length} ${t("unanswered")}</span>${S.i < tot - 1 ? `<button class="link" id="fin2">${t("finishNow")}</button>` : ""}</div>
   </div>`, { protect: true });
   const el = $("tm"), upd = () => {
     if (S?.screen !== examQ) return;
     const used = examUsed();
-    if (S.limit) { const left = S.limit - used; if (left <= 0) return examEnd(); clock(el, left); } else clock(el, used);
+    if (S.limit) { const left = S.limit - used; if (left <= 0) { S.expired = true; return examEnd(); } clock(el, left); } else clock(el, used);
+    if (used % 20 === 0) saveExam();
   };
   upd(); S.tick = setInterval(upd, 1000);
   $("bk").onclick = () => S.back(); bindMark(q);
@@ -619,7 +686,8 @@ function examQ() {
   }));
   $("pv").onclick = () => { S.i--; saveExam(); examQ(); };
   if ($("nx")) $("nx").onclick = () => { S.i++; saveExam(); examQ(); };
-  if ($("fin")) $("fin").onclick = examEnd;
+  if ($("fin")) $("fin").onclick = confirmFinish;
+  if ($("fin2")) $("fin2").onclick = confirmFinish;
 }
 async function examEnd() {
   stopTimer();
@@ -633,7 +701,8 @@ async function examEnd() {
   });
   const score = ans.filter(Boolean).length, p = pctOf(score, S.items.length);
   if (st.best == null || p > st.best) st.best = p;
-  const ex = { ...S.ex, ids: S.items.map((q) => q.id), picked: S.picked, used, status: "done", score, finished_at: new Date().toISOString() };
+  const ex = { ...S.ex, ids: S.items.map((q) => q.id), picked: S.picked, used, status: "done", score, finished_at: new Date().toISOString(), expired: !!S.expired };
+  store.set(`exb:${ex.id}`, null);
   Promise.all([...saves, api.updateExam(ex.id, { ids: ex.ids, picked: ex.picked, i: S.i, used, status: "done", score, finished_at: ex.finished_at }).catch(() => {})])
     .then(() => api.claimMockXp(ex.id)).then(xpToast).catch(() => {});
   api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
@@ -643,22 +712,39 @@ async function examEnd() {
 function examResult(ex, items, part = "all") {
   const picked = items.map((q) => { const i = ex.ids.indexOf(q.id); const v = ex.picked?.[i]; return v == null ? null : +v; });
   const n = items.length, c = items.filter((q, i) => picked[i] === q.answer).length, p = pctOf(c, n), s = ex.used || 0;
+  const answered = picked.filter((v) => v != null).length, wrong = answered - c, blank = n - answered;
   const by = {}; items.forEach((q, i) => { by[q.topic] = by[q.topic] || [0, 0]; by[q.topic][1]++; if (picked[i] === q.answer) by[q.topic][0]++; });
-  const answered = picked.filter((v) => v != null).length;
+  const weakT = Object.entries(by).filter(([, [a, b]]) => b >= 2 && a / b < 0.6).map(([k]) => k);
+  const missIds = items.filter((q, i) => picked[i] !== q.answer).map((q) => q.id);
   S = { screen: () => examResult(ex, items, part), back: myExams, ex, items };
   const showA = part !== "review", showR = part !== "analysis";
   frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("examNo")} #${ex.id}</h2></div>
+  ${ex.expired ? `<div class="banner">⏱ ${t("timeUp")}</div>` : ""}
   <div class="card score">${ringSvg(p, 130)}
     <h2>${p >= 80 ? t("r80") : p >= 60 ? t("r60") : t("r0")}</h2>
-    <p class="muted">${c} ${t("of")} ${n} ${t("ofCorrect")} · ${Math.floor(s / 60)} ${t("min")} ${s % 60} ${t("sec")}</p>
+    <div class="rw"><div><b class="okc">${c}</b><span>${t("rightN")}</span></div><div><b class="badc">${wrong}</b><span>${t("wrongN")}</span></div><div><b>${blank}</b><span>${t("unanswered")}</span></div></div>
+    <p class="muted">⏱ ${Math.floor(s / 60)} ${t("min")} ${s % 60} ${t("sec")}${answered ? ` · ${Math.round(s / answered)} ${t("sec")} / ${t("q")}` : ""}</p>
+    <div id="cmp" class="muted"></div>
   </div>
+  <div class="actions res-actions">${showR && part === "all" ? `<button class="ghost" id="rv">${t("review")}</button>` : ""}${missIds.length ? `<button class="primary" id="rw">${t("retryWrong")} (${missIds.length})</button>` : ""}<button class="ghost" id="hm">${t("home")}</button></div>
   ${showA ? `<div class="section-title">${t("strengths")}</div>
   ${topicBars(Object.entries(by).map(([k, [a, b]]) => ({ k, a, b })))}
-  <div class="big-stat"><div class="tile"><span>${t("avgPerQ")}</span><span class="n">${answered ? Math.round(s / answered) : 0} ${t("sec")}</span><span class="muted">${t("recPerQ")}</span></div>
-  <div class="tile"><span>${t("answeredL")}</span><span class="n">${answered}/${n}</span></div></div>` : ""}
-  ${showR ? `<div class="section-title">${t("review")}</div><div class="review protect">${items.map((q, i) => { const pk = picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted" style="white-space:pre-line">${esc(c2.e)}</span></div>`; }).join("")}</div>` : ""}
+  ${weakT.length ? `<div class="section-title">${t("reviewTopics")}</div><div class="chips">${weakT.map((k) => `<button class="chip pick warm" data-tp="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>` : ""}` : ""}
+  ${showR ? `<div class="section-title" id="rvs">${t("review")}</div><div class="review protect">${items.map((q, i) => { const pk = picked[i], ok = pk === q.answer, c2 = q[st.lang]; return `<div class="rv"><span class="st ${ok ? "okc" : "badc"}">${i + 1}. ${ok ? t("correct") : pk == null ? t("none") : t("wrong")}</span><span>${esc(c2.q)}</span>${ok ? "" : `<span class="muted">${t("yourAns")}: ${pk == null ? t("none") : esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[q.answer])}</b></span><span class="muted" style="white-space:pre-line">${esc(c2.e || t("noExp"))}</span></div>`; }).join("")}</div>` : ""}
   <div class="actions"><button class="primary" id="nw">${t("newExamGo")}</button><button class="ghost" id="ml">${t("navExams")}</button></div>`, { protect: showR });
-  $("bk").onclick = myExams; $("nw").onclick = newExam; $("ml").onclick = myExams;
+  $("bk").onclick = myExams; $("nw").onclick = newExam; $("ml").onclick = myExams; $("hm").onclick = route;
+  if ($("rv")) $("rv").onclick = () => $("rvs").scrollIntoView({ behavior: "smooth" });
+  if ($("rw")) $("rw").onclick = () => practice({ kind: "ids", ids: missIds });
+  app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.tp })));
+  // comparison with earlier finished exams (only real data; a message when there is nothing to compare)
+  api.myExams(st.user.id, TR()).then((list) => {
+    if (!$("cmp")) return;
+    const prev = list.filter((x) => x.status === "done" && x.id !== ex.id && new Date(x.finished_at || x.created_at) < new Date(ex.finished_at || Date.now()));
+    if (!prev.length) { $("cmp").textContent = t("noCompare"); return; }
+    const last = prev.sort((a, b) => new Date(b.finished_at || b.created_at) - new Date(a.finished_at || a.created_at))[0];
+    const lp = pctOf(last.score, last.ids.length), avg = Math.round(prev.reduce((a, x) => a + pctOf(x.score, x.ids.length), 0) / prev.length), d = p - lp;
+    $("cmp").innerHTML = `${t("prevExam")}: <b>${lp}%</b> (${d >= 0 ? "+" : ""}${d}) · ${t("avgExams")} (${prev.length}): <b>${avg}%</b>`;
+  }).catch(() => {});
 }
 async function openExam(ex, part) {
   loading();
@@ -763,6 +849,7 @@ async function stats() {
   const tt = totals(), done = hist.length || tt.done;
   const right = hist.length ? hist.filter((r) => r.correct).length : tt.right;
   const first = hist.filter((r) => (r.first_correct ?? r.correct)).length;
+  const attempts = hist.reduce((a, r) => a + (r.attempts || 1), 0);
   const level = tt.n ? Math.min(5, (right / tt.n) * 5) : 0;
   const fin = exams.filter((x) => x.status === "done");
   const exQ = fin.reduce((a, x) => a + (x.picked || []).filter((v) => v != null).length, 0), exS = fin.reduce((a, x) => a + (x.used || 0), 0);
@@ -775,6 +862,8 @@ async function stats() {
     <div class="card st-box"><span class="muted">${t("curAvg")}</span><span class="pct">${pctOf(right, done)}%</span><span>${right} / ${done} ${t("correctAns")}</span></div>
     <div class="card st-box"><span class="muted">${t("level")}</span><span class="pct">${level.toFixed(1)}<small>/5</small></span><div class="lvl"><i style="left:${(level / 5) * 100}%"></i></div><span class="muted" style="font-size:12px">${t("levelD")}</span></div>
   </div>
+  <div class="card defs"><div class="big-stat"><div class="tile"><span>${t("uniqueQs")}</span><span class="n">${done}</span></div><div class="tile"><span>${t("attemptsN")}</span><span class="n">${attempts}</span></div></div>
+    <p class="muted" style="font-size:13px">ℹ️ ${t("statsDefs")}</p></div>
   <div class="card"><div class="card-h"><h3>${t("activityL")}</h3><span class="muted">${t("last14")}</span></div>${activityChart(act)}</div>
   <div class="section-title">${t("byTopicA")}</div>
   <div id="bytopic"><div class="spin sm"></div></div>
@@ -1185,7 +1274,8 @@ async function planMock(n) {
   try {
     const ids = await api.examIds(TR(), n, [], "all");
     if (!ids.length) throw new Error(t("noneMatch"));
-    const row = await api.createExam({ track: TR(), settings: { timed: true, guided: false, topics: [], pool: "all", plan: true }, ids, picked: ids.map(() => null), time_limit: ids.length * EXAM_SECONDS_PER_Q });
+    const limit = ids.length * EXAM_SECONDS_PER_Q;
+    const row = await api.createExam({ track: TR(), settings: { timed: true, guided: false, topics: [], pool: "all", plan: true, deadline: new Date(Date.now() + limit * 1000).toISOString() }, ids, picked: ids.map(() => null), time_limit: limit });
     runExam(row);
   } catch (e) { frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="ghost" id="hm">${t("back")}</button></div>`); $("hm").onclick = journey; }
 }
@@ -1432,6 +1522,23 @@ function friendNick() {
   return n || null;
 }
 
+
+/* ---------------- first-time intro (short, can be skipped) ---------------- */
+function intro(i = 0) {
+  const steps = [["🎯", "in1T", "in1D"], ["📝", "in2T", "in2D"], ["🔁", "in3T", "in3D"], ["📊", "in4T", "in4D"]];
+  const done = () => { store.set(`intro:${st.user.id}`, 1); home(); };
+  S = { screen: () => intro(i), back: done };
+  const [em, h, d] = steps[i], last = i === steps.length - 1;
+  frame(`<div class="card intro">
+    <div class="big-emoji" aria-hidden="true">${em}</div><h2>${t(h)}</h2><p class="muted">${t(d)}</p>
+    <div class="dots" aria-hidden="true">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
+    <button class="primary" id="in">${last ? t("inGo") : t("next") + " " + fwd()}</button>
+    ${last ? "" : `<button class="link" id="sk">${t("skip")}</button>`}
+  </div>`);
+  $("in").onclick = () => (last ? done() : intro(i + 1));
+  if ($("sk")) $("sk").onclick = done;
+}
+
 /* ---------------- daily goal + streak ---------------- */
 const goalKey = () => `goal:${st.user.id}`;
 const goalOf = () => store.get(goalKey()) || 20;
@@ -1633,18 +1740,28 @@ function parseExp(e, lang) {
   return { per, gen: gen.join("\n") };
 }
 // Mark the options right/wrong and write the reason under each one; returns the explanation box html
+// highlight the question's medical terms inside an (already escaped) explanation
+function markTerms(html, q) {
+  const words = (q.terms || []).flat().filter((w) => w && w.length > 2).sort((a, b) => b.length - a.length);
+  if (!words.length) return html;
+  const re = new RegExp(`(${words.map((w) => esc(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+  return html.replace(re, '<mark class="term-hl">$1</mark>');
+}
 function reveal(q, k) {
-  const c = q[st.lang], ok = k === q.answer, { per, gen } = parseExp(c.e, st.lang);
+  const c = q[st.lang], ok = k === q.answer, { per, gen } = parseExp(c.e, st.lang), L = LET[st.lang];
   app.querySelectorAll(".opt").forEach((b) => {
-    const n = +b.dataset.k; b.disabled = true;
+    const n = +b.dataset.k; b.disabled = true; b.classList.remove("sel");
     if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong");
-    if (per[n] && !b.querySelector(".why")) b.children[1].insertAdjacentHTML("beforeend", `<small class="why">${n === q.answer ? "✓" : "✗"} ${esc(per[n])}</small>`);
   });
-  const hasPer = Object.keys(per).length > 0;
-  return `<div class="explain"><b>${ok ? t("correct") : t("wrong")}</b>
-    <div class="rans">${t("rightAns")}: <strong>${LET[st.lang][q.answer]} – ${esc(c.o[q.answer])}</strong></div>
-    ${hasPer ? (gen ? `<span>${esc(gen)}</span>` : "") : `<span>${esc(c.e)}</span>`}
-    ${hasPer ? `<div class="muted" style="font-size:13px">${t("whyEach")}</div>` : ""}
+  const why = per[q.answer] || "", others = [0, 1, 2, 3].filter((n) => n !== q.answer && per[n]);
+  const hasAny = !!(why || gen || others.length);
+  const fmt = (x) => markTerms(esc(x), q);
+  return `<div class="explain">
+    <b class="verdict ${ok ? "okc" : "badc"}">${ok ? t("correct") : k == null ? t("none") : t("wrong")}</b>
+    <div class="exsec"><h4>${t("rightAns")}</h4><p><strong>${L[q.answer]} – ${esc(c.o[q.answer])}</strong></p></div>
+    ${why || gen ? `<div class="exsec"><h4>${t("whyRight")}</h4>${why ? `<p>${fmt(why)}</p>` : ""}${gen ? `<p>${fmt(gen)}</p>` : ""}</div>` : ""}
+    ${others.length ? `<div class="exsec"><h4>${t("whyWrong")}</h4><ul>${others.map((n) => `<li class="${n === k ? "picked" : ""}"><b>${L[n]}</b> – ${fmt(per[n])}</li>`).join("")}</ul></div>` : ""}
+    ${hasAny ? "" : `<p class="muted">${t("noExp")}</p>`}
     <div class="ref"><strong>${t("source")}:</strong> <bdi dir="ltr">${esc(q.source)}</bdi></div></div>`;
 }
 function feedback(k) {

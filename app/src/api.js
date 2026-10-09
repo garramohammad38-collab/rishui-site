@@ -176,3 +176,6 @@ export async function startFriend(code, nick) { return must(await supabase.rpc("
 export async function friendAnswer(code, index, pick) { return must(await supabase.rpc("friend_answer", { p_code: code, p_index: index + 1, p_pick: pick })); }
 export async function finishFriend(code) { return must(await supabase.rpc("finish_friend_challenge", { p_code: code })); }
 export const appUrl = window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/";
+export async function examCount(track, topics, pool) {
+  return must(await supabase.rpc("exam_count", { p_track: track, p_topics: topics?.length ? topics : null, p_pool: pool }));
+}

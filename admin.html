@@ -6,6 +6,8 @@
 <title>מוסמך · لوحة الإدارة</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="import-tools.js"></script>
 <style>
 :root{--bg:#EAF1FA;--surface:#fff;--ink:#0F1E33;--muted:#566A85;--line:#D2DEEC;--accent:#1554A8;--accent-soft:#DCE8F8;--ok:#1F8A4C;--ok-soft:#DDF2E5;--bad:#C2413A;--bad-soft:#F8E0DE;--amber-soft:#FBEBCF;
   --font:"IBM Plex Sans Arabic","IBM Plex Sans Hebrew",system-ui,sans-serif}
@@ -45,6 +47,7 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--accent-soft)}
 .opt input[type=radio]{width:auto;flex:none}
 .stat{font-size:28px;font-weight:600}
 [hidden]{display:none!important}
+.sumgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.sumgrid div{background:#f4f6fa;border-radius:10px;padding:10px;display:flex;flex-direction:column;align-items:center}.sumgrid b{font-size:22px}.sumgrid span{font-size:12px;color:#666}
 </style>
 </head>
 <body>
@@ -252,48 +255,74 @@ function parseCSV(text) {
   return rows.filter(r => r.some(x => x.trim()));
 }
 function rowsFromCSV(text) {
-  const [head, ...data] = parseCSV(text.replace(/^﻿/, ""));
-  const ix = Object.fromEntries(head.map((h,i) => [h.trim(), i]));
-  const g = (r,k) => (r[ix[k]] ?? "").trim();
-  return data.map(r => ({
-    track: g(r,"track") || curTrack, topic: g(r,"topic"), answer: (+g(r,"answer")) - 1,
-    he: { q: g(r,"q_he"), o: [1,2,3,4].map(i => g(r,"o"+i+"_he")), e: g(r,"e_he") },
-    en: { q: g(r,"q_en"), o: [1,2,3,4].map(i => g(r,"o"+i+"_en")), e: g(r,"e_en") },
-    terms: g(r,"terms").split(";").map(x => x.split("=").map(y => y.trim())).filter(p => p.length === 2 && p[0] && p[1]),
-    source: g(r,"source"), is_free: /^(1|true|yes|כן|نعم)$/i.test(g(r,"is_free")),
-  }));
+  return ImportTools.rowsFromTable(parseCSV(text.replace(/^\uFEFF/, "")), importCtx()).rows;
+}
+function rowsFromXLSX(buf) {
+  if (!window.XLSX) throw new Error("قارئ ملفات Excel ما انحمّل. افحص الإنترنت وجرّب كمان مرة.");
+  const wb = XLSX.read(buf, { type: "array" });
+  // the sheet with the questions: "שאלות" in our template, otherwise the first sheet that has a known header
+  const names = ["שאלות", ...wb.SheetNames];
+  for (const n of names) {
+    const ws = wb.Sheets[n]; if (!ws) continue;
+    const res = ImportTools.rowsFromTable(XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" }), importCtx());
+    if (res.layout) return res.rows;
+  }
+  throw new Error("ما لقيت ورقة فيها أعمدة الأسئلة (השאלה أو q_he).");
 }
 function rowsFromJSON(text) {
   const arr = JSON.parse(text);
-  return arr.map(x => ({ track: x.track || curTrack, topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
+  return arr.map((x, n) => ({ line: n + 1, track: x.track || curTrack, topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
+}
+const importCtx = () => ({ curTrack, tracks: TRACKS, topicsBy: TOPICS_BY });
+async function existingQuestions(tracks) {
+  let all = [];
+  for (const tr of tracks) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from("questions").select("id,he").eq("track", tr).order("id").range(from, from + 999);
+      if (error) throw error;
+      all = all.concat(data.map((x) => ({ id: x.id, q: x.he?.q })));
+      if (data.length < 1000) break;
+    }
+  }
+  return all;
 }
 function viewImport() {
   $("body").innerHTML = `<div class="card"><h3>استيراد أسئلة</h3>
-    <p class="muted">ملف CSV (من Excel: Save As → CSV UTF-8) بنفس أعمدة القالب <b>questions-template.csv</b>، أو ملف JSON. الجواب الصحيح بالـCSV رقم من 1 لـ4. المصطلحات: <span dir="ltr">Lithium=ליתיום;Toxicity=הרעלה</span></p>
-    <input type="file" id="file" accept=".csv,.json,text/csv,application/json">
+    <p class="muted">ملف Excel (‎.xlsx‎) من القالب <b>musmach-questions-template.xlsx</b>، أو CSV بأعمدة <b>questions-template.csv</b>، أو JSON. التطبيق بيفحص كل سطر وبيلاقي الأسئلة المكررة قبل ما يضيف إشي.</p>
+    <input type="file" id="file" accept=".xlsx,.csv,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
     <label><input type="checkbox" id="pub" style="width:auto"> انشرهم مباشرة (الأفضل تخليهم مسودة لحد ما تراجعهم)</label>
     <div id="pre"></div></div>`;
   $("file").onchange = async () => {
     const f = $("file").files[0]; if (!f) return;
-    const text = await f.text();
+    $("pre").innerHTML = `<p class="muted">بفحص الملف…</p>`;
     let rows;
-    try { rows = f.name.toLowerCase().endsWith(".json") ? rowsFromJSON(text) : rowsFromCSV(text); }
-    catch (e) { $("pre").innerHTML = `<div class="msg bad">الملف مش مقروء: ${esc(e.message)}</div>`; return; }
-    const bad = rows.map((r,i) => [i+2, validate(r)]).filter(([,p]) => p.length);
-    const good = rows.filter(r => !validate(r).length);
-    $("pre").innerHTML = `<p>${rows.length} صف · <b>${good.length}</b> جاهزين${bad.length ? ` · <span style="color:var(--bad)">${bad.length} فيهم مشاكل</span>` : ""}</p>
-      ${bad.length ? `<div class="msg bad">${bad.slice(0,20).map(([n,p]) => `سطر ${n}: ${p.map(esc).join("، ")}`).join("<br>")}</div>` : ""}
-      ${good.length ? `<button class="btn" id="go">استيراد ${good.length} سؤال</button>` : ""}`;
-    if ($("go")) $("go").onclick = async () => {
-      $("go").disabled = true;
-      const pub = $("pub").checked;
-      for (let i = 0; i < good.length; i += 200) {
-        const chunk = good.slice(i, i+200).map(r => ({ ...r, published: pub }));
-        const { error } = await sb.from("questions").insert(chunk);
-        if (error) { $("pre").insertAdjacentHTML("beforeend", `<div class="msg bad">توقف عند ${i}: ${esc(error.message)}</div>`); return; }
-      }
-      msg(`انضافوا ${good.length} سؤال`); tab = "list"; render();
+    try {
+      const name = f.name.toLowerCase();
+      rows = name.endsWith(".xlsx") ? rowsFromXLSX(await f.arrayBuffer()) : name.endsWith(".json") ? rowsFromJSON(await f.text()) : rowsFromCSV(await f.text());
+    } catch (e) { $("pre").innerHTML = `<div class="msg bad">الملف مش مقروء: ${esc(e.message)}</div>`; return; }
+    if (!rows.length) { $("pre").innerHTML = `<div class="msg bad">ما في أسئلة بالملف، أو أسماء الأعمدة مش مثل القالب.</div>`; return; }
+    let existing = [];
+    try { existing = await existingQuestions([...new Set(rows.map((r) => r.track))]); }
+    catch (e) { $("pre").innerHTML = `<div class="msg bad">ما قدرت أفحص الأسئلة الموجودة: ${esc(e.message)}</div>`; return; }
+    const { inFile, inDb } = ImportTools.findDuplicates(rows, existing);
+    const problems = rows.map((r, i) => [r.line ?? i + 2, validate(r)]).filter(([, p]) => p.length);
+    const okRows = rows.map((r, i) => ({ r, i })).filter(({ r }) => !validate(r).length);
+    const draw = () => {
+      const withDup = $("dup")?.checked;
+      const ready = okRows.filter(({ i }) => withDup || (!inFile.has(i) && !inDb.has(i)));
+      const heOnly = ready.filter(({ r }) => r.heOnly).length;
+      $("pre").innerHTML = `<div class="sumgrid"><div><b>${rows.length}</b><span>صفوف بالملف</span></div><div><b style="color:var(--ok)">${ready.length}</b><span>جاهزين للإضافة</span></div>
+          <div><b style="color:var(--bad)">${problems.length}</b><span>فيهم نقص</span></div><div><b>${inFile.size + inDb.size}</b><span>مكررين</span></div></div>
+        ${problems.length ? `<div class="msg bad"><b>صفوف ناقصة (ما رح تنضاف):</b><br>${problems.slice(0, 30).map(([n, p]) => `سطر ${n}: ${p.map(esc).join("، ")}`).join("<br>")}${problems.length > 30 ? `<br>و${problems.length - 30} كمان…` : ""}</div>` : ""}
+        ${inDb.size ? `<div class="msg"><b>موجودين أصلاً بالبنك (${inDb.size}):</b><br>${[...inDb].slice(0, 20).map(([i, id]) => `سطر ${rows[i].line ?? i + 2} = سؤال #${id}`).join("<br>")}</div>` : ""}
+        ${inFile.size ? `<div class="msg"><b>مكررين جوّا الملف (${inFile.size}):</b><br>${[...inFile].slice(0, 20).map(([i, j]) => `سطر ${rows[i].line ?? i + 2} = سطر ${rows[j].line ?? j + 2}`).join("<br>")}</div>` : ""}
+        ${inFile.size + inDb.size ? `<label><input type="checkbox" id="dup" style="width:auto" ${withDup ? "checked" : ""}> ضيف المكررين كمان (مش منصوح)</label>` : ""}
+        ${heOnly ? `<div class="msg">${heOnly} سؤال بالعبري بس (من قالب الإكسل). بالإنجليزي رح يطلعوا بالعبري لحد ما تضيف ترجمة.</div>` : ""}
+        ${ready.length ? `<button class="btn" id="go">استيراد ${ready.length} سؤال</button>` : ""}`;
+      if ($("dup")) $("dup").onchange = draw;
+      if ($("go")) $("go").onclick = () => runImport(ready.map(({ r }) => r));
     };
+    draw();
   };
   const ex = document.createElement("div");
   ex.className = "card";
@@ -306,6 +335,25 @@ function viewImport() {
     a.href = URL.createObjectURL(new Blob([JSON.stringify(all, null, 1)], { type: "application/json" }));
     a.download = `rishui-questions-${new Date().toISOString().slice(0,10)}.json`; a.click();
   };
+}
+// adds in small groups; if a group fails, its rows are tried one by one so one bad row doesn't stop the rest
+async function runImport(list) {
+  $("go").disabled = true;
+  const pub = $("pub").checked, clean = (r) => { const { line, heOnly, ...x } = r; return { ...x, published: pub }; };
+  let added = 0; const failed = [];
+  for (let i = 0; i < list.length; i += 50) {
+    const chunk = list.slice(i, i + 50);
+    $("go").textContent = `بضيف… ${added}/${list.length}`;
+    const { error } = await sb.from("questions").insert(chunk.map(clean));
+    if (!error) { added += chunk.length; continue; }
+    for (const r of chunk) {
+      const { error: e1 } = await sb.from("questions").insert(clean(r));
+      if (e1) failed.push([r.line, e1.message]); else added++;
+    }
+  }
+  $("pre").insertAdjacentHTML("beforeend", `<div class="msg ${failed.length ? "bad" : ""}"><b>انضاف ${added} سؤال${pub ? " (منشورين)" : " (مسودة)"}.</b>${failed.length ? `<br>ما انضافوا ${failed.length}:<br>${failed.map(([n, m]) => `سطر ${n}: ${esc(m)}`).join("<br>")}` : ""}</div>`);
+  $("go").remove();
+  msg(`انضاف ${added} سؤال`);
 }
 
 /* ---------- reports ---------- */
