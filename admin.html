@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="import-tools.js"></script>
-<script src="assets/ptr.js"></script>
+<script src="assets/ptr.js?v=2"></script>
 <style>
 :root{--bg:#EAF1FA;--surface:#fff;--ink:#0F1E33;--muted:#566A85;--line:#D2DEEC;--accent:#1554A8;--accent-soft:#DCE8F8;--ok:#1F8A4C;--ok-soft:#DDF2E5;--bad:#C2413A;--bad-soft:#F8E0DE;--amber-soft:#FBEBCF;
   --font:"IBM Plex Sans Arabic","IBM Plex Sans Hebrew",system-ui,sans-serif}
@@ -124,12 +124,13 @@ async function start() {
 /* ---------- layout ---------- */
 function render() {
   const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["stats","أرقام"]];
-  root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="out">خروج</button></div></div>
+  root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
   ${msgHtml()}<div id="body"></div>`;
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
+  $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
   ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, stats: viewStats })[tab]();
 }

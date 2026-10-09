@@ -1,7 +1,7 @@
 // Pull down to refresh, for when the page is opened from the home screen (no browser bar = no built-in refresh).
 (function () {
   var standalone = navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
-  if (!standalone || !("ontouchstart" in window)) return;
+  if (!("ontouchstart" in window)) return;
   var LIMIT = 80, y0 = null, dy = 0, el = document.createElement("div");
   el.setAttribute("aria-hidden", "true");
   el.style.cssText = "position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;width:36px;height:36px;margin-left:-18px;border-radius:50%;background:#fff;color:#1554A8;box-shadow:0 2px 10px rgba(0,0,0,.2);display:grid;place-items:center;font:20px system-ui;z-index:99999;opacity:0;transform:translateY(-50px);transition:opacity .15s";
