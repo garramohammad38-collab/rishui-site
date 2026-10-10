@@ -888,16 +888,25 @@ function viewQuestion(q, picked, back) {
 async function stats() {
   S = { screen: stats };
   frame(`<h2 class="page-h">${t("navStats")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "stats" });
-  const [hist, act, exams] = await Promise.all([api.answerHistory(st.user.id, TR()).catch(() => []), api.activity(st.user.id, TR(), 14), api.myExams(st.user.id, TR()).catch(() => [])]);
+  // fast path: small server-side summary; falls back to downloading everything on an older database
+  let sum = null, hist = [], exams = [], act = [], ts = null;
+  [sum, act, ts] = await Promise.all([api.statsSummary(TR()).catch(() => null), api.activity(st.user.id, TR(), 14), api.topicStats(TR()).catch(() => null)]);
+  if (!sum || !ts) [hist, exams] = await Promise.all([api.answerHistory(st.user.id, TR()).catch(() => []), api.myExams(st.user.id, TR()).catch(() => [])]);
   if (S?.screen !== stats) return;
-  const tt = totals(), done = hist.length || tt.done;
-  const right = hist.length ? hist.filter((r) => r.correct).length : tt.right;
-  const first = hist.filter((r) => (r.first_correct ?? r.correct)).length;
-  const attempts = hist.reduce((a, r) => a + (r.attempts || 1), 0);
+  const tt = totals();
+  let done, right, first, attempts, exQ, exS, nExams, best;
+  if (sum && ts) {
+    done = ts.reduce((a, r) => a + r.answered, 0); right = ts.reduce((a, r) => a + r.correct, 0); first = ts.reduce((a, r) => a + (r.first_correct ?? r.correct), 0);
+    attempts = Number(sum.attempts); exQ = Number(sum.exam_q); exS = Number(sum.exam_secs); nExams = Number(sum.exams_done); best = sum.best == null ? st.best : Number(sum.best);
+    if (!done) done = tt.done, right = tt.right;
+  } else {
+    done = hist.length || tt.done; right = hist.length ? hist.filter((r) => r.correct).length : tt.right;
+    first = hist.filter((r) => (r.first_correct ?? r.correct)).length; attempts = hist.reduce((a, r) => a + (r.attempts || 1), 0);
+    const fin = exams.filter((x) => x.status === "done");
+    exQ = fin.reduce((a, x) => a + (x.picked || []).filter((v) => v != null).length, 0); exS = fin.reduce((a, x) => a + (x.used || 0), 0); nExams = fin.length;
+    best = fin.length ? Math.max(...fin.map((x) => pctOf(x.score, x.ids.length))) : st.best;
+  }
   const level = tt.n ? Math.min(5, (right / tt.n) * 5) : 0;
-  const fin = exams.filter((x) => x.status === "done");
-  const exQ = fin.reduce((a, x) => a + (x.picked || []).filter((v) => v != null).length, 0), exS = fin.reduce((a, x) => a + (x.used || 0), 0);
-  const best = fin.length ? Math.max(...fin.map((x) => pctOf(x.score, x.ids.length))) : st.best;
   const byT = Object.keys(st.counts).sort().map((k) => ({ k, b: st.counts[k] }));
   frame(`<h2 class="page-h">${t("navStats")}</h2>
   <div class="stat-top">
@@ -913,9 +922,9 @@ async function stats() {
   <div id="bytopic"><div class="spin sm"></div></div>
   <div class="section-title">${t("timeMgmt")}</div>
   <div class="big-stat"><div class="tile"><span>${t("avgPerQ")}</span><span class="n">${exQ ? Math.round(exS / exQ) : "—"} ${exQ ? t("sec") : ""}</span><span class="muted">${t("recPerQ")}</span></div>
-  <div class="tile"><span>${t("examsDone")}</span><span class="n">${fin.length}</span><span class="muted">${t("bestExam")}: ${best == null ? "—" : best + "%"}</span></div></div>`, { wide: true, nav: "stats" });
+  <div class="tile"><span>${t("examsDone")}</span><span class="n">${nExams}</span><span class="muted">${t("bestExam")}: ${best == null ? "—" : best + "%"}</span></div></div>`, { wide: true, nav: "stats" });
   let agg = {};
-  try { (await api.topicStats(TR())).forEach((r) => (agg[r.topic] = [r.answered, r.correct])); }
+  try { (ts || (await api.topicStats(TR()))).forEach((r) => (agg[r.topic] = [r.answered, r.correct])); }
   catch {
     // older database without my_topic_stats: look the topics up from the questions
     const known = st.qTopic || (st.qTopic = new Map());

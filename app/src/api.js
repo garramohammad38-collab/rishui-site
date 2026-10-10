@@ -150,6 +150,9 @@ export async function answerHistory(uid, track) {
   try { return await pageAll(q("question_id,picked,correct,first_correct,attempts,answered_at")); }
   catch { return pageAll(q("question_id,picked,correct,answered_at")); }
 }
+export async function statsSummary(track) {
+  return must(await supabase.rpc("my_stats_summary", { p_track: track }));
+}
 export async function resetProgress(track) {
   must(await supabase.rpc("reset_my_progress", { p_track: track }));
 }
