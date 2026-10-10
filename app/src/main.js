@@ -162,6 +162,12 @@ async function afterLogin(user) {
     await initPurchases(user.id).catch(() => {});
     route();
   } catch (e) {
+    // the account no longer exists (deleted) but this browser still holds its old sign-in: sign out and show the login
+    if (/no rows|PGRST116|JSON object requested|JWT|user from sub claim/i.test(String(e?.message || e) + " " + (e?.code || ""))) {
+      await api.auth.signOut().catch(() => {});
+      st.user = null; st.profile = null;
+      return login();
+    }
     frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button></div>`);
     $("rt").onclick = () => afterLogin(user);
   }
