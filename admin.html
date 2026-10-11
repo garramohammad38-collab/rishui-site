@@ -482,20 +482,29 @@ async function viewUsers() {
   const s = userState, PAGE = 50;
   $("body").innerHTML = `<div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
-    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="7" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
   const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
   $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
-  let q = sb.from("profiles").select("email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
+  let q = sb.from("profiles").select("id,email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
   if (s.q) q = q.ilike("email", `%${s.q}%`);
   const { data, count, error } = await q;
-  if (error) { $("rows").innerHTML = `<tr><td colspan="6" class="msg bad">${esc(error.message)}</td></tr>`; return; }
+  if (error) { $("rows").innerHTML = `<tr><td colspan="7" class="msg bad">${esc(error.message)}</td></tr>`; return; }
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
   const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
-  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td></tr>`).join("")
-    || `<tr><td colspan="6" class="muted">ما في مستخدمين</td></tr>`;
+  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
+    || `<tr><td colspan="7" class="muted">ما في مستخدمين</td></tr>`;
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const em = b.dataset.em;
+    if (!confirm(`متأكد بدك تحذف المستخدم؟\n${em}\n\nبينحذف حسابه وكل بياناته (إجاباته، إحصائياته، اشتراكه) ومش ممكن ترجّعها.`)) return;
+    if (!confirm(`تأكيد أخير: حذف ${em} نهائياً؟`)) return;
+    b.disabled = true;
+    const { error: e } = await sb.rpc("admin_delete_user", { p_id: b.dataset.del });
+    if (e) { alert("ما انحذف: " + e.message); b.disabled = false; return; }
+    viewUsers();
+  });
   const pages = Math.max(1, Math.ceil((count || 0) / PAGE));
   $("upg").textContent = `صفحة ${s.page + 1} من ${pages}`;
   $("upr").disabled = s.page === 0; $("unx").disabled = s.page + 1 >= pages;
