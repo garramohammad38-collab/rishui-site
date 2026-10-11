@@ -449,6 +449,7 @@ async function viewAnn() {
     <label>النص (اختياري)</label><textarea id="ab" maxlength="2000" dir="auto" placeholder="تفاصيل..."></textarea>
     <div class="row"><div><label>لمين</label><select id="atr"><option value="">كل الطلاب</option>${TRACKS.map(t => `<option value="${t.id}">${esc(trackLabel(t.id))} بس</option>`).join("")}</select></div>
       <div><label>لقديش يضل ظاهر</label><select id="ad"><option value="1">يوم</option><option value="3">3 أيام</option><option value="7" selected>أسبوع</option><option value="30">شهر</option><option value="">لحد ما أوقفه</option></select></div></div>
+    <label style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="aonce" style="width:auto"> يبين مرة وحدة بس (بيختفي لحاله بعد ما الطالب يشوفه مرة، حتى لو ما ضغط "הבנתי")</label>
     <div id="apv"></div>
     <button class="btn" id="asend" style="align-self:flex-start">📢 انشر الإعلان</button></div>
     <div class="card"><h3>الإعلانات</h3><div class="tbl"><table><thead><tr><th>الإعلان</th><th>لمين</th><th>تاريخ</th><th>الحالة</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
@@ -459,9 +460,10 @@ async function viewAnn() {
     const title = $("at").value.trim(); if (!title) { $("at").focus(); return; }
     const days = $("ad").value, row = { title, body: $("ab").value.trim() || null, track: $("atr").value || null,
       expires_at: days ? new Date(Date.now() + days * 864e5).toISOString() : null };
+    if ($("aonce").checked) row.once = true;
     $("asend").disabled = true;
     const { error } = await sb.from("announcements").insert(row);
-    if (error) { msg(/announcements/.test(error.message) ? "لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول." : error.message, false); }
+    if (error) { msg(/announcements/.test(error.message) ? "لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول." : /once/.test(error.message) ? "لازم تشغّل migration-26 (خيار مرة وحدة) بـ Supabase أول." : error.message, false); }
     else msg("✅ انشر الإعلان. الطلاب رح يشوفوه لما يفتحوا التطبيق.");
     render();
   };
