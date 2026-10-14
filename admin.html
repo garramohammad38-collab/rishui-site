@@ -114,7 +114,7 @@ async function start() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return login();
   const { data: p } = await sb.from("profiles").select("*").eq("id", data.session.user.id).single();
-  if (!p || p.role !== "admin") {
+  if (!p || (p.role !== "admin" && p.role !== "editor")) {
     await sb.auth.signOut();
     msg("هاد الحساب مش مدير. شغّل أمر تعيين المدير من الدليل.", false); return login();
   }
@@ -122,8 +122,12 @@ async function start() {
 }
 
 /* ---------- layout ---------- */
+const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what an editor (doctor) may open
 function render() {
-  const tabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const isAdmin = me.role === "admin";
+  const tabs = isAdmin ? allTabs : allTabs.filter(t => EDITOR_TABS.includes(t[0]));
+  if (!tabs.some(t => t[0] === tab)) tab = "list";
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
@@ -498,10 +502,25 @@ let userState = { q: "", page: 0 };
 const fmtDT = d => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 async function viewUsers() {
   const s = userState, PAGE = 50;
-  $("body").innerHTML = `<div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
+  $("body").innerHTML = `<div class="card"><h3>إضافة دكتور (محرّر)</h3>
+    <p class="muted">بيشوف الأسئلة (إضافة وتعديل واستيراد) والأرقام بس. ما بيشوف المستخدمين ولا الإشعارات ولا الإعلانات ولا الأكواد. لازم يكون سجّل حساب بالتطبيق أولاً.</p>
+    <div class="row"><input id="ed" type="email" dir="ltr" placeholder="إيميل الدكتور"><button class="btn" id="edgo" style="flex:none">إضافة</button></div>
+    <div id="edl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
     <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="9" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
+  const loadEditors = async () => {
+    const { data: ed } = await sb.from("profiles").select("email").eq("role", "editor").order("email");
+    $("edl").innerHTML = (ed || []).length ? ed.map(e => `<div class="row" style="justify-content:space-between"><span dir="ltr">${esc(e.email)}</span><button class="btn ghost" data-ed="${esc(e.email)}" style="flex:none">إزالة</button></div>`).join("") : "ما في دكاترة مضافين";
+    $("edl").querySelectorAll("[data-ed]").forEach(b => b.onclick = async () => { if (!confirm("تشيل صلاحية " + b.dataset.ed + "؟")) return; const { error } = await sb.rpc("admin_set_editor", { p_email: b.dataset.ed, p_on: false }); if (error) alert(error.message); loadEditors(); });
+  };
+  loadEditors();
+  $("edgo").onclick = async () => {
+    const em = $("ed").value.trim(); if (!em) return;
+    const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_on: true });
+    if (error) { alert(error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message); return; }
+    $("ed").value = ""; loadEditors();
+  };
   const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
   $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
   let q = sb.from("profiles").select("id,email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
@@ -518,7 +537,7 @@ async function viewUsers() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
-  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
+  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">دكتور</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
   $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
     || `<tr><td colspan="9" class="muted">ما في مستخدمين</td></tr>`;
   $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
@@ -583,7 +602,8 @@ async function viewStats() {
     h += `<div class="card"><b>كل يوم: <span style="color:var(--ok)">■</span> سجّلوا جديد · <span style="color:var(--accent)">■</span> حلّوا أسئلة</b>${bars(ap.signups_by_day, ["n", "a"], ["var(--ok)", "var(--accent)"])}</div>`;
     h += `<div class="card"><b>أصعب المواضيع (أقل نسبة إجابات صحيحة)</b>${ap.hard_topics.length ? `<div class="tbl"><table><thead><tr><th>الموضوع</th><th>إجابات</th><th>صحيحة</th></tr></thead><tbody>${ap.hard_topics.map(t => `<tr><td class="he">${esc(trackLabel(t.track))} · ${esc(TOPICS_OF(t.track)[t.k] || t.k)}</td><td>${num(t.n)}</td><td>${t.pct}%</td></tr>`).join("")}</tbody></table></div>` : `<span class="muted">بتظهر لما يكون في 10 إجابات على الأقل بالموضوع.</span>`}</div>`;
   }
-  h += `<h3>📦 عام</h3>` + cardsHtml([["كل المستخدمين", num(u.count)], ["اشتراكات فعّالة", num(a.count)], ["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]]);
+  h += `<h3>📦 عام</h3>` + cardsHtml(me.role === "admin" ? [["كل المستخدمين", num(u.count)], ["اشتراكات فعّالة", num(a.count)], ["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]] : [["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]]);
+  if (me.role !== "admin") { $("st").innerHTML = h; $("st").style.cssText = "display:flex;flex-direction:column;gap:12px"; return; }
   h += ce || !cfg ? `<div class="card"><b>الوضع المجاني</b><p class="muted">شغّل supabase/migration-5-free-mode.sql عشان يظهر هاد الخيار.</p></div>`
     : `<div class="card"><b>الوضع المجاني: ${cfg.free_mode ? "🟢 شغّال (كل الأسئلة ببلاش)" : "⚪ مطفي (بدها اشتراك)"}</b>
        <p class="muted">لما يكون شغّال، كل طالب مسجّل بيحل كل أسئلة مساره بدون اشتراك.</p>
