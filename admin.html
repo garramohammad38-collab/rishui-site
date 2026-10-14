@@ -452,6 +452,12 @@ async function viewAnn() {
     <label style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="aonce" style="width:auto"> يبين مرة وحدة بس (بيختفي لحاله بعد ما الطالب يشوفه مرة، حتى لو ما ضغط "הבנתי")</label>
     <div id="apv"></div>
     <button class="btn" id="asend" style="align-self:flex-start">📢 انشر الإعلان</button></div>
+    <div class="card"><h3>🔔 إشعار Push للتلفون</h3>
+    <p class="muted">بيوصل لتلفونات الطلاب اللي فعّلوا "חדשות ועדכונים" (آيفون)، حتى والتطبيق مسكّر. لا تبعت كثير (مرة بالأسبوع أو أقل).</p>
+    <label>العنوان</label><input id="pt" maxlength="60" dir="auto" placeholder="מסלולים חדשים נוספו!">
+    <label>النص</label><input id="pb" maxlength="160" dir="auto" placeholder="רפואה, פיזיותרפיה, ריפוי בעיסוק ורנטגן">
+    <label>لمين</label><select id="ptr"><option value="">كل الطلاب</option>${TRACKS.map(t => `<option value="${t.id}">${esc(trackLabel(t.id))} بس</option>`).join("")}</select>
+    <button class="btn" id="psend" style="align-self:flex-start">🔔 ابعت الإشعار</button></div>
     <div class="card"><h3>الإعلانات</h3><div class="tbl"><table><thead><tr><th>الإعلان</th><th>لمين</th><th>تاريخ</th><th>الحالة</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
   const prev = () => { const t = $("at").value.trim(), b = $("ab").value.trim();
     $("apv").innerHTML = t ? `<label>هيك رح يطلع للطالب:</label><div style="background:var(--accent-soft);border-radius:12px;padding:12px" dir="auto"><b>📢 ${esc(t)}</b>${b ? `<p style="margin:6px 0 0;white-space:pre-line">${esc(b)}</p>` : ""}</div>` : ""; };
@@ -465,6 +471,16 @@ async function viewAnn() {
     const { error } = await sb.from("announcements").insert(row);
     if (error) { msg(/announcements/.test(error.message) ? "لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول." : /once/.test(error.message) ? "لازم تشغّل migration-26 (خيار مرة وحدة) بـ Supabase أول." : error.message, false); }
     else msg("✅ انشر الإعلان. الطلاب رح يشوفوه لما يفتحوا التطبيق.");
+    render();
+  };
+  $("psend").onclick = async () => {
+    const title = $("pt").value.trim(); if (!title) { $("pt").focus(); return; }
+    if (!confirm("تبعت الإشعار هلق للطلاب؟ ما بتقدر ترجّعه.")) return;
+    $("psend").disabled = true;
+    const { data, error } = await sb.functions.invoke("send-push", { body: { title, body: $("pb").value.trim(), track: $("ptr").value || null } });
+    $("psend").disabled = false;
+    if (error || data?.error) msg("❌ " + (data?.error || error.message) + (/not found|404/i.test(error?.message || "") ? " — لازم تنشر دالة send-push بـ Supabase أول." : ""), false);
+    else msg(`✅ انبعت لـ ${data.sent} تلفون` + (data.failed ? ` (فشل ${data.failed}${data.lastErr ? ": " + data.lastErr : ""})` : ""));
     render();
   };
   const { data, error } = await sb.from("announcements").select("*").order("created_at", { ascending: false }).limit(50);
