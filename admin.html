@@ -67,7 +67,7 @@ const trackLabel = id => { const x = TRACKS.find(t => t.id === id); return x ? `
 async function loadMeta() {
   const [{ data: tr }, { data: tp }] = await Promise.all([
     sb.from("tracks").select("*").order("sort"), sb.from("topics").select("*").order("sort")]);
-  TRACKS = tr || []; TOPICS_BY = {};
+  TRACKS = (tr || []).filter(t => !me || me.role === "admin" || (me.tracks || []).includes(t.id)); TOPICS_BY = {};
   for (const t of tp || []) (TOPICS_BY[t.track] = TOPICS_BY[t.track] || {})[t.id] = t.he;
   if (!TRACKS.find(t => t.id === curTrack) && TRACKS[0]) curTrack = TRACKS[0].id;
 }
@@ -122,7 +122,7 @@ async function start() {
 }
 
 /* ---------- layout ---------- */
-const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what an editor (doctor) may open
+const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what a limited admin may open
 function render() {
   const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
   const isAdmin = me.role === "admin";
@@ -502,24 +502,28 @@ let userState = { q: "", page: 0 };
 const fmtDT = d => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 async function viewUsers() {
   const s = userState, PAGE = 50;
-  $("body").innerHTML = `<div class="card"><h3>إضافة دكتور (محرّر)</h3>
-    <p class="muted">بيشوف الأسئلة (إضافة وتعديل واستيراد) والأرقام بس. ما بيشوف المستخدمين ولا الإشعارات ولا الإعلانات ولا الأكواد. لازم يكون سجّل حساب بالتطبيق أولاً.</p>
-    <div class="row"><input id="ed" type="email" dir="ltr" placeholder="إيميل الدكتور"><button class="btn" id="edgo" style="flex:none">إضافة</button></div>
+  $("body").innerHTML = `<div class="card"><h3>إضافة ادمن بصلاحيات محدودة</h3>
+    <p class="muted">بيشوف الأسئلة (إضافة وتعديل واستيراد) وأرقام المسارات اللي بتحددها بس. ما بيشوف المستخدمين ولا الإشعارات ولا الإعلانات ولا الأكواد. لازم يكون سجّل حساب أولاً.</p>
+    <input id="ed" type="email" dir="ltr" placeholder="إيميل الادمن">
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap">${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="edt" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    <button class="btn" id="edgo" style="align-self:flex-start">إضافة / تحديث المسارات</button>
     <div id="edl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
     <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="9" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
   const loadEditors = async () => {
-    const { data: ed } = await sb.from("profiles").select("email").eq("role", "editor").order("email");
-    $("edl").innerHTML = (ed || []).length ? ed.map(e => `<div class="row" style="justify-content:space-between"><span dir="ltr">${esc(e.email)}</span><button class="btn ghost" data-ed="${esc(e.email)}" style="flex:none">إزالة</button></div>`).join("") : "ما في دكاترة مضافين";
-    $("edl").querySelectorAll("[data-ed]").forEach(b => b.onclick = async () => { if (!confirm("تشيل صلاحية " + b.dataset.ed + "؟")) return; const { error } = await sb.rpc("admin_set_editor", { p_email: b.dataset.ed, p_on: false }); if (error) alert(error.message); loadEditors(); });
+    const { data: ed } = await sb.from("profiles").select("email,tracks").eq("role", "editor").order("email");
+    $("edl").innerHTML = (ed || []).length ? ed.map(e => `<div class="row" style="justify-content:space-between"><span><b dir="ltr">${esc(e.email)}</b><br><span class="muted">${(e.tracks || []).map(t => esc(trackLabel(t))).join(" · ")}</span></span><button class="btn ghost" data-ed="${esc(e.email)}" style="flex:none">إزالة</button></div>`).join("") : "ما في ادمن محدود مضاف";
+    $("edl").querySelectorAll("[data-ed]").forEach(b => b.onclick = async () => { if (!confirm("تشيل صلاحية " + b.dataset.ed + "؟")) return; const { error } = await sb.rpc("admin_set_editor", { p_email: b.dataset.ed, p_tracks: [] }); if (error) alert(error.message); loadEditors(); });
   };
   loadEditors();
   $("edgo").onclick = async () => {
-    const em = $("ed").value.trim(); if (!em) return;
-    const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_on: true });
+    const em = $("ed").value.trim(), tr = [...document.querySelectorAll(".edt:checked")].map(x => x.value);
+    if (!em) return;
+    if (!tr.length) { alert("اختار مسار واحد على الأقل"); return; }
+    const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_tracks: tr });
     if (error) { alert(error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message); return; }
-    $("ed").value = ""; loadEditors();
+    $("ed").value = ""; document.querySelectorAll(".edt").forEach(x => x.checked = false); loadEditors();
   };
   const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
   $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
@@ -537,7 +541,7 @@ async function viewUsers() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
-  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">دكتور</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
+  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
   $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
     || `<tr><td colspan="9" class="muted">ما في مستخدمين</td></tr>`;
   $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
@@ -571,7 +575,18 @@ function topList(title, rows, label) {
   return `<div class="card"><b>${title}</b>${rows.length ? rows.map(r => `<div class="li"><span>${esc(label(r.k))}</span><span class="muted">${num(r.n)}</span><div class="lbar" style="width:${Math.round(100 * r.n / total)}%"></div></div>`).join("") : `<span class="muted">لسا ما في</span>`}</div>`;
 }
 const cardsHtml = list => `<div class="grid4">${list.map(([n, v, sub]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v}</span>${sub ? `<span class="muted">${sub}</span>` : ""}</div>`).join("")}</div>`;
+async function viewEditorStats() {
+  $("body").innerHTML = `<div class="row" style="justify-content:flex-start">${[7, 30, 90].map(d => `<button class="btn ${d === statDays ? "" : "ghost"}" data-d="${d}">آخر ${d} يوم</button>`).join("")}</div><div id="st"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  $("body").querySelectorAll("[data-d]").forEach(b => b.onclick = () => { statDays = +b.dataset.d; viewEditorStats(); });
+  const { data: r, error } = await sb.rpc("editor_stats", { p_track: curTrack, p_days: statDays });
+  if (error || !r) { $("st").innerHTML = `<div class="msg bad">${esc(error?.message || "مش جاهز")}</div>`; return; }
+  const acc = r.answers ? Math.round(100 * r.correct / r.answers) : 0;
+  $("st").innerHTML = `<h3>${esc(trackLabel(curTrack))}</h3>` + cardsHtml([["كل الأسئلة", num(r.questions)], ["منشورة", num(r.published)], [`إجابات آخر ${statDays} يوم`, num(r.answers), `${acc}% صحيحة`], ["طلاب حلّوا أسئلة", num(r.students)]])
+    + `<div class="card"><b>أصعب المواضيع (أقل نسبة إجابات صحيحة)</b>${r.hard_topics.length ? `<div class="tbl"><table><thead><tr><th>الموضوع</th><th>إجابات</th><th>صحيحة</th></tr></thead><tbody>${r.hard_topics.map(t => `<tr><td class="he">${esc(TOPICS_OF(curTrack)[t.k] || t.k)}</td><td>${num(t.n)}</td><td>${t.pct}%</td></tr>`).join("")}</tbody></table></div>` : `<span class="muted">بتظهر لما يكون في 10 إجابات على الأقل بالموضوع.</span>`}</div>`;
+  $("st").style.cssText = "display:flex;flex-direction:column;gap:12px";
+}
 async function viewStats() {
+  if (me.role !== "admin") return viewEditorStats();
   $("body").innerHTML = `<div class="row" style="justify-content:flex-start">${[7, 30, 90].map(d => `<button class="btn ${d === statDays ? "" : "ghost"}" data-d="${d}">آخر ${d} يوم</button>`).join("")}</div><div id="st"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
   $("body").querySelectorAll("[data-d]").forEach(b => b.onclick = () => { statDays = +b.dataset.d; viewStats(); });
   const now = new Date().toISOString();
