@@ -489,8 +489,9 @@ async function viewAnn() {
   $("rows").innerHTML = (data || []).map(a => `<tr><td dir="auto"><b>${esc(a.title)}</b>${a.body ? `<div class="muted" style="white-space:pre-line">${esc(a.body)}</div>` : ""}</td>
     <td>${a.track ? esc(trackLabel(a.track)) : "الكل"}</td><td dir="ltr" style="text-align:start">${fmtDT(a.created_at)}</td>
     <td>${live(a) ? `<span class="pill">ظاهر${a.expires_at ? " لحد " + esc(a.expires_at.slice(0, 10)) : ""}</span>` : `<span class="pill off">موقوف</span>`}</td>
-    <td>${live(a) ? `<button class="btn danger" data-off="${a.id}">وقّف</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">لسا ما نشرت إعلانات</td></tr>`;
+    <td>${live(a) ? `<button class="btn danger" data-off="${a.id}">وقّف</button> ` : ""}<button class="btn danger" data-del="${a.id}">🗑 احذف</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">لسا ما نشرت إعلانات</td></tr>`;
   $("rows").querySelectorAll("[data-off]").forEach(b => b.onclick = async () => { await sb.from("announcements").update({ active: false }).eq("id", +b.dataset.off); viewAnn(); });
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("تحذف هاد الإعلان نهائياً؟")) return; await sb.from("announcements").delete().eq("id", +b.dataset.del); viewAnn(); });
 }
 
 /* ---------- users ---------- */
