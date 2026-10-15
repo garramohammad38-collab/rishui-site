@@ -507,7 +507,14 @@ async function viewUsers() {
     <input id="ed" type="email" dir="ltr" placeholder="إيميل الادمن">
     <div class="row" style="justify-content:flex-start;flex-wrap:wrap">${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="edt" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
     <button class="btn" id="edgo" style="align-self:flex-start">إضافة / تحديث المسارات</button>
-    <div id="edl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
+    <div id="edl" class="muted">بحمّل…</div></div><div class="card"><h3>فتح مسارات لحساب</h3>
+    <p class="muted">بتحط إيميل حساب وبتختار المسارات، والحساب بيقدر يدخلها ويتنقل بينها مجاناً لحد التاريخ اللي بتحدده. لازم يكون سجّل حساب أولاً.</p>
+    <input id="gem" type="email" dir="ltr" placeholder="إيميل الحساب">
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" id="gall"><b>كل المسارات</b></label>${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="gtr" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    <div class="row" style="justify-content:flex-start;align-items:center"><span class="muted" style="flex:none">لحد:</span><input id="guntil" type="date" dir="ltr" style="flex:none;width:auto"><span class="muted" style="flex:none">(فاضي = بدون نهاية)</span></div>
+    <button class="btn" id="ggo" style="align-self:flex-start">فتح المسارات</button>
+    <div id="gmsg" class="muted"></div>
+    <div id="gl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
     <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>أسئلة محلولة</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
@@ -524,6 +531,25 @@ async function viewUsers() {
     const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_tracks: tr });
     if (error) { alert(error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message); return; }
     $("ed").value = ""; document.querySelectorAll(".edt").forEach(x => x.checked = false); loadEditors();
+  };
+  const loadGrants = async () => {
+    const { data: gr, error } = await sb.rpc("admin_list_grants");
+    if (error) { $("gl").textContent = error.message; return; }
+    const by = {}; (gr || []).forEach(g => (by[g.email] || (by[g.email] = [])).push(g));
+    $("gl").innerHTML = Object.keys(by).length ? Object.entries(by).map(([em, l]) => `<div class="row" style="justify-content:space-between;flex-wrap:wrap"><b dir="ltr">${esc(em)}</b><span>${l.map(g => `<span class="pill" style="margin:2px">${esc(trackLabel(g.track))} · ${new Date(g.until).getFullYear() >= 2099 ? "بدون نهاية" : "لحد " + esc(String(g.until).slice(0, 10))} <a href="#" data-rv="${esc(g.user_id)}" data-tr="${esc(g.track)}" style="color:#C0392B;text-decoration:none">✕</a></span>`).join("")}</span></div>`).join("") : "ما في حسابات مفتوح إلها مسارات";
+    $("gl").querySelectorAll("[data-rv]").forEach(a => a.onclick = async e => { e.preventDefault(); if (!confirm("تسكّر هذا المسار عن الحساب؟")) return; const { error: x } = await sb.rpc("admin_revoke_track", { p_user: a.dataset.rv, p_track: a.dataset.tr }); if (x) alert(x.message); loadGrants(); });
+  };
+  loadGrants();
+  $("gall").onchange = () => document.querySelectorAll(".gtr").forEach(x => x.checked = $("gall").checked);
+  $("ggo").onclick = async () => {
+    const em = $("gem").value.trim(), tr = [...document.querySelectorAll(".gtr:checked")].map(x => x.value);
+    if (!em) return;
+    if (!tr.length) { alert("اختار مسار واحد على الأقل"); return; }
+    const u = $("guntil").value ? new Date($("guntil").value + "T23:59:59").toISOString() : "2099-12-31T23:59:59Z";
+    const { error } = await sb.rpc("admin_grant_tracks", { p_email: em, p_tracks: tr, p_until: u });
+    if (error) { $("gmsg").textContent = error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message; return; }
+    $("gmsg").textContent = `✓ انفتح ${tr.length} مسار لـ ${em}`;
+    $("gem").value = ""; $("guntil").value = ""; document.querySelectorAll(".gtr,#gall").forEach(x => x.checked = false); loadGrants();
   };
   const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
   $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
