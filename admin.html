@@ -577,8 +577,14 @@ async function viewUsers() {
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
   const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
-  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td>${solvedCell(u.id)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
+  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}${seen[u.id]?.n ? ` <a href="#" data-rd="${esc(u.id)}" data-em="${esc(u.email)}" title="مسح الأجهزة" style="text-decoration:none">↺</a>` : ""}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td>${solvedCell(u.id)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
     || `<tr><td colspan="10" class="muted">ما في مستخدمين</td></tr>`;
+  $("rows").querySelectorAll("[data-rd]").forEach(a => a.onclick = async e => {
+    e.preventDefault();
+    if (!confirm(`تمسح أجهزة ${a.dataset.em}؟\nأول جهاز بيدخل منه بعدها بيصير جهازه.`)) return;
+    const { error: x } = await sb.rpc("admin_reset_devices", { p_user: a.dataset.rd });
+    if (x) alert(x.message); else viewUsers();
+  });
   $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     const em = b.dataset.em;
     if (!confirm(`متأكد بدك تحذف المستخدم؟\n${em}\n\nبينحذف حسابه وكل بياناته (إجاباته، إحصائياته، اشتراكه) ومش ممكن ترجّعها.`)) return;
