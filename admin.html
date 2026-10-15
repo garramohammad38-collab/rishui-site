@@ -509,7 +509,7 @@ async function viewUsers() {
     <button class="btn" id="edgo" style="align-self:flex-start">إضافة / تحديث المسارات</button>
     <div id="edl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
-    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="9" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>أسئلة محلولة</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
   const loadEditors = async () => {
     const { data: ed } = await sb.from("profiles").select("email,tracks").eq("role", "editor").order("email");
@@ -530,7 +530,7 @@ async function viewUsers() {
   let q = sb.from("profiles").select("id,email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
   if (s.q) q = q.ilike("email", `%${s.q}%`);
   const { data, count, error } = await q;
-  if (error) { $("rows").innerHTML = `<tr><td colspan="9" class="msg bad">${esc(error.message)}</td></tr>`; return; }
+  if (error) { $("rows").innerHTML = `<tr><td colspan="10" class="msg bad">${esc(error.message)}</td></tr>`; return; }
   // last sign-in = the newest "last seen" of the account's devices
   const seen = {};
   const ids = (data || []).map(u => u.id);
@@ -538,12 +538,21 @@ async function viewUsers() {
     const { data: dv } = await sb.from("devices").select("user_id,last_seen").in("user_id", ids).limit(2000);
     (dv || []).forEach(d => { const x = seen[d.user_id] || (seen[d.user_id] = { n: 0, last: null }); x.n++; if (!x.last || d.last_seen > x.last) x.last = d.last_seen; });
   }
+  // questions solved per user, split by track
+  const solved = {};
+  if (ids.length) {
+    const { data: sv } = await sb.rpc("admin_user_solved", { p_ids: ids });
+    (sv || []).forEach(r => { const x = solved[r.user_id] || (solved[r.user_id] = { n: 0, c: 0, t: [] }); x.n += +r.n; x.c += +r.correct; x.t.push([r.track, +r.n]); });
+  }
+  const solvedCell = id => { const x = solved[id]; if (!x) return `<span class="muted">0</span>`;
+    x.t.sort((a, b) => b[1] - a[1]);
+    return `<b>${num(x.n)}</b> <span class="muted">(${Math.round(100 * x.c / x.n)}% صح)</span>`+ (`<br><span class="muted he" style="font-size:12px">${x.t.map(([t, n]) => `${esc(trackLabel(t))}: ${num(n)}`).join(" · ")}</span>`); };
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
   const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
-  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
-    || `<tr><td colspan="9" class="muted">ما في مستخدمين</td></tr>`;
+  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td>${solvedCell(u.id)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
+    || `<tr><td colspan="10" class="muted">ما في مستخدمين</td></tr>`;
   $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     const em = b.dataset.em;
     if (!confirm(`متأكد بدك تحذف المستخدم؟\n${em}\n\nبينحذف حسابه وكل بياناته (إجاباته، إحصائياته، اشتراكه) ومش ممكن ترجّعها.`)) return;
