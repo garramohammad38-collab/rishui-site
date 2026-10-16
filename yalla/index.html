@@ -2,171 +2,681 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>إدارة يلّا</title>
-<meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="app/icon.png">
+<title>يلّا · لوحة الإدارة</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="import-tools.js"></script>
+<script src="assets/ptr.js?v=2"></script>
 <style>
-/* Layout: one column console — header band, stat strip, searchable user list with track toggles */
-:root{
-  --bg:#F3F5FA; --card:#FFFFFF; --ink:#141B2D; --muted:#5E6782; --line:#DDE2EE;
-  --blue:#1D4FB5; --orange:#F28C28;
-  --yael:#0B6E6E; --amiranet:#1D4FB5; --psycho:#7A3FB0;
-  --danger:#C0392B;
-  --font:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
-}
-@media (prefers-color-scheme:dark){:root{
-  --bg:#0E1322; --card:#171E31; --ink:#E9EDF7; --muted:#9AA3BD; --line:#29324A;
-  --blue:#5B8BEA; --yael:#2FA3A3; --amiranet:#5B8BEA; --psycho:#A877DA; color-scheme:dark}}
+:root{--bg:#EAF1FA;--surface:#fff;--ink:#0F1E33;--muted:#566A85;--line:#D2DEEC;--accent:#1554A8;--accent-soft:#DCE8F8;--ok:#1F8A4C;--ok-soft:#DDF2E5;--bad:#C2413A;--bad-soft:#F8E0DE;--amber-soft:#FBEBCF;
+  --font:"IBM Plex Sans Arabic","IBM Plex Sans Hebrew",system-ui,sans-serif}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
-.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
-header{background:var(--blue);color:#fff}
-header .wrap{padding-block:18px;flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
-header h1{margin:0;font-size:20px;font-weight:700}
-header h1 span{color:var(--orange)}
-header small{opacity:.8;font-size:13px}
-button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px}
-button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
-button:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
-header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
-input{font:inherit;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
-.login{max-width:380px;margin:40px auto 0;display:flex;flex-direction:column;gap:12px}
-.login h2{margin:0;font-size:18px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.msg{font-size:13px;color:var(--muted);min-height:1.2em}
-.msg.err{color:var(--danger)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
-.stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
-.stat span{font-size:12px;color:var(--muted)}
-.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tools input{flex:1;min-width:200px}
-.list{display:flex;flex-direction:column;gap:8px}
-.user{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
-.user .who{min-width:0}
-.user .name{font-weight:700;overflow-wrap:anywhere}
-.user .meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;border:1.5px dashed var(--line);color:var(--muted);background:transparent}
-.chip.on{border-style:solid;color:#fff}
-.chip.on.yael{background:var(--yael);border-color:var(--yael)}
-.chip.on.amiranet{background:var(--amiranet);border-color:var(--amiranet)}
-.chip.on.psycho{background:var(--psycho);border-color:var(--psycho)}
-.empty{text-align:center;color:var(--muted);padding:30px}
-@media (max-width:560px){.user{grid-template-columns:1fr}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{margin:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+label{font-size:13px;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
+textarea{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:760px){.grid2,.grid4{grid-template-columns:1fr}}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row > *{flex:1;min-width:140px}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:600 14px var(--font);cursor:pointer;flex:none;min-width:0}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:start;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr.click{cursor:pointer}tr.click:hover{background:var(--accent-soft)}
+.tbl{overflow-x:auto}
+.pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill.off{background:var(--amber-soft);color:#8a5a0a}
+.msg{border-radius:8px;padding:8px 12px;font-size:14px}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}.msg.bad{background:var(--bad-soft);color:var(--bad)}
+.muted{color:var(--muted);font-size:13px}
+.he{font-family:"IBM Plex Sans Hebrew",var(--font)}
+.opt{display:flex;gap:8px;align-items:center}
+.opt input[type=radio]{width:auto;flex:none}
+.stat{font-size:28px;font-weight:600}
+[hidden]{display:none!important}
+.sumgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.sumgrid div{background:#f4f6fa;border-radius:10px;padding:10px;display:flex;flex-direction:column;align-items:center}.sumgrid b{font-size:22px}.sumgrid span{font-size:12px;color:#666}
+.bars{display:flex;align-items:flex-end;gap:2px;height:140px;padding-top:6px}.bcol{flex:1;display:flex;align-items:flex-end;gap:1px;height:100%;min-width:2px}.bcol i{flex:1;border-radius:3px 3px 0 0;min-height:1px}
+.bax{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.li{position:relative;display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;overflow:hidden}.li>span{position:relative;z-index:1}.lbar{position:absolute;inset-block:0;inset-inline-start:0;background:var(--accent-soft)}
 </style>
 </head>
 <body>
-<header><div class="wrap">
-  <div><h1>يلّا <span>·</span> لوحة الإدارة</h1><small>المستخدمين وفتح المسارات</small></div>
-  <button id="logout" hidden>خروج</button>
-</div></header>
-
-<main class="wrap">
-  <section id="loginView" class="card login" hidden>
-    <h2>دخول المدير</h2>
-    <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="username">
-    <input id="pass" type="password" placeholder="كلمة السر" autocomplete="current-password">
-    <div class="row">
-      <button class="primary" id="loginBtn">دخول</button>
-      <button id="signupBtn">أول مرة؟ إنشاء حساب مدير</button>
-    </div>
-    <div id="loginMsg" class="msg"></div>
-  </section>
-
-  <section id="appView" hidden>
-    <div class="stats" id="stats"></div>
-    <div class="tools" style="margin-top:16px">
-      <input id="q" type="search" placeholder="بحث بالاسم أو البريد">
-      <button id="reload">تحديث</button>
-    </div>
-    <div class="msg" id="appMsg"></div>
-    <div class="list" id="list"></div>
-  </section>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<div class="wrap" id="root"></div>
 <script>
-const sb = supabase.createClient('https://ifscexzwzyobdyxmjisd.supabase.co','sb_publishable_nV6RQIspnFRAE62Hzb34rg_7wQqR7V6');
-const TRACKS = [['yael','יע"ל'],['amiranet','אמירנ"ט'],['psycho','פסיכומטרי']];
-const $ = (id) => document.getElementById(id);
-let users = [];
+/* ===== Rishui admin panel — open this file in Chrome/Edge on your computer ===== */
+// tracks and topics come from the database (tables "tracks" and "topics")
+let TRACKS = [], TOPICS_BY = {}; // TOPICS_BY[track][topicId] = Hebrew name
+let curTrack = localStorage.getItem("ya-track") || "yael";
+const TOPICS_OF = tr => TOPICS_BY[tr] || {};
+const trackLabel = id => { const x = TRACKS.find(t => t.id === id); return x ? `${x.icon || ""} ${x.he}` : id; };
+async function loadMeta() {
+  const [{ data: tr }, { data: tp }] = await Promise.all([
+    sb.from("tracks").select("*").order("sort"), sb.from("topics").select("*").order("sort")]);
+  TRACKS = (tr || []).filter(t => !me || me.role === "admin" || (me.tracks || []).includes(t.id)); TOPICS_BY = {};
+  for (const t of tp || []) (TOPICS_BY[t.track] = TOPICS_BY[t.track] || {})[t.id] = t.he;
+  if (!TRACKS.find(t => t.id === curTrack) && TRACKS[0]) curTrack = TRACKS[0].id;
+}
+const root = document.getElementById("root");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const $ = id => document.getElementById(id);
+const cfg = { url: localStorage.getItem("ya-url") || "https://ifscexzwzyobdyxmjisd.supabase.co", key: localStorage.getItem("ya-key") || "sb_publishable_nV6RQIspnFRAE62Hzb34rg_7wQqR7V6" };
+let sb = null, me = null, tab = "list", editing = null, listState = { topic: "", pub: "", q: "", page: 0 }, flashMsg = null;
 
-function show(logged){ $('loginView').hidden = logged; $('appView').hidden = !logged; $('logout').hidden = !logged; }
-function msg(el, text, err){ $(el).textContent = text || ''; $(el).classList.toggle('err', !!err); }
-const fmt = (d) => d ? new Date(d).toLocaleString('ar', {dateStyle:'short', timeStyle:'short'}) : '—';
+function msg(text, ok = true) { flashMsg = { text, ok }; }
+function msgHtml() { const m = flashMsg; flashMsg = null; return m ? `<div class="msg ${m.ok ? "ok" : "bad"}">${esc(m.text)}</div>` : ""; }
 
-async function load(){
-  msg('appMsg','جاري التحميل…');
-  const { data, error } = await sb.rpc('admin_list_users');
-  if (error){ msg('appMsg', error.message.includes('forbidden') ? 'هذا الحساب مش مدير.' : 'خطأ: '+error.message, true); users=[]; render(); return; }
-  users = data || []; msg('appMsg',''); render();
+/* ---------- setup + login ---------- */
+function setup() {
+  root.innerHTML = `<h1>لوحة إدارة يلّا</h1>${msgHtml()}
+  <div class="card"><h3>ربط المشروع (مرة وحدة)</h3>
+    <p class="muted">من Supabase → Project Settings → API انسخ الـ Project URL والـ anon public key.</p>
+    <label>Project URL</label><input id="u" dir="ltr" value="${esc(cfg.url)}" placeholder="https://xxxx.supabase.co">
+    <label>anon public key</label><input id="k" dir="ltr" value="${esc(cfg.key)}">
+    <button class="btn" id="s">حفظ</button></div>`;
+  $("s").onclick = () => {
+    cfg.url = $("u").value.trim(); cfg.key = $("k").value.trim();
+    localStorage.setItem("ya-url", cfg.url); localStorage.setItem("ya-key", cfg.key); start();
+  };
+}
+function login() {
+  root.innerHTML = `<h1>لوحة إدارة يلّا</h1>${msgHtml()}
+  <form class="card" id="f"><h3>تسجيل دخول المدير</h3>
+    <label>الإيميل</label><input id="e" type="email" dir="ltr">
+    <label>الباسوورد</label><input id="p" type="password" dir="ltr">
+    <button class="btn" type="submit">دخول</button>
+    <button class="btn ghost" type="button" id="su">أول مرة؟ إنشاء حساب مدير بنفس الإيميل والباسوورد</button>
+    <button class="btn ghost" type="button" id="cfg">تغيير ربط المشروع</button></form>`;
+  $("cfg").onclick = setup;
+  $("su").onclick = async () => {
+    const email = $("e").value.trim(), password = $("p").value;
+    if (!email || password.length < 8) { msg("اكتب الإيميل وباسوورد 8 أحرف على الأقل", false); return login(); }
+    sb = sb || supabase.createClient(cfg.url, cfg.key);
+    const { error } = await sb.auth.signUp({ email, password });
+    msg(error ? error.message : "وصلك إيميل تأكيد. افتح الرابط اللي فيه، وبعدين ارجع هون واعمل دخول.", !error); login();
+  };
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.auth.signInWithPassword({ email: $("e").value.trim(), password: $("p").value });
+    if (error) { msg("الإيميل أو الباسوورد غلط", false); return login(); }
+    start();
+  };
+}
+async function start() {
+  if (!cfg.url || !cfg.key) return setup();
+  sb = sb || supabase.createClient(cfg.url, cfg.key);
+  const { data } = await sb.auth.getSession();
+  if (!data.session) return login();
+  const { data: p } = await sb.from("profiles").select("*").eq("id", data.session.user.id).single();
+  if (!p || (p.role !== "admin" && p.role !== "editor")) {
+    await sb.auth.signOut();
+    msg("هاد الحساب مش مدير. شغّل أمر تعيين المدير من الدليل.", false); return login();
+  }
+  me = p; await loadMeta(); render();
 }
 
-function render(){
-  const day = Date.now() - 864e5;
-  const stats = [
-    ['المستخدمين', users.length],
-    ['جدد آخر 24 ساعة', users.filter(u => new Date(u.created_at) > day).length],
-    ['نشطين آخر 24 ساعة', users.filter(u => new Date(u.last_seen) > day).length],
-    ...TRACKS.map(([id, n]) => ['مفتوح ' + n, users.filter(u => (u.tracks||[]).includes(id)).length]),
-  ];
-  $('stats').innerHTML = '';
-  for (const [l, v] of stats){ const d = document.createElement('div'); d.className='stat'; d.innerHTML='<b></b><span></span>'; d.querySelector('b').textContent=v; d.querySelector('span').textContent=l; $('stats').append(d); }
+/* ---------- layout ---------- */
+const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what a limited admin may open
+function render() {
+  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const isAdmin = me.role === "admin";
+  const tabs = isAdmin ? allTabs : allTabs.filter(t => EDITOR_TABS.includes(t[0]));
+  if (!tabs.some(t => t[0] === tab)) tab = "list";
+  root.innerHTML = `<div class="top"><h1>لوحة إدارة يلّا</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
+  <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
+  <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
+  ${msgHtml()}<div id="body"></div>`;
+  root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
+  $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("ya-track", curTrack); listState.topic = ""; editing = null; render(); };
+  $("rf").onclick = () => { $("rf").disabled = true; render(); };
+  $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, ann: viewAnn, stats: viewStats })[tab]();
+}
 
-  const q = $('q').value.trim().toLowerCase();
-  const list = users.filter(u => !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q));
-  $('list').innerHTML = '';
-  if (!list.length){ const e=document.createElement('div'); e.className='empty'; e.textContent = users.length ? 'ما في نتائج.' : 'لسا ما في مستخدمين مسجّلين. لما حدا يسجّل بـ Apple من التطبيق بيظهر هون.'; $('list').append(e); return; }
-  for (const u of list){
-    const row = document.createElement('div'); row.className='user';
-    const who = document.createElement('div'); who.className='who';
-    const name = document.createElement('div'); name.className='name'; name.textContent = u.name || 'بدون اسم';
-    const meta = document.createElement('div'); meta.className='meta';
-    meta.textContent = (u.email || 'بريد مخفي') + ' · سجّل ' + fmt(u.created_at) + ' · آخر دخول ' + fmt(u.last_seen) + ' · ' + (u.answered||0) + ' سؤال';
-    who.append(name, meta);
-    const chips = document.createElement('div'); chips.className='chips';
-    for (const [id, n] of TRACKS){
-      const on = (u.tracks||[]).includes(id);
-      const b = document.createElement('button'); b.className = 'chip ' + id + (on ? ' on' : '');
-      b.textContent = (on ? '✓ ' : '🔒 ') + n; b.setAttribute('aria-pressed', on);
-      b.onclick = () => toggle(u, id, b);
-      chips.append(b);
-    }
-    row.append(who, chips); $('list').append(row);
+/* ---------- list ---------- */
+const PAGE = 50;
+async function viewList() {
+  const b = $("body"), s = listState;
+  b.innerHTML = `<div class="card"><div class="row">
+    <select id="ft"><option value="">كل المواضيع</option>${Object.entries(TOPICS_OF(curTrack)).map(([k,n]) => `<option value="${k}" ${s.topic===k?"selected":""}>${esc(n)}</option>`).join("")}</select>
+    <select id="fp"><option value="">منشور وغير منشور</option><option value="1" ${s.pub==="1"?"selected":""}>منشور</option><option value="0" ${s.pub==="0"?"selected":""}>غير منشور</option></select>
+    <input id="fq" placeholder="بحث بنص السؤال" value="${esc(s.q)}">
+    <button class="btn" id="go">بحث</button><button class="btn ghost" id="new">+ سؤال جديد</button><button class="btn" id="puball" style="display:none"></button></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الموضوع</th><th>السؤال (עברית)</th><th>الحالة</th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="pv">السابق</button><span class="muted" id="pg"></span><button class="btn ghost" id="nx">التالي</button></div></div>`;
+  $("go").onclick = () => { s.topic = $("ft").value; s.pub = $("fp").value; s.q = $("fq").value.trim(); s.page = 0; viewList(); };
+  $("new").onclick = () => { editing = null; tab = "edit"; render(); };
+  $("pv").onclick = () => { if (s.page > 0) { s.page--; viewList(); } };
+  $("nx").onclick = () => { s.page++; viewList(); };
+  let q = sb.from("questions").select("id,topic,he,published,is_free", { count: "exact" }).eq("track", curTrack).order("id").range(s.page*PAGE, s.page*PAGE+PAGE-1);
+  if (s.topic) q = q.eq("topic", s.topic);
+  if (s.pub) q = q.eq("published", s.pub === "1");
+  if (s.q) { const w = s.q.replace(/[,()*%]/g, " "); q = q.or(`he->>q.ilike.*${w}*,en->>q.ilike.*${w}*`); }
+  const { data, count, error } = await q;
+  if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
+  $("pg").textContent = `${count} سؤال · صفحة ${s.page+1} من ${Math.max(1, Math.ceil(count/PAGE))}`;
+  $("rows").innerHTML = data.length ? data.map(r => `<tr class="click" data-id="${r.id}"><td>${r.id}</td><td>${esc(TOPICS_OF(curTrack)[r.topic] || r.topic)}</td><td class="he" dir="rtl">${esc((r.he?.q || "").slice(0,120))}</td><td>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} ${r.is_free ? `<span class="pill">مجاني</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في نتائج</td></tr>`;
+  $("rows").querySelectorAll("tr.click").forEach(tr => tr.onclick = () => openEditor(+tr.dataset.id));
+  // publish every draft of this track (optionally only the chosen topic) in one go
+  let dq = sb.from("questions").select("id", { count: "exact", head: true }).eq("track", curTrack).eq("published", false);
+  if (s.topic) dq = dq.eq("topic", s.topic);
+  const { count: drafts } = await dq;
+  const pb = $("puball");
+  if (pb && drafts) {
+    pb.style.display = ""; pb.textContent = `انشر كل المسودات (${drafts})`;
+    pb.onclick = async () => {
+      if (pb.dataset.sure !== "1") { pb.dataset.sure = "1"; pb.textContent = `متأكد؟ اضغط كمان مرة لنشر ${drafts} سؤال`; return; }
+      pb.disabled = true;
+      let u = sb.from("questions").update({ published: true, updated_at: new Date().toISOString() }).eq("track", curTrack).eq("published", false);
+      if (s.topic) u = u.eq("topic", s.topic);
+      const { error } = await u;
+      if (error) { msg(error.message, false); return render(); }
+      msg(`انتشروا ${drafts} سؤال`); viewList();
+    };
   }
 }
-
-async function toggle(u, id, btn){
-  const cur = u.tracks || [];
-  const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
-  btn.disabled = true;
-  const { error } = await sb.rpc('admin_set_tracks', { p_id: u.id, p_tracks: next });
-  btn.disabled = false;
-  if (error){ msg('appMsg','ما زبط: '+error.message, true); return; }
-  u.tracks = next; msg('appMsg', 'تم الحفظ. المستخدم بيشوف التغيير لما يفتح التطبيق.'); render();
+async function openEditor(id) {
+  const { data, error } = await sb.from("questions").select("*").eq("id", id).single();
+  if (error) { msg(error.message, false); return render(); }
+  editing = data; tab = "edit"; render();
 }
 
-$('loginBtn').onclick = async () => {
-  msg('loginMsg','…');
-  const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pass').value });
-  if (error){ msg('loginMsg', error.message.includes('confirm') ? 'لازم تأكد البريد أول (افتح الرابط اللي وصلك).' : 'البريد أو كلمة السر غلط.', true); return; }
-  msg('loginMsg',''); show(true); load();
-};
-$('signupBtn').onclick = async () => {
-  const email = $('email').value.trim(), password = $('pass').value;
-  if (!email || password.length < 8){ msg('loginMsg','اكتب البريد وكلمة سر 8 أحرف على الأقل.', true); return; }
-  const { error } = await sb.auth.signUp({ email, password });
-  msg('loginMsg', error ? 'خطأ: '+error.message : 'وصلك إيميل تأكيد. افتح الرابط، وبعدين ارجع هون واعمل دخول.', !!error);
-};
-$('logout').onclick = async () => { await sb.auth.signOut(); users=[]; show(false); };
-$('reload').onclick = load;
-$('q').oninput = render;
+/* ---------- edit ---------- */
+function viewEdit() {
+  const q = editing || { track: curTrack, topic: Object.keys(TOPICS_OF(curTrack))[0] || "", answer: 0, he: { q:"", o:["","","",""], e:"" }, en: { q:"", o:["","","",""], e:"" }, terms: [], source: "", is_free: false, published: false, reviewed_by: "" };
+  const opts = (lang, dir) => q[lang].o.map((o,i) => `<div class="opt"><input type="radio" name="ans" value="${i}" ${q.answer===i?"checked":""} aria-label="الجواب الصحيح ${i+1}"><input id="${lang}-o${i}" dir="${dir}" value="${esc(o)}" placeholder="خيار ${i+1}"></div>`).join("");
+  $("body").innerHTML = `<form class="card" id="f">
+    <h3>${q.id ? `تعديل سؤال #${q.id}` : "سؤال جديد"}</h3>
+    <div class="row"><div><label>المسار</label><select id="trk">${TRACKS.map(t => `<option value="${t.id}" ${(q.track||curTrack)===t.id?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
+      <div><label>الموضوع</label><select id="tp"></select></div>
+      <div><label>راجعه</label><input id="rv" value="${esc(q.reviewed_by || "")}"></div></div>
+    <p class="muted">علّم الدائرة جنب الجواب الصحيح (نفس الترتيب بالعبري والإنجليزي).</p>
+    <div class="grid2">
+      <div class="he" dir="rtl"><label>שאלה (עברית)</label><textarea id="he-q">${esc(q.he.q)}</textarea>${opts("he","rtl")}<label>הסבר (עברית)</label><textarea id="he-e">${esc(q.he.e)}</textarea></div>
+      <div dir="ltr"><label>Question (English)</label><textarea id="en-q">${esc(q.en.q)}</textarea>${q.en.o.map((o,i) => `<input id="en-o${i}" value="${esc(o)}" placeholder="Option ${i+1}" style="margin-top:6px">`).join("")}<label>Explanation (English)</label><textarea id="en-e">${esc(q.en.e)}</textarea></div>
+    </div>
+    <label>المصدر (كتاب، فصل، إرشادات)</label><input id="src" dir="ltr" value="${esc(q.source)}">
+    <label>مصطلحات: كل سطر "English | עברית"</label><textarea id="tm" dir="ltr">${esc((q.terms||[]).map(x => x.join(" | ")).join("\n"))}</textarea>
+    <div class="row" style="justify-content:flex-start"><label style="flex:none"><input type="checkbox" id="pb" style="width:auto" ${q.published?"checked":""}> منشور للطلاب</label>
+      <label style="flex:none"><input type="checkbox" id="fr" style="width:auto" ${q.is_free?"checked":""}> سؤال مجاني (عيّنة)</label></div>
+    <div class="row" style="justify-content:flex-start"><button class="btn" type="submit">حفظ</button>${q.id ? `<button class="btn danger" type="button" id="del">حذف</button>` : ""}<button class="btn ghost" type="button" id="cn">رجوع للقائمة</button></div>
+    <div id="er"></div>
+  </form>`;
+  const fillTopics = () => { const tr = $("trk").value; $("tp").innerHTML = Object.entries(TOPICS_OF(tr)).map(([k,n]) => `<option value="${k}" ${q.topic===k?"selected":""}>${esc(n)}</option>`).join(""); };
+  fillTopics(); $("trk").onchange = fillTopics;
+  $("cn").onclick = () => { editing = null; tab = "list"; render(); };
+  let armed = false;
+  if ($("del")) $("del").onclick = async () => {
+    if (!armed) { armed = true; $("del").textContent = "متأكد؟ اضغط كمان مرة للحذف"; return; }
+    const { error } = await sb.from("questions").delete().eq("id", q.id);
+    if (error) { $("er").innerHTML = `<div class="msg bad">${esc(error.message)}</div>`; return; }
+    msg("انحذف السؤال"); editing = null; tab = "list"; render();
+  };
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const v = id => $(id).value.trim();
+    const ans = root.querySelector("input[name=ans]:checked");
+    const row = {
+      track: v("trk"), topic: v("tp"), answer: ans ? +ans.value : -1,
+      he: { q: v("he-q"), o: [0,1,2,3].map(i => v("he-o"+i)), e: v("he-e") },
+      en: { q: v("en-q"), o: [0,1,2,3].map(i => v("en-o"+i)), e: v("en-e") },
+      terms: v("tm").split("\n").map(l => l.split("|").map(x => x.trim())).filter(p => p.length === 2 && p[0] && p[1]),
+      source: v("src"), reviewed_by: v("rv") || null, published: $("pb").checked, is_free: $("fr").checked, updated_at: new Date().toISOString(),
+    };
+    const problems = validate(row);
+    if (problems.length) { $("er").innerHTML = `<div class="msg bad">${problems.map(esc).join("<br>")}</div>`; return; }
+    const res = q.id ? await sb.from("questions").update(row).eq("id", q.id).select().single() : await sb.from("questions").insert(row).select().single();
+    if (res.error) { $("er").innerHTML = `<div class="msg bad">${esc(res.error.message)}</div>`; return; }
+    msg(q.id ? `انحفظ السؤال #${res.data.id}` : `انضاف سؤال #${res.data.id}`);
+    editing = q.id ? res.data : null; render();
+  };
+}
+function validate(r) {
+  const p = [];
+  if (!TOPICS_OF(r.track)[r.topic]) p.push(`موضوع غير معروف بمسار ${r.track}: ${r.topic}`);
+  if (!(r.answer >= 0 && r.answer <= 3)) p.push("لازم تختار الجواب الصحيح");
+  for (const [l,n] of [["he","العبري"],["en","الإنجليزي"]]) {
+    if (!r[l].q) p.push(`نص السؤال ب${n} فاضي`);
+    if (r[l].o.length !== 4 || r[l].o.some(o => !o)) p.push(`لازم ٤ خيارات ب${n}`);
+    if (!r[l].e) p.push(`الشرح ب${n} فاضي`);
+  }
+  if (!r.source) p.push("المصدر فاضي");
+  return p;
+}
 
-sb.auth.getSession().then(({ data }) => { show(!!data.session); if (data.session) load(); });
+/* ---------- import ---------- */
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function rowsFromCSV(text) {
+  return ImportTools.rowsFromTable(parseCSV(text.replace(/^\uFEFF/, "")), importCtx()).rows;
+}
+function rowsFromXLSX(buf) {
+  if (!window.XLSX) throw new Error("قارئ ملفات Excel ما انحمّل. افحص الإنترنت وجرّب كمان مرة.");
+  const wb = XLSX.read(buf, { type: "array" });
+  // the sheet with the questions: "שאלות" in our template, otherwise the first sheet that has a known header
+  const names = ["שאלות", ...wb.SheetNames];
+  for (const n of names) {
+    const ws = wb.Sheets[n]; if (!ws) continue;
+    const res = ImportTools.rowsFromTable(XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" }), importCtx());
+    if (res.layout) return res.rows;
+  }
+  throw new Error("ما لقيت ورقة فيها أعمدة الأسئلة (השאלה أو q_he).");
+}
+function rowsFromJSON(text) {
+  const arr = JSON.parse(text);
+  return arr.map((x, n) => ({ line: n + 1, track: x.track || curTrack, topic: x.topic ?? x.t, answer: x.answer ?? x.a, he: x.he, en: x.en, terms: x.terms || [], source: x.source ?? x.ref ?? "", is_free: !!x.is_free }));
+}
+const importCtx = () => ({ curTrack, tracks: TRACKS, topicsBy: TOPICS_BY });
+async function existingQuestions(tracks) {
+  let all = [];
+  for (const tr of tracks) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from("questions").select("id,he").eq("track", tr).order("id").range(from, from + 999);
+      if (error) throw error;
+      all = all.concat(data.map((x) => ({ id: x.id, q: x.he?.q })));
+      if (data.length < 1000) break;
+    }
+  }
+  return all;
+}
+function viewImport() {
+  $("body").innerHTML = `<div class="card"><h3>استيراد أسئلة</h3>
+    <p class="muted">ملف Excel (‎.xlsx‎) من القالب <b>musmach-questions-template.xlsx</b>، أو CSV بأعمدة <b>questions-template.csv</b>، أو JSON. التطبيق بيفحص كل سطر وبيلاقي الأسئلة المكررة قبل ما يضيف إشي.</p>
+    <input type="file" id="file" accept=".xlsx,.csv,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <label><input type="checkbox" id="pub" style="width:auto"> انشرهم مباشرة (الأفضل تخليهم مسودة لحد ما تراجعهم)</label>
+    <div id="pre"></div></div>`;
+  $("file").onchange = async () => {
+    const f = $("file").files[0]; if (!f) return;
+    $("pre").innerHTML = `<p class="muted">بفحص الملف…</p>`;
+    let rows;
+    try {
+      const name = f.name.toLowerCase();
+      rows = name.endsWith(".xlsx") ? rowsFromXLSX(await f.arrayBuffer()) : name.endsWith(".json") ? rowsFromJSON(await f.text()) : rowsFromCSV(await f.text());
+    } catch (e) { $("pre").innerHTML = `<div class="msg bad">الملف مش مقروء: ${esc(e.message)}</div>`; return; }
+    if (!rows.length) { $("pre").innerHTML = `<div class="msg bad">ما في أسئلة بالملف، أو أسماء الأعمدة مش مثل القالب.</div>`; return; }
+    let existing = [];
+    try { existing = await existingQuestions([...new Set(rows.map((r) => r.track))]); }
+    catch (e) { $("pre").innerHTML = `<div class="msg bad">ما قدرت أفحص الأسئلة الموجودة: ${esc(e.message)}</div>`; return; }
+    const { inFile, inDb } = ImportTools.findDuplicates(rows, existing);
+    const problems = rows.map((r, i) => [r.line ?? i + 2, validate(r)]).filter(([, p]) => p.length);
+    const okRows = rows.map((r, i) => ({ r, i })).filter(({ r }) => !validate(r).length);
+    const draw = () => {
+      const withDup = $("dup")?.checked;
+      const ready = okRows.filter(({ i }) => withDup || (!inFile.has(i) && !inDb.has(i)));
+      const heOnly = ready.filter(({ r }) => r.heOnly).length;
+      $("pre").innerHTML = `<div class="sumgrid"><div><b>${rows.length}</b><span>صفوف بالملف</span></div><div><b style="color:var(--ok)">${ready.length}</b><span>جاهزين للإضافة</span></div>
+          <div><b style="color:var(--bad)">${problems.length}</b><span>فيهم نقص</span></div><div><b>${inFile.size + inDb.size}</b><span>مكررين</span></div></div>
+        ${problems.length ? `<div class="msg bad"><b>صفوف ناقصة (ما رح تنضاف):</b><br>${problems.slice(0, 30).map(([n, p]) => `سطر ${n}: ${p.map(esc).join("، ")}`).join("<br>")}${problems.length > 30 ? `<br>و${problems.length - 30} كمان…` : ""}</div>` : ""}
+        ${inDb.size ? `<div class="msg"><b>موجودين أصلاً بالبنك (${inDb.size}):</b><br>${[...inDb].slice(0, 20).map(([i, id]) => `سطر ${rows[i].line ?? i + 2} = سؤال #${id}`).join("<br>")}</div>` : ""}
+        ${inFile.size ? `<div class="msg"><b>مكررين جوّا الملف (${inFile.size}):</b><br>${[...inFile].slice(0, 20).map(([i, j]) => `سطر ${rows[i].line ?? i + 2} = سطر ${rows[j].line ?? j + 2}`).join("<br>")}</div>` : ""}
+        ${inFile.size + inDb.size ? `<label><input type="checkbox" id="dup" style="width:auto" ${withDup ? "checked" : ""}> ضيف المكررين كمان (مش منصوح)</label>` : ""}
+        ${heOnly ? `<div class="msg">${heOnly} سؤال بالعبري بس (من قالب الإكسل). بالإنجليزي رح يطلعوا بالعبري لحد ما تضيف ترجمة.</div>` : ""}
+        ${ready.length ? `<button class="btn" id="go">استيراد ${ready.length} سؤال</button>` : ""}`;
+      if ($("dup")) $("dup").onchange = draw;
+      if ($("go")) $("go").onclick = () => runImport(ready.map(({ r }) => r));
+    };
+    draw();
+  };
+  const ex = document.createElement("div");
+  ex.className = "card";
+  ex.innerHTML = `<h3>تصدير نسخة احتياطية</h3><p class="muted">بينزّل كل الأسئلة كملف JSON على كمبيوترك.</p><button class="btn ghost" id="exp">تنزيل</button>`;
+  $("body").appendChild(ex);
+  $("exp").onclick = async () => {
+    let all = [], from = 0;
+    for (;;) { const { data, error } = await sb.from("questions").select("*").order("id").range(from, from+999); if (error || !data.length) break; all = all.concat(data); from += 1000; if (data.length < 1000) break; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(all, null, 1)], { type: "application/json" }));
+    a.download = `yalla-questions-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  };
+}
+// adds in small groups; if a group fails, its rows are tried one by one so one bad row doesn't stop the rest
+async function runImport(list) {
+  $("go").disabled = true;
+  const pub = $("pub").checked, clean = (r) => { const { line, heOnly, ...x } = r; return { ...x, published: pub }; };
+  let added = 0; const failed = [];
+  for (let i = 0; i < list.length; i += 50) {
+    const chunk = list.slice(i, i + 50);
+    $("go").textContent = `بضيف… ${added}/${list.length}`;
+    const { error } = await sb.from("questions").insert(chunk.map(clean));
+    if (!error) { added += chunk.length; continue; }
+    for (const r of chunk) {
+      const { error: e1 } = await sb.from("questions").insert(clean(r));
+      if (e1) failed.push([r.line, e1.message]); else added++;
+    }
+  }
+  $("pre").insertAdjacentHTML("beforeend", `<div class="msg ${failed.length ? "bad" : ""}"><b>انضاف ${added} سؤال${pub ? " (منشورين)" : " (مسودة)"}.</b>${failed.length ? `<br>ما انضافوا ${failed.length}:<br>${failed.map(([n, m]) => `سطر ${n}: ${esc(m)}`).join("<br>")}` : ""}</div>`);
+  $("go").remove();
+  msg(`انضاف ${added} سؤال`);
+}
+
+/* ---------- reports ---------- */
+async function viewReports() {
+  $("body").innerHTML = `<div class="card"><h3>تبليغات الطلاب</h3><div class="tbl"><table><thead><tr><th>سؤال</th><th>النص</th><th>تاريخ</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const { data, error } = await sb.from("reports").select("id,question_id,note,created_at,questions(he)").eq("resolved", false).order("created_at", { ascending: false }).limit(200);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
+  $("rows").innerHTML = data.length ? data.map(r => `<tr><td><button class="btn ghost" data-open="${r.question_id}">#${r.question_id}</button></td><td class="he" dir="rtl">${esc((r.questions?.he?.q || "").slice(0,100))}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ""}</td><td dir="ltr">${r.created_at.slice(0,10)}</td><td><button class="btn" data-res="${r.id}">تم</button></td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في تبليغات مفتوحة</td></tr>`;
+  $("rows").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openEditor(+b.dataset.open));
+  $("rows").querySelectorAll("[data-res]").forEach(b => b.onclick = async () => { await sb.from("reports").update({ resolved: true }).eq("id", +b.dataset.res); viewReports(); });
+}
+
+/* ---------- messages ---------- */
+async function viewMessages() {
+  $("body").innerHTML = `<div class="card"><h3>رسائل الطلاب (צור קשר)</h3><p class="muted">اضغط على الإيميل عشان ترد عليه، وبعدين "تم".</p><div class="tbl"><table><thead><tr><th>من</th><th>المسار</th><th>الرسالة</th><th>تاريخ</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const { data, error } = await sb.from("messages").select("id,email,track,body,created_at").eq("done", false).order("created_at", { ascending: false }).limit(300);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="5">${esc(error.message)}<br><span class="muted">إذا مكتوب إنو الجدول مش موجود: شغّل supabase/migration-4-messages.sql</span></td></tr>`; return; }
+  $("rows").innerHTML = data.length ? data.map(r => `<tr><td dir="ltr"><a href="mailto:${esc(r.email)}?subject=${encodeURIComponent("יאללה – תשובה לפנייה")}">${esc(r.email)}</a></td><td>${esc(r.track ? trackLabel(r.track) : "")}</td><td class="he" dir="auto" style="white-space:pre-wrap">${esc(r.body)}</td><td dir="ltr">${r.created_at.slice(0,10)}</td><td><button class="btn" data-done="${r.id}">تم</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted">ما في رسائل جديدة</td></tr>`;
+  $("rows").querySelectorAll("[data-done]").forEach(b => b.onclick = async () => { await sb.from("messages").update({ done: true }).eq("id", +b.dataset.done); viewMessages(); });
+}
+
+/* ---------- codes ---------- */
+async function viewCodes() {
+  const d = new Date(); d.setMonth(d.getMonth()+4);
+  $("body").innerHTML = `<form class="card" id="f"><h3>كود جديد</h3>
+    <div class="row"><div><label>الكود</label><input id="c" dir="ltr" value="${randCode()}"></div><div><label>عدد الاستخدامات</label><input id="n" type="number" min="1" value="30"></div>
+    <div><label>صالح لحد</label><input id="v" type="date" value="${d.toISOString().slice(0,10)}"></div><div><label>ملاحظة (لمين)</label><input id="nt" placeholder="مثلاً: كلية تل أبيب، دورة أيلول"></div>
+    <div><label>بيفتح مسار</label><select id="ct">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}<option value="all">كل المسارات</option></select></div></div>
+    <button class="btn" type="submit">إنشاء</button></form>
+    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>المسار</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.from("access_codes").insert({ code: $("c").value.trim().toUpperCase(), uses_left: +$("n").value, valid_until: $("v").value, note: $("nt").value.trim() || null, track: $("ct").value });
+    if (error) msg(error.message, false); else msg("انعمل الكود");
+    render();
+  };
+  const { data } = await sb.from("access_codes").select("*").order("created_at", { ascending: false }).limit(200);
+  $("rows").innerHTML = (data || []).map(r => `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.track === "all" ? "كل المسارات" : esc(trackLabel(r.track))}</td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">ما في أكواد</td></tr>`;
+}
+function randCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "RS-"; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random()*a.length)]; return s; }
+
+/* ---------- tracks & topics ---------- */
+function viewTracks() {
+  const topics = Object.entries(TOPICS_OF(curTrack));
+  const tr = TRACKS.find(t => t.id === curTrack) || {};
+  const state = tr.active ? "open" : tr.coming_soon ? "soon" : "hidden";
+  const stLabel = { open: "🟢 مفتوح للطلاب", soon: "🟡 بقريبًا (ظاهر بس مقفول)", hidden: "⚪ مخفي" };
+  $("body").innerHTML = `<div class="card"><h3>حالة مسار ${esc(trackLabel(curTrack))}: ${stLabel[state]}</h3>
+    <p class="muted">"بقريبًا" = الطلاب بيشوفوه بالتطبيق مع كلمة "בקרוב" وما بيقدروا يفوتوا عليه. لما تجهز الأسئلة، افتحه.</p>
+    <div class="row" style="justify-content:flex-start">${["open","soon","hidden"].map(k => `<button class="btn ${k === state ? "" : "ghost"}" data-st="${k}" style="flex:none">${stLabel[k]}</button>`).join("")}</div></div>
+  <div class="card"><h3>مواضيع مسار ${esc(trackLabel(curTrack))}</h3>
+    <div class="tbl"><table><thead><tr><th>المعرّف</th><th>الاسم</th></tr></thead><tbody>${topics.map(([k,n]) => `<tr><td dir="ltr">${esc(k)}</td><td class="he" dir="rtl">${esc(n)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">ما في مواضيع</td></tr>`}</tbody></table></div>
+    <form id="ft" class="row"><input id="ti" dir="ltr" placeholder="معرّف بالإنجليزي، مثلاً p_sport"><input id="th" dir="rtl" placeholder="الاسم بالعبري"><input id="te" dir="ltr" placeholder="Name in English"><button class="btn" type="submit">إضافة موضوع</button></form></div>
+  <div class="card"><h3>مسار جديد</h3>
+    <form id="fk" class="row"><input id="ki" dir="ltr" placeholder="id, e.g. dietetics"><input id="kh" dir="rtl" placeholder="الاسم بالعبري"><input id="ke" dir="ltr" placeholder="Name in English"><input id="kc" placeholder="أيقونة 🥗" style="max-width:90px"><input id="kd" dir="rtl" placeholder="وصف قصير بالعبري"><button class="btn" type="submit">إضافة مسار</button></form>
+    <p class="muted">المعرّف بالإنجليزي، أحرف صغيرة بدون مسافات. بعدها لازم تعمل بالـApp Store منتجين: rishui_&lt;id&gt;_monthly و rishui_&lt;id&gt;_until_exam.</p></div>`;
+  $("body").querySelectorAll("[data-st]").forEach(b => b.onclick = async () => {
+    const k = b.dataset.st; if (k === state) return;
+    if (k === "open" && !confirm("متأكد؟ لما تفتح المسار، الطلاب الجداد بيقدروا يختاروه ويحلّوا أسئلته.")) return;
+    const { error } = await sb.from("tracks").update({ active: k === "open", coming_soon: k === "soon" }).eq("id", curTrack);
+    if (error) msg(/coming_soon/.test(error.message) ? "لازم تشغّل supabase/migration-19-coming-soon.sql أول." : error.message, false); else msg("تغيّرت حالة المسار");
+    await loadMeta(); render();
+  });
+  $("ft").onsubmit = async e => {
+    e.preventDefault();
+    const id = $("ti").value.trim().toLowerCase(), he = $("th").value.trim(), en = $("te").value.trim();
+    if (!/^[a-z0-9_]+$/.test(id) || !he || !en) { msg("عبّي المعرّف (أحرف إنجليزية صغيرة) والاسمين", false); return render(); }
+    const { error } = await sb.from("topics").insert({ track: curTrack, id, he, en, sort: (topics.length + 1) * 10 });
+    if (error) msg(error.message, false); else msg("انضاف الموضوع");
+    await loadMeta(); render();
+  };
+  $("fk").onsubmit = async e => {
+    e.preventDefault();
+    const id = $("ki").value.trim().toLowerCase(), he = $("kh").value.trim(), en = $("ke").value.trim();
+    if (!/^[a-z]+$/.test(id) || !he || !en) { msg("المعرّف أحرف إنجليزية صغيرة بس، وعبّي الاسمين", false); return render(); }
+    const { error } = await sb.from("tracks").insert({ id, he, en, icon: $("kc").value.trim() || null, he_desc: $("kd").value.trim() || null, en_desc: en + " licensing exam", sort: (TRACKS.length + 1) * 10 });
+    if (error) msg(error.message, false); else { msg("انضاف المسار"); curTrack = id; localStorage.setItem("ya-track", id); }
+    await loadMeta(); render();
+  };
+}
+
+/* ---------- announcements ---------- */
+async function viewAnn() {
+  $("body").innerHTML = `<div class="card"><h3>إعلان جديد للطلاب</h3>
+    <p class="muted">بيطلع للطلاب فوق بالصفحة الرئيسية بالتطبيق، لحد ما يضغطوا "הבנתי". اكتب باللغة اللي بدك ياها (الطلاب أغلبهم بالعبري).</p>
+    <label>العنوان</label><input id="at" maxlength="120" dir="auto" placeholder="مثلًا: נוספו 200 שאלות חדשות! 🎉">
+    <label>النص (اختياري)</label><textarea id="ab" maxlength="2000" dir="auto" placeholder="تفاصيل..."></textarea>
+    <div class="row"><div><label>لمين</label><select id="atr"><option value="">كل الطلاب</option>${TRACKS.map(t => `<option value="${t.id}">${esc(trackLabel(t.id))} بس</option>`).join("")}</select></div>
+      <div><label>لقديش يضل ظاهر</label><select id="ad"><option value="1">يوم</option><option value="3">3 أيام</option><option value="7" selected>أسبوع</option><option value="30">شهر</option><option value="">لحد ما أوقفه</option></select></div></div>
+    <label style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="aonce" style="width:auto"> يبين مرة وحدة بس (بيختفي لحاله بعد ما الطالب يشوفه مرة، حتى لو ما ضغط "הבנתי")</label>
+    <div id="apv"></div>
+    <button class="btn" id="asend" style="align-self:flex-start">📢 انشر الإعلان</button></div>
+    <div class="card"><h3>🔔 إشعار Push للتلفون</h3>
+    <p class="muted">بيوصل لتلفونات الطلاب اللي فعّلوا "חדשות ועדכונים" (آيفون)، حتى والتطبيق مسكّر. لا تبعت كثير (مرة بالأسبوع أو أقل).</p>
+    <label>نص الإشعار (العنوان ثابت: "يلّا للجامعة")</label><input id="pb" maxlength="200" dir="auto" placeholder="נוספו מסלולים חדשים: רפואה, פיזיותרפיה, ריפוי בעיסוק ורנטגן">
+    <label>لمين</label><select id="ptr"><option value="">كل الطلاب</option>${TRACKS.map(t => `<option value="${t.id}">${esc(trackLabel(t.id))} بس</option>`).join("")}</select>
+    <button class="btn" id="psend" style="align-self:flex-start">🔔 ابعت الإشعار</button></div>
+    <div class="card"><h3>الإعلانات</h3><div class="tbl"><table><thead><tr><th>الإعلان</th><th>لمين</th><th>تاريخ</th><th>الحالة</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" class="muted">بحمّل…</td></tr></tbody></table></div></div>`;
+  const prev = () => { const t = $("at").value.trim(), b = $("ab").value.trim();
+    $("apv").innerHTML = t ? `<label>هيك رح يطلع للطالب:</label><div style="background:var(--accent-soft);border-radius:12px;padding:12px" dir="auto"><b>📢 ${esc(t)}</b>${b ? `<p style="margin:6px 0 0;white-space:pre-line">${esc(b)}</p>` : ""}</div>` : ""; };
+  $("at").oninput = prev; $("ab").oninput = prev;
+  $("asend").onclick = async () => {
+    const title = $("at").value.trim(); if (!title) { $("at").focus(); return; }
+    const days = $("ad").value, row = { title, body: $("ab").value.trim() || null, track: $("atr").value || null,
+      expires_at: days ? new Date(Date.now() + days * 864e5).toISOString() : null };
+    if ($("aonce").checked) row.once = true;
+    $("asend").disabled = true;
+    const { error } = await sb.from("announcements").insert(row);
+    if (error) { msg(/announcements/.test(error.message) ? "لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول." : /once/.test(error.message) ? "لازم تشغّل migration-26 (خيار مرة وحدة) بـ Supabase أول." : error.message, false); }
+    else msg("✅ انشر الإعلان. الطلاب رح يشوفوه لما يفتحوا التطبيق.");
+    render();
+  };
+  $("psend").onclick = async () => {
+    const title = "يلّا للجامعة"; if (!$("pb").value.trim()) { $("pb").focus(); return; }
+    if (!confirm("تبعت الإشعار هلق للطلاب؟ ما بتقدر ترجّعه.")) return;
+    $("psend").disabled = true;
+    const { data, error } = await sb.functions.invoke("send-push", { body: { title, body: $("pb").value.trim(), track: $("ptr").value || null } });
+    $("psend").disabled = false;
+    if (error || data?.error) msg("❌ " + (data?.error || error.message) + (/not found|404/i.test(error?.message || "") ? " — لازم تنشر دالة send-push بـ Supabase أول." : ""), false);
+    else msg(`✅ انبعت لـ ${data.sent} تلفون` + (data.failed ? ` (فشل ${data.failed}${data.lastErr ? ": " + data.lastErr : ""})` : ""));
+    render();
+  };
+  const { data, error } = await sb.from("announcements").select("*").order("created_at", { ascending: false }).limit(50);
+  if (error) { $("rows").innerHTML = `<tr><td colspan="5" class="msg bad">لازم تشغّل supabase/migration-18-announcements.sql بـ Supabase أول.</td></tr>`; return; }
+  const live = a => a.active && (!a.expires_at || new Date(a.expires_at) > new Date());
+  $("rows").innerHTML = (data || []).map(a => `<tr><td dir="auto"><b>${esc(a.title)}</b>${a.body ? `<div class="muted" style="white-space:pre-line">${esc(a.body)}</div>` : ""}</td>
+    <td>${a.track ? esc(trackLabel(a.track)) : "الكل"}</td><td dir="ltr" style="text-align:start">${fmtDT(a.created_at)}</td>
+    <td>${live(a) ? `<span class="pill">ظاهر${a.expires_at ? " لحد " + esc(a.expires_at.slice(0, 10)) : ""}</span>` : `<span class="pill off">موقوف</span>`}</td>
+    <td>${live(a) ? `<button class="btn danger" data-off="${a.id}">وقّف</button> ` : ""}<button class="btn danger" data-del="${a.id}">🗑 احذف</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">لسا ما نشرت إعلانات</td></tr>`;
+  $("rows").querySelectorAll("[data-off]").forEach(b => b.onclick = async () => { await sb.from("announcements").update({ active: false }).eq("id", +b.dataset.off); viewAnn(); });
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("تحذف هاد الإعلان نهائياً؟")) return; await sb.from("announcements").delete().eq("id", +b.dataset.del); viewAnn(); });
+}
+
+/* ---------- users ---------- */
+let userState = { q: "", page: 0 };
+const fmtDT = d => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+async function viewUsers() {
+  const s = userState, PAGE = 50;
+  $("body").innerHTML = `<div class="card"><h3>إضافة ادمن بصلاحيات محدودة</h3>
+    <p class="muted">بيشوف الأسئلة (إضافة وتعديل واستيراد) وأرقام المسارات اللي بتحددها بس. ما بيشوف المستخدمين ولا الإشعارات ولا الإعلانات ولا الأكواد. لازم يكون سجّل حساب أولاً.</p>
+    <input id="ed" type="email" dir="ltr" placeholder="إيميل الادمن">
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap">${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="edt" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    <button class="btn" id="edgo" style="align-self:flex-start">إضافة / تحديث المسارات</button>
+    <div id="edl" class="muted">بحمّل…</div></div><div class="card"><h3>فتح مسارات لحساب</h3>
+    <p class="muted">بتحط إيميل حساب وبتختار المسارات، والحساب بيقدر يدخلها ويتنقل بينها مجاناً لحد التاريخ اللي بتحدده. لازم يكون سجّل حساب أولاً.</p>
+    <input id="gem" type="email" dir="ltr" placeholder="إيميل الحساب">
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" id="gall"><b>كل المسارات</b></label>${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="gtr" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    <div class="row" style="justify-content:flex-start;align-items:center"><span class="muted" style="flex:none">لحد:</span><input id="guntil" type="date" dir="ltr" style="flex:none;width:auto"><span class="muted" style="flex:none">(فاضي = بدون نهاية)</span></div>
+    <button class="btn" id="ggo" style="align-self:flex-start">فتح المسارات</button>
+    <div id="gmsg" class="muted"></div>
+    <div id="gl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
+    <div class="muted" id="ucount">بحمّل…</div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>أسئلة محلولة</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">بحمّل…</td></tr></tbody></table></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
+  const loadEditors = async () => {
+    const { data: ed } = await sb.from("profiles").select("email,tracks").eq("role", "editor").order("email");
+    $("edl").innerHTML = (ed || []).length ? ed.map(e => `<div class="row" style="justify-content:space-between"><span><b dir="ltr">${esc(e.email)}</b><br><span class="muted">${(e.tracks || []).map(t => esc(trackLabel(t))).join(" · ")}</span></span><button class="btn ghost" data-ed="${esc(e.email)}" style="flex:none">إزالة</button></div>`).join("") : "ما في ادمن محدود مضاف";
+    $("edl").querySelectorAll("[data-ed]").forEach(b => b.onclick = async () => { if (!confirm("تشيل صلاحية " + b.dataset.ed + "؟")) return; const { error } = await sb.rpc("admin_set_editor", { p_email: b.dataset.ed, p_tracks: [] }); if (error) alert(error.message); loadEditors(); });
+  };
+  loadEditors();
+  $("edgo").onclick = async () => {
+    const em = $("ed").value.trim(), tr = [...document.querySelectorAll(".edt:checked")].map(x => x.value);
+    if (!em) return;
+    if (!tr.length) { alert("اختار مسار واحد على الأقل"); return; }
+    const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_tracks: tr });
+    if (error) { alert(error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message); return; }
+    $("ed").value = ""; document.querySelectorAll(".edt").forEach(x => x.checked = false); loadEditors();
+  };
+  const loadGrants = async () => {
+    const { data: gr, error } = await sb.rpc("admin_list_grants");
+    if (error) { $("gl").textContent = error.message; return; }
+    const by = {}; (gr || []).forEach(g => (by[g.email] || (by[g.email] = [])).push(g));
+    $("gl").innerHTML = Object.keys(by).length ? Object.entries(by).map(([em, l]) => `<div class="row" style="justify-content:space-between;flex-wrap:wrap"><b dir="ltr">${esc(em)}</b><span>${l.map(g => `<span class="pill" style="margin:2px">${esc(trackLabel(g.track))} · ${new Date(g.until).getFullYear() >= 2099 ? "بدون نهاية" : "لحد " + esc(String(g.until).slice(0, 10))} <a href="#" data-rv="${esc(g.user_id)}" data-tr="${esc(g.track)}" style="color:#C0392B;text-decoration:none">✕</a></span>`).join("")}</span></div>`).join("") : "ما في حسابات مفتوح إلها مسارات";
+    $("gl").querySelectorAll("[data-rv]").forEach(a => a.onclick = async e => { e.preventDefault(); if (!confirm("تسكّر هذا المسار عن الحساب؟")) return; const { error: x } = await sb.rpc("admin_revoke_track", { p_user: a.dataset.rv, p_track: a.dataset.tr }); if (x) alert(x.message); loadGrants(); });
+  };
+  loadGrants();
+  $("gall").onchange = () => document.querySelectorAll(".gtr").forEach(x => x.checked = $("gall").checked);
+  $("ggo").onclick = async () => {
+    const em = $("gem").value.trim(), tr = [...document.querySelectorAll(".gtr:checked")].map(x => x.value);
+    if (!em) return;
+    if (!tr.length) { alert("اختار مسار واحد على الأقل"); return; }
+    const u = $("guntil").value ? new Date($("guntil").value + "T23:59:59").toISOString() : "2099-12-31T23:59:59Z";
+    const { error } = await sb.rpc("admin_grant_tracks", { p_email: em, p_tracks: tr, p_until: u });
+    if (error) { $("gmsg").textContent = error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message; return; }
+    $("gmsg").textContent = `✓ انفتح ${tr.length} مسار لـ ${em}`;
+    $("gem").value = ""; $("guntil").value = ""; document.querySelectorAll(".gtr,#gall").forEach(x => x.checked = false); loadGrants();
+  };
+  const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
+  $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
+  let q = sb.from("profiles").select("id,email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
+  if (s.q) q = q.ilike("email", `%${s.q}%`);
+  const { data, count, error } = await q;
+  if (error) { $("rows").innerHTML = `<tr><td colspan="10" class="msg bad">${esc(error.message)}</td></tr>`; return; }
+  // last sign-in = the newest "last seen" of the account's devices
+  const seen = {};
+  const ids = (data || []).map(u => u.id);
+  if (ids.length) {
+    const { data: dv } = await sb.from("devices").select("user_id,last_seen").in("user_id", ids).limit(2000);
+    (dv || []).forEach(d => { const x = seen[d.user_id] || (seen[d.user_id] = { n: 0, last: null }); x.n++; if (!x.last || d.last_seen > x.last) x.last = d.last_seen; });
+  }
+  // questions solved per user, split by track
+  const solved = {};
+  if (ids.length) {
+    const { data: sv } = await sb.rpc("admin_user_solved", { p_ids: ids });
+    (sv || []).forEach(r => { const x = solved[r.user_id] || (solved[r.user_id] = { n: 0, c: 0, t: [] }); x.n += +r.n; x.c += +r.correct; x.t.push([r.track, +r.n]); });
+  }
+  const solvedCell = id => { const x = solved[id]; if (!x) return `<span class="muted">0</span>`;
+    x.t.sort((a, b) => b[1] - a[1]);
+    return `<b>${num(x.n)}</b> <span class="muted">(${Math.round(100 * x.c / x.n)}% صح)</span>`+ (`<br><span class="muted he" style="font-size:12px">${x.t.map(([t, n]) => `${esc(trackLabel(t))}: ${num(n)}`).join(" · ")}</span>`); };
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+  const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
+  $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
+  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
+  $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}${seen[u.id]?.n ? ` <a href="#" data-rd="${esc(u.id)}" data-em="${esc(u.email)}" title="مسح الأجهزة" style="text-decoration:none">↺</a>` : ""}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td>${solvedCell(u.id)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
+    || `<tr><td colspan="10" class="muted">ما في مستخدمين</td></tr>`;
+  $("rows").querySelectorAll("[data-rd]").forEach(a => a.onclick = async e => {
+    e.preventDefault();
+    if (!confirm(`تمسح أجهزة ${a.dataset.em}؟\nأول جهاز بيدخل منه بعدها بيصير جهازه.`)) return;
+    const { error: x } = await sb.rpc("admin_reset_devices", { p_user: a.dataset.rd });
+    if (x) alert(x.message); else viewUsers();
+  });
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const em = b.dataset.em;
+    if (!confirm(`متأكد بدك تحذف المستخدم؟\n${em}\n\nبينحذف حسابه وكل بياناته (إجاباته، إحصائياته، اشتراكه) ومش ممكن ترجّعها.`)) return;
+    if (!confirm(`تأكيد أخير: حذف ${em} نهائياً؟`)) return;
+    b.disabled = true;
+    const { error: e } = await sb.rpc("admin_delete_user", { p_id: b.dataset.del });
+    if (e) { alert("ما انحذف: " + e.message); b.disabled = false; return; }
+    viewUsers();
+  });
+  const pages = Math.max(1, Math.ceil((count || 0) / PAGE));
+  $("upg").textContent = `صفحة ${s.page + 1} من ${pages}`;
+  $("upr").disabled = s.page === 0; $("unx").disabled = s.page + 1 >= pages;
+  $("upr").onclick = () => { s.page--; viewUsers(); }; $("unx").onclick = () => { s.page++; viewUsers(); };
+}
+
+/* ---------- stats ---------- */
+let statDays = 30;
+const ZONES = { "Asia/Jerusalem": "إسرائيل", "Asia/Tel_Aviv": "إسرائيل", "Asia/Hebron": "فلسطين", "Asia/Gaza": "فلسطين", "Asia/Amman": "الأردن", "Europe/Berlin": "ألمانيا", "Europe/London": "بريطانيا", "America/New_York": "أمريكا", "Asia/Dubai": "الإمارات", "Europe/Moscow": "روسيا", "Africa/Cairo": "مصر" };
+const DEV = { mobile: "📱 تلفون", desktop: "💻 كمبيوتر", tablet: "📲 تابلت" };
+const PAGES = { "/": "الصفحة الرئيسية", "/app/": "التطبيق بالمتصفح", "/admin.html": "لوحة الإدارة", "/legal/": "الصفحات القانونية", "/legal/privacy-he.html": "الخصوصية (عبري)", "/legal/terms-he.html": "الشروط (عبري)", "/legal/privacy-en.html": "الخصوصية (إنجليزي)", "/legal/terms-en.html": "الشروط (إنجليزي)" };
+const num = n => Number(n || 0).toLocaleString("en-US");
+function bars(rows, keys, colors) {
+  const max = Math.max(1, ...rows.flatMap(r => keys.map(k => +r[k] || 0)));
+  return `<div class="bars">${rows.map(r => `<div class="bcol" title="${esc(r.d)}: ${keys.map(k => num(r[k])).join(" / ")}">${keys.map((k, i) => `<i style="height:${Math.round(100 * (+r[k] || 0) / max)}%;background:${colors[i]}"></i>`).join("")}</div>`).join("")}</div>
+    <div class="bax"><span>${esc(rows[0]?.d || "")}</span><span>${esc(rows.at(-1)?.d || "")}</span></div>`;
+}
+function topList(title, rows, label) {
+  const total = rows.reduce((s, r) => s + +r.n, 0) || 1;
+  return `<div class="card"><b>${title}</b>${rows.length ? rows.map(r => `<div class="li"><span>${esc(label(r.k))}</span><span class="muted">${num(r.n)}</span><div class="lbar" style="width:${Math.round(100 * r.n / total)}%"></div></div>`).join("") : `<span class="muted">لسا ما في</span>`}</div>`;
+}
+const cardsHtml = list => `<div class="grid4">${list.map(([n, v, sub]) => `<div class="card"><span class="muted">${n}</span><span class="stat">${v}</span>${sub ? `<span class="muted">${sub}</span>` : ""}</div>`).join("")}</div>`;
+async function viewEditorStats() {
+  $("body").innerHTML = `<div class="row" style="justify-content:flex-start">${[7, 30, 90].map(d => `<button class="btn ${d === statDays ? "" : "ghost"}" data-d="${d}">آخر ${d} يوم</button>`).join("")}</div><div id="st"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  $("body").querySelectorAll("[data-d]").forEach(b => b.onclick = () => { statDays = +b.dataset.d; viewEditorStats(); });
+  const { data: r, error } = await sb.rpc("editor_stats", { p_track: curTrack, p_days: statDays });
+  if (error || !r) { $("st").innerHTML = `<div class="msg bad">${esc(error?.message || "مش جاهز")}</div>`; return; }
+  const acc = r.answers ? Math.round(100 * r.correct / r.answers) : 0;
+  $("st").innerHTML = `<h3>${esc(trackLabel(curTrack))}</h3>` + cardsHtml([["كل الأسئلة", num(r.questions)], ["منشورة", num(r.published)], [`إجابات آخر ${statDays} يوم`, num(r.answers), `${acc}% صحيحة`], ["طلاب حلّوا أسئلة", num(r.students)]])
+    + `<div class="card"><b>أصعب المواضيع (أقل نسبة إجابات صحيحة)</b>${r.hard_topics.length ? `<div class="tbl"><table><thead><tr><th>الموضوع</th><th>إجابات</th><th>صحيحة</th></tr></thead><tbody>${r.hard_topics.map(t => `<tr><td class="he">${esc(TOPICS_OF(curTrack)[t.k] || t.k)}</td><td>${num(t.n)}</td><td>${t.pct}%</td></tr>`).join("")}</tbody></table></div>` : `<span class="muted">بتظهر لما يكون في 10 إجابات على الأقل بالموضوع.</span>`}</div>`;
+  $("st").style.cssText = "display:flex;flex-direction:column;gap:12px";
+}
+async function viewStats() {
+  if (me.role !== "admin") return viewEditorStats();
+  $("body").innerHTML = `<div class="row" style="justify-content:flex-start">${[7, 30, 90].map(d => `<button class="btn ${d === statDays ? "" : "ghost"}" data-d="${d}">آخر ${d} يوم</button>`).join("")}</div><div id="st"><div class="card"><span class="muted">بحمّل…</span></div></div>`;
+  $("body").querySelectorAll("[data-d]").forEach(b => b.onclick = () => { statDays = +b.dataset.d; viewStats(); });
+  const now = new Date().toISOString();
+  const [{ data: r, error }, u, a, q, p, { data: cfg, error: ce }] = await Promise.all([
+    sb.rpc("admin_stats", { p_days: statDays }),
+    sb.from("profiles").select("id", { count: "exact", head: true }),
+    sb.from("profiles").select("id", { count: "exact", head: true }).gt("plan_until", now),
+    sb.from("questions").select("id", { count: "exact", head: true }),
+    sb.from("questions").select("id", { count: "exact", head: true }).eq("published", true),
+    sb.from("app_settings").select("free_mode").eq("id", 1).maybeSingle(),
+  ]);
+  let h = "";
+  if (error || !r) {
+    h += `<div class="msg bad">إحصائيات الزوار والطلاب مش جاهزة: شغّل supabase/migration-17-site-stats.sql بـ Supabase. ${esc(error?.message || "")}</div>`;
+  } else {
+    const s = r.site, ap = r.app, acc = ap.answers ? Math.round(100 * ap.correct / ap.answers) : 0;
+    h += `<h3>🌐 زوار الموقع</h3>` + cardsHtml([
+      ["زوار اليوم", num(s.today_visitors)], [`زوار آخر ${statDays} يوم`, num(s.visitors), "كل شخص مرة وحدة"],
+      ["مرات فتح الصفحات", num(s.visits)], ["فتحوا التطبيق بالمتصفح", num(s.app_visitors)]]);
+    h += `<div class="card"><b>زوار كل يوم</b>${bars(s.by_day, ["n"], ["var(--accent)"])}</div>`;
+    h += `<div class="grid2">` + topList("من وين إجوا", s.refs, k => k || "دخلوا مباشرة / واتساب / تطبيق") + topList("أي صفحات فتحوا", s.pages, k => PAGES[k] || k)
+       + topList("نوع الجهاز", s.devices, k => DEV[k] || k) + topList("من أي بلد (تقريبًا)", s.zones, k => ZONES[k] || k) + `</div>`;
+    h += `<h3>🎓 الطلاب بالتطبيق</h3>` + cardsHtml([
+      ["سجّلوا اليوم", num(ap.new_today)], [`سجّلوا آخر ${statDays} يوم`, num(ap.new_users), `من أصل ${num(ap.users)}`],
+      ["حلّوا أسئلة اليوم", num(ap.active_today)], ["حلّوا أسئلة آخر 7 أيام", num(ap.active_7)],
+      [`إجابات آخر ${statDays} يوم`, num(ap.answers), `${acc}% صحيحة`], ["طلاب شغّالين بالفترة", num(ap.active)],
+      ["امتحانات خلصت", num(ap.exams_done)], ["مهمات يومية خلصت", num(ap.missions_done)]]);
+    h += `<div class="card"><b>كل يوم: <span style="color:var(--ok)">■</span> سجّلوا جديد · <span style="color:var(--accent)">■</span> حلّوا أسئلة</b>${bars(ap.signups_by_day, ["n", "a"], ["var(--ok)", "var(--accent)"])}</div>`;
+    h += `<div class="card"><b>أصعب المواضيع (أقل نسبة إجابات صحيحة)</b>${ap.hard_topics.length ? `<div class="tbl"><table><thead><tr><th>الموضوع</th><th>إجابات</th><th>صحيحة</th></tr></thead><tbody>${ap.hard_topics.map(t => `<tr><td class="he">${esc(trackLabel(t.track))} · ${esc(TOPICS_OF(t.track)[t.k] || t.k)}</td><td>${num(t.n)}</td><td>${t.pct}%</td></tr>`).join("")}</tbody></table></div>` : `<span class="muted">بتظهر لما يكون في 10 إجابات على الأقل بالموضوع.</span>`}</div>`;
+  }
+  h += `<h3>📦 عام</h3>` + cardsHtml(me.role === "admin" ? [["كل المستخدمين", num(u.count)], ["اشتراكات فعّالة", num(a.count)], ["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]] : [["كل الأسئلة", num(q.count)], ["منشورة", num(p.count)]]);
+  if (me.role !== "admin") { $("st").innerHTML = h; $("st").style.cssText = "display:flex;flex-direction:column;gap:12px"; return; }
+  h += ce || !cfg ? `<div class="card"><b>الوضع المجاني</b><p class="muted">شغّل supabase/migration-5-free-mode.sql عشان يظهر هاد الخيار.</p></div>`
+    : `<div class="card"><b>الوضع المجاني: ${cfg.free_mode ? "🟢 شغّال (كل الأسئلة ببلاش)" : "⚪ مطفي (بدها اشتراك)"}</b>
+       <p class="muted">لما يكون شغّال، كل طالب مسجّل بيحل كل أسئلة مساره بدون اشتراك.</p>
+       <button class="btn" id="fm" style="align-self:flex-start">${cfg.free_mode ? "طفّي الوضع المجاني" : "شغّل الوضع المجاني"}</button></div>`;
+  $("st").innerHTML = h; $("st").style.cssText = "display:flex;flex-direction:column;gap:12px";
+  if ($("fm")) $("fm").onclick = async () => { await sb.from("app_settings").update({ free_mode: !cfg.free_mode }).eq("id", 1); viewStats(); };
+}
+
+start();
 </script>
 </body>
 </html>
