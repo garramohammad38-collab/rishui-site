@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>إدارة يلّا</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column console — header band, stat strip, searchable user list with track toggles */
+:root{
+  --bg:#F3F5FA; --card:#FFFFFF; --ink:#141B2D; --muted:#5E6782; --line:#DDE2EE;
+  --blue:#1D4FB5; --orange:#F28C28;
+  --yael:#0B6E6E; --amiranet:#1D4FB5; --psycho:#7A3FB0;
+  --danger:#C0392B;
+  --font:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0E1322; --card:#171E31; --ink:#E9EDF7; --muted:#9AA3BD; --line:#29324A;
+  --blue:#5B8BEA; --yael:#2FA3A3; --amiranet:#5B8BEA; --psycho:#A877DA; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+header{background:var(--blue);color:#fff}
+header .wrap{padding-block:18px;flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+header h1{margin:0;font-size:20px;font-weight:700}
+header h1 span{color:var(--orange)}
+header small{opacity:.8;font-size:13px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+button:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+input{font:inherit;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.login{max-width:380px;margin:40px auto 0;display:flex;flex-direction:column;gap:12px}
+.login h2{margin:0;font-size:18px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.msg{font-size:13px;color:var(--muted);min-height:1.2em}
+.msg.err{color:var(--danger)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tools input{flex:1;min-width:200px}
+.list{display:flex;flex-direction:column;gap:8px}
+.user{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
+.user .who{min-width:0}
+.user .name{font-weight:700;overflow-wrap:anywhere}
+.user .meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;border:1.5px dashed var(--line);color:var(--muted);background:transparent}
+.chip.on{border-style:solid;color:#fff}
+.chip.on.yael{background:var(--yael);border-color:var(--yael)}
+.chip.on.amiranet{background:var(--amiranet);border-color:var(--amiranet)}
+.chip.on.psycho{background:var(--psycho);border-color:var(--psycho)}
+.empty{text-align:center;color:var(--muted);padding:30px}
+@media (max-width:560px){.user{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div><h1>يلّا <span>·</span> لوحة الإدارة</h1><small>المستخدمين وفتح المسارات</small></div>
+  <button id="logout" hidden>خروج</button>
+</div></header>
+
+<main class="wrap">
+  <section id="loginView" class="card login" hidden>
+    <h2>دخول المدير</h2>
+    <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="username">
+    <input id="pass" type="password" placeholder="كلمة السر" autocomplete="current-password">
+    <div class="row">
+      <button class="primary" id="loginBtn">دخول</button>
+      <button id="signupBtn">أول مرة؟ إنشاء حساب مدير</button>
+    </div>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <section id="appView" hidden>
+    <div class="stats" id="stats"></div>
+    <div class="tools" style="margin-top:16px">
+      <input id="q" type="search" placeholder="بحث بالاسم أو البريد">
+      <button id="reload">تحديث</button>
+    </div>
+    <div class="msg" id="appMsg"></div>
+    <div class="list" id="list"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const sb = supabase.createClient('https://ifscexzwzyobdyxmjisd.supabase.co','sb_publishable_nV6RQIspnFRAE62Hzb34rg_7wQqR7V6');
+const TRACKS = [['yael','יע"ל'],['amiranet','אמירנ"ט'],['psycho','פסיכומטרי']];
+const $ = (id) => document.getElementById(id);
+let users = [];
+
+function show(logged){ $('loginView').hidden = logged; $('appView').hidden = !logged; $('logout').hidden = !logged; }
+function msg(el, text, err){ $(el).textContent = text || ''; $(el).classList.toggle('err', !!err); }
+const fmt = (d) => d ? new Date(d).toLocaleString('ar', {dateStyle:'short', timeStyle:'short'}) : '—';
+
+async function load(){
+  msg('appMsg','جاري التحميل…');
+  const { data, error } = await sb.rpc('admin_list_users');
+  if (error){ msg('appMsg', error.message.includes('forbidden') ? 'هذا الحساب مش مدير.' : 'خطأ: '+error.message, true); users=[]; render(); return; }
+  users = data || []; msg('appMsg',''); render();
+}
+
+function render(){
+  const day = Date.now() - 864e5;
+  const stats = [
+    ['المستخدمين', users.length],
+    ['جدد آخر 24 ساعة', users.filter(u => new Date(u.created_at) > day).length],
+    ['نشطين آخر 24 ساعة', users.filter(u => new Date(u.last_seen) > day).length],
+    ...TRACKS.map(([id, n]) => ['مفتوح ' + n, users.filter(u => (u.tracks||[]).includes(id)).length]),
+  ];
+  $('stats').innerHTML = '';
+  for (const [l, v] of stats){ const d = document.createElement('div'); d.className='stat'; d.innerHTML='<b></b><span></span>'; d.querySelector('b').textContent=v; d.querySelector('span').textContent=l; $('stats').append(d); }
+
+  const q = $('q').value.trim().toLowerCase();
+  const list = users.filter(u => !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q));
+  $('list').innerHTML = '';
+  if (!list.length){ const e=document.createElement('div'); e.className='empty'; e.textContent = users.length ? 'ما في نتائج.' : 'لسا ما في مستخدمين مسجّلين. لما حدا يسجّل بـ Apple من التطبيق بيظهر هون.'; $('list').append(e); return; }
+  for (const u of list){
+    const row = document.createElement('div'); row.className='user';
+    const who = document.createElement('div'); who.className='who';
+    const name = document.createElement('div'); name.className='name'; name.textContent = u.name || 'بدون اسم';
+    const meta = document.createElement('div'); meta.className='meta';
+    meta.textContent = (u.email || 'بريد مخفي') + ' · سجّل ' + fmt(u.created_at) + ' · آخر دخول ' + fmt(u.last_seen) + ' · ' + (u.answered||0) + ' سؤال';
+    who.append(name, meta);
+    const chips = document.createElement('div'); chips.className='chips';
+    for (const [id, n] of TRACKS){
+      const on = (u.tracks||[]).includes(id);
+      const b = document.createElement('button'); b.className = 'chip ' + id + (on ? ' on' : '');
+      b.textContent = (on ? '✓ ' : '🔒 ') + n; b.setAttribute('aria-pressed', on);
+      b.onclick = () => toggle(u, id, b);
+      chips.append(b);
+    }
+    row.append(who, chips); $('list').append(row);
+  }
+}
+
+async function toggle(u, id, btn){
+  const cur = u.tracks || [];
+  const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+  btn.disabled = true;
+  const { error } = await sb.rpc('admin_set_tracks', { p_id: u.id, p_tracks: next });
+  btn.disabled = false;
+  if (error){ msg('appMsg','ما زبط: '+error.message, true); return; }
+  u.tracks = next; msg('appMsg', 'تم الحفظ. المستخدم بيشوف التغيير لما يفتح التطبيق.'); render();
+}
+
+$('loginBtn').onclick = async () => {
+  msg('loginMsg','…');
+  const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pass').value });
+  if (error){ msg('loginMsg', error.message.includes('confirm') ? 'لازم تأكد البريد أول (افتح الرابط اللي وصلك).' : 'البريد أو كلمة السر غلط.', true); return; }
+  msg('loginMsg',''); show(true); load();
+};
+$('signupBtn').onclick = async () => {
+  const email = $('email').value.trim(), password = $('pass').value;
+  if (!email || password.length < 8){ msg('loginMsg','اكتب البريد وكلمة سر 8 أحرف على الأقل.', true); return; }
+  const { error } = await sb.auth.signUp({ email, password });
+  msg('loginMsg', error ? 'خطأ: '+error.message : 'وصلك إيميل تأكيد. افتح الرابط، وبعدين ارجع هون واعمل دخول.', !!error);
+};
+$('logout').onclick = async () => { await sb.auth.signOut(); users=[]; show(false); };
+$('reload').onclick = load;
+$('q').oninput = render;
+
+sb.auth.getSession().then(({ data }) => { show(!!data.session); if (data.session) load(); });
+</script>
+</body>
+</html>
