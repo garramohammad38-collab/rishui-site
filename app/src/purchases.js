@@ -1,8 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 import { Purchases } from "@revenuecat/purchases-capacitor";
 
-// product ids: rishui_<track>_monthly and rishui_<track>_until_exam
-const productRe = /^rishui_([a-z]+)_(monthly|until_exam)$/;
+// product ids: rishui_<track>_monthly, rishui_<track>_2months and rishui_<track>_until_exam
+const productRe = /^rishui_([a-z]+)_(monthly|2months|until_exam)$/;
+const KIND = { monthly: "month", "2months": "two", until_exam: "exam" };
 const platform = Capacitor.getPlatform(); // "ios" | "android" | "web"
 export const storeAvailable = platform === "ios" || platform === "android";
 
@@ -20,7 +21,7 @@ export async function initPurchases(userId) {
     for (const p of current?.availablePackages ?? []) {
       // Google Play ids can look like "rishui_monthly:monthly"
       const m = (p.product?.identifier ?? "").split(":")[0].match(productRe);
-      if (m) packages[`${m[1]}:${m[2] === "monthly" ? "month" : "exam"}`] = p;
+      if (m) packages[`${m[1]}:${KIND[m[2]]}`] = p;
     }
   } catch { /* store unreachable: prices just won't show */ }
 }

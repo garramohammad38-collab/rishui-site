@@ -33,8 +33,8 @@ export const T = {
     checkEmail: "Check your email and tap the confirmation link, then sign in.",
     wrongLogin: "Email or password is incorrect.", netErr: "No connection. Check your internet and try again.",
     tooMany: "This account is already active on 2 devices. Sign out on one of them, or contact support.",
-    choose: "Choose your plan", monthly: "Monthly", monthlyD: "Renews every month. Cancel anytime in your store settings.",
-    untilExam: "Until the exam", untilD: "One payment, full access until your exam date", best: "Best value",
+    choose: "Choose your plan", subsT: "Subscriptions", subsOn: "Your subscription is active. Manage or cancel it in your store settings.", subsOff: "No active subscription. See the plans and unlock all questions.", continueFree: "Continue with 15 free questions", monthly: "Monthly", monthlyD: "Renews every month. Cancel anytime in your store settings.",
+    twoMonths: "2 months", twoD: "Renews every 2 months. Cancel anytime in your store settings.", untilExam: "Until the exam", untilD: "One payment, full access until your exam date", best: "Best value",
     examDate: "Exam date", buy: "Subscribe", restore: "Restore purchases", restored: "Purchases restored.",
     nothingRestore: "No previous purchases were found.", buying: "Opening the store…", activating: "Activating your plan…",
     activated: "Your plan is active.", payFail: "The purchase didn't go through. You weren't charged.",
@@ -59,7 +59,9 @@ export const T = {
     ofCorrect: "correct", min: "min", sec: "sec", strengths: "Strengths and gaps", again: "Try again", home: "Home",
     review: "Review answers", yourAns: "Your answer", rightAns: "Correct answer", none: "No answer",
     tap: "Tap to flip", accuracy: "Accuracy", answered: "Answered", bestMock: "Best mock exam",
-    dailyLimit: "You've reached today's question limit. It resets tomorrow.", locked: "Subscribe to unlock all questions.",
+    devLimit: "This account is already in use on another device. Each account works on one device only.", devMove: "Move my account to this device", heroTag: "Licensing exam prep for health professions", devMoveQ: "The account will be signed out of the other device. You can do this once every 30 days. Continue?", devMoveNo: "You already moved your account in the last 30 days. Contact support.",
+    orWith: "or continue with", appleBtn: "Continue with Apple", googleBtn: "Continue with Google", socialErr: "Sign-in did not complete. Try again.", guestBtn: "Start without signing up", guestOr: "or sign in", guestNote: "You are using a guest account. Create an account to keep your progress on every device.", saveAcct: "Create account", saveDone: "Check your email to confirm. Your progress is kept.", guestName: "Guest", guestOut: "Leaving a guest account deletes its progress. Leave anyway?",
+    dailyLimit: "You've reached today's question limit. It resets tomorrow.", locked: "15 free questions are open to try. Subscribe to unlock all.",
     loadErr: "Couldn't load questions. Check your connection and try again.", retry: "Try again", saveDate: "Save",
   },
   he: {
@@ -74,8 +76,8 @@ export const T = {
     checkEmail: "בדוק את המייל ולחץ על קישור האישור, ואז התחבר.",
     wrongLogin: "האימייל או הסיסמה שגויים.", netErr: "אין חיבור. בדוק את האינטרנט ונסה שוב.",
     tooMany: "החשבון כבר פעיל ב-2 מכשירים. התנתק באחד מהם או פנה לתמיכה.",
-    choose: "בחר מסלול", monthly: "חודשי", monthlyD: "מתחדש כל חודש. אפשר לבטל בהגדרות החנות.",
-    untilExam: "עד הבחינה", untilD: "תשלום אחד, גישה מלאה עד מועד הבחינה", best: "הכי משתלם",
+    choose: "בחר מסלול", subsT: "מנויים", subsOn: "המנוי שלך פעיל. אפשר לנהל או לבטל בהגדרות החנות.", subsOff: "אין מנוי פעיל. לצפייה במסלולים ולפתיחת כל השאלות.", continueFree: "המשך עם 15 שאלות חינם", monthly: "חודשי", monthlyD: "מתחדש כל חודש. אפשר לבטל בהגדרות החנות.",
+    twoMonths: "חודשיים", twoD: "מתחדש כל חודשיים. אפשר לבטל בהגדרות החנות.", untilExam: "עד הבחינה", untilD: "תשלום אחד, גישה מלאה עד מועד הבחינה", best: "הכי משתלם",
     examDate: "מועד הבחינה", buy: "להרשמה", restore: "שחזור רכישות", restored: "הרכישות שוחזרו.",
     nothingRestore: "לא נמצאו רכישות קודמות.", buying: "פותח את החנות…", activating: "מפעיל את המסלול…",
     activated: "המסלול שלך פעיל.", payFail: "הרכישה לא הושלמה. לא בוצע חיוב.",
@@ -100,14 +102,16 @@ export const T = {
     ofCorrect: "נכונות", min: "דק׳", sec: "שנ׳", strengths: "נקודות חוזק וחולשה", again: "נסה שוב", home: "מסך ראשי",
     review: "סקירת תשובות", yourAns: "התשובה שלך", rightAns: "התשובה הנכונה", none: "לא נענתה",
     tap: "הקש להפיכה", accuracy: "דיוק", answered: "נענו", bestMock: "מבחן תרגול הכי טוב",
-    dailyLimit: "הגעת למכסת השאלות היומית. היא מתאפסת מחר.", locked: "הירשם כדי לפתוח את כל השאלות.",
+    devLimit: "החשבון הזה כבר בשימוש במכשיר אחר. כל חשבון פועל במכשיר אחד בלבד.", devMove: "העברת החשבון למכשיר הזה", heroTag: "הכנה למבחני הרישוי במקצועות הבריאות", devMoveQ: "החשבון ינותק מהמכשיר השני. אפשר לעשות זאת פעם ב-30 יום. להמשיך?", devMoveNo: "כבר העברת את החשבון ב-30 הימים האחרונים. פנו לתמיכה.",
+    orWith: "או המשך עם", appleBtn: "המשך עם Apple", googleBtn: "המשך עם Google", socialErr: "ההתחברות לא הושלמה. נסה שוב.", guestBtn: "התחל בלי הרשמה", guestOr: "או התחברות", guestNote: "אתה משתמש בחשבון אורח. צור חשבון כדי לשמור את ההתקדמות בכל מכשיר.", saveAcct: "יצירת חשבון", saveDone: "בדוק את המייל לאישור. ההתקדמות נשמרת.", guestName: "אורח", guestOut: "יציאה מחשבון אורח תמחק את ההתקדמות שלו. לצאת בכל זאת?",
+    dailyLimit: "הגעת למכסת השאלות היומית. היא מתאפסת מחר.", locked: "15 שאלות פתוחות לנסיון חינם. הירשם כדי לפתוח את כולן.",
     loadErr: "לא הצלחנו לטעון שאלות. בדוק את החיבור ונסה שוב.", retry: "נסה שוב", saveDate: "שמירה",
   },
 };
 
 /* ---- sections: home / new exam / my exams / my questions / statistics / tools ---- */
 Object.assign(T.en, {
-  navHome: "Home", navNew: "New exam", navExams: "My exams", navQs: "My questions", navStats: "Statistics", navTools: "Tools",
+  navHome: "Home", navNew: "New exam", navExams: "My exams", navQs: "Practice", navStats: "Statistics", navTools: "More", sUn: "Unanswered", hSubHome: "Keep studying for your licensing exam", hSubQs: "Practice, search and tools", hSubExams: "Your past and open exams", hSubStats: "Your progress at a glance", hSubTools: "Account, settings and help", hSubNew: "Build an exam your way",
   pkg: "Your plan", validUntil: "Valid until", freeNow: "Free for now", solved: "solved", inBank: "questions in the bank",
   exSettings: "Exam settings", timing: "Timing", timed: "Timed", untimed: "No time limit",
   solutions: "Solutions", guided: "Guided", guidedD: "Answer and explanation right after each question",
@@ -130,7 +134,7 @@ Object.assign(T.en, {
   acctD: "Exam date, subscription, sign out", legalT: "Terms & privacy", newExamGo: "Create a new exam",
 });
 Object.assign(T.he, {
-  navHome: "ראשי", navNew: "מבחן חדש", navExams: "המבחנים שלי", navQs: "השאלות שלי", navStats: "סטטיסטיקה", navTools: "כלים",
+  navHome: "ראשי", navNew: "מבחן חדש", navExams: "המבחנים שלי", navQs: "תרגול", navStats: "סטטיסטיקה", navTools: "עוד", sUn: "לא נענו", hSubHome: "ממשיכים ללמוד לקראת מבחן הרישוי", hSubQs: "תרגול, חיפוש וכלים", hSubExams: "המבחנים הפתוחים והקודמים שלך", hSubStats: "ההתקדמות שלך במבט אחד", hSubTools: "חשבון, הגדרות ועזרה", hSubNew: "בנו מבחן בדיוק לפי הצורך",
   pkg: "מצב החבילה", validUntil: "בתוקף עד", freeNow: "חינם כרגע", solved: "פתורות", inBank: "שאלות בחבילה",
   exSettings: "הגדרות המבחן", timing: "זמנים", timed: "מבחן עם זמן", untimed: "מבחן ללא זמן",
   solutions: "פתרונות", guided: "מבחן מודרך", guidedD: "תשובה והסבר מיד אחרי כל שאלה",
@@ -183,6 +187,7 @@ Object.assign(T.en, {
   reminder: "Daily reminder", reminderD: "One reminder a day for your mission. It isn't sent if you already finished.",
   remOn: "Turn on", remOff: "Turn off", remTime: "Time", remBody: "Your mission for today is waiting: 10 questions, about 10 minutes.",
   remDenied: "Allow notifications for the app in your phone settings.", remWeb: "Reminders work in the phone app.",
+  pushT: "News and updates", pushD: "Get a notification when new questions or tracks are added.",
 });
 Object.assign(T.he, {
   mission: "המשימה שלך להיום", startMission: "התחלת משימת היום", contMission: "המשך המשימה", left: "נשארו",
@@ -193,6 +198,7 @@ Object.assign(T.he, {
   reminder: "תזכורת יומית", reminderD: "תזכורת אחת ביום למשימה. לא נשלחת אם כבר סיימת.",
   remOn: "הפעלה", remOff: "כיבוי", remTime: "שעה", remBody: "המשימה של היום מחכה לך: 10 שאלות, בערך 10 דקות.",
   remDenied: "צריך לאשר התראות לאפליקציה בהגדרות הטלפון.", remWeb: "התזכורות עובדות באפליקציה בטלפון.",
+  pushT: "חדשות ועדכונים", pushD: "קבלו התראה כשנוספות שאלות חדשות או מסלולים חדשים.",
 });
 
 Object.assign(T.en, {
@@ -280,7 +286,7 @@ Object.assign(T.en, {
   whyRight: "Why is this the right answer?", whyWrong: "Why the other answers are wrong", noExp: "No detailed explanation for this question yet.",
   uniqueQs: "Different questions answered", attemptsN: "Answers given (incl. repeats)",
   statsDefs: "Current average uses your latest answer to each question. First-try success uses only your first answer. Answering a question again doesn't add to the number of different questions.",
-  level: "Bank answered correctly", levelD: "How much of the whole bank you've answered correctly (0–5). This is not a prediction of your exam score.",
+  level: "Bank answered correctly", levelD: "How much of the whole bank you've answered correctly (0–10). This is not a prediction of your exam score.",
   askedFor: "You asked for", onlyAvail: "only available:", matchQs: "questions match your choice", maxPer: "up to",
   summaryT: "Exam summary", timerPolicy: "The timer keeps running even if you close the app, like in a real exam.", change: "Change",
   gMorning: "Good morning", gNoon: "Good afternoon", gEvening: "Good evening", gNight: "Good night",
@@ -298,7 +304,7 @@ Object.assign(T.he, {
   whyRight: "למה זו התשובה הנכונה?", whyWrong: "למה שאר התשובות שגויות", noExp: "עוד אין הסבר מפורט לשאלה הזו.",
   uniqueQs: "שאלות שונות שנענו", attemptsN: "תשובות שניתנו (כולל חזרות)",
   statsDefs: "הממוצע העדכני מחושב לפי התשובה האחרונה לכל שאלה. ההצלחה בניסיון הראשון לפי התשובה הראשונה בלבד. מענה חוזר על אותה שאלה לא מגדיל את מספר השאלות השונות.",
-  level: "כיסוי נכון של המאגר", levelD: "כמה מכל המאגר כבר ענית נכון (0–5). זו לא תחזית לציון במבחן.",
+  level: "כיסוי נכון של המאגר", levelD: "כמה מכל המאגר כבר ענית נכון (0–10). זו לא תחזית לציון במבחן.",
   askedFor: "ביקשת", onlyAvail: "זמינות רק", matchQs: "שאלות מתאימות לבחירה", maxPer: "עד",
   summaryT: "סיכום המבחן", timerPolicy: "הטיימר ממשיך לרוץ גם אם סוגרים את האפליקציה, כמו במבחן אמיתי.", change: "שינוי",
   gMorning: "בוקר טוב", gNoon: "צהריים טובים", gEvening: "ערב טוב", gNight: "לילה טוב",
@@ -325,3 +331,21 @@ Object.assign(T.he, { introAgain: "הדרכה קצרה", introAgainD: "לראו�
 Object.assign(T.en, { soonTag: "Coming soon", soonTitle: "More tracks coming soon", soonD: "We're preparing questions for these exams. They'll open here as soon as they're ready." });
 Object.assign(T.he, { soonTag: "בקרוב", soonTitle: "מסלולים נוספים בקרוב", soonD: "אנחנו מכינים שאלות לבחינות האלה. הן ייפתחו כאן ברגע שיהיו מוכנות." });
 
+
+Object.assign(T.he, { adTitle: "מבחן אדפטיבי", adD: "המבחן מתאים את רמת הקושי אליך בזמן אמת, כמו בבחינה האמיתית. בין 85 ל-145 שאלות.", adBtn: "התחל מבחן אדפטיבי",
+  adRules: "איך זה עובד", adR1: "שאלה נכונה ← השאלה הבאה קשה יותר. שאלה שגויה ← קלה יותר.", adR2: "המבחן נעצר כשברור אם אתה מעל או מתחת לרף ההצלחה, לא לפני 85 שאלות ולא אחרי 145.", adR3: "אין משוב בזמן המבחן. הסברים מופיעים בסוף.", adStart: "התחל",
+  adQ: "שאלה", adNext: "הבא", adExitQ: "לצאת מהמבחן? ההתקדמות לא תישמר.", adScore: "הציון המשוער שלך", adScoreD: "הציון הצפוי שלך על כל מאגר השאלות", adReady: "מוכן לבחינה", adClose: "קרוב לרף", adNot: "עדיין לא מוכן",
+  adNote: "הציון הוא הערכה לצורכי תרגול ואינו ציון בחינה רשמי. הדיוק משתפר ככל שיותר תלמידים עונים.", adNotEnough: "אין עדיין מספיק שאלות למבחן אדפטיבי.", adErr: "לא הצלחנו לטעון את השאלה. נסה שוב." });
+Object.assign(T.en, { adTitle: "Adaptive exam", adD: "The exam adapts its difficulty to you in real time, like the real test. Between 85 and 145 questions.", adBtn: "Start adaptive exam",
+  adRules: "How it works", adR1: "Correct answer → the next question is harder. Wrong → easier.", adR2: "It stops once it is clear whether you are above or below the passing line: never before 85 questions, never after 145.", adR3: "No feedback during the exam. Explanations appear at the end.", adStart: "Start",
+  adQ: "Question", adNext: "Next", adExitQ: "Leave the exam? Your progress will not be saved.", adScore: "Your estimated score", adScoreD: "Your expected score across the whole question bank", adReady: "Ready for the exam", adClose: "Close to the line", adNot: "Not ready yet",
+  adNote: "This score is a practice estimate, not an official exam score. Accuracy improves as more students answer.", adNotEnough: "There are not enough questions for an adaptive exam yet.", adErr: "Could not load the question. Try again." });
+
+Object.assign(T.he, { linkBad: "הקישור לא תקף או שפג תוקפו. נסו שוב." });
+Object.assign(T.en, { linkBad: "This link is invalid or has expired. Please try again." });
+Object.assign(T.he, { lbPts: "נקודות", lbIntroD: "תחרות שבועית בין תלמידי המסלול שלך: מי שפותר הכי הרבה שאלות נכון מקבל הכי הרבה נקודות.",
+  lbR1: "כל תשובה נכונה = נקודה אחת", lbR2: "כל שאלה נספרת פעם אחת בשבוע", lbR3: "הטבלה מתאפסת כל שבוע (ביום ראשון), וכולם מתחילים מחדש", lbR4: "כולם משתתפים אוטומטית עם שם בדוי, כך שאף אחד לא רואה את השם האמיתי שלך",
+  leagueIntro: "הליגה השבועית", board: "טבלת המובילים", howXp: "איך זה עובד", lbEmpty: "עדיין אין נקודות השבוע. פתרו שאלות ותהיו הראשונים!", lbReroll: "החלף שם" });
+Object.assign(T.en, { lbPts: "points", lbIntroD: "A weekly competition between students of your track: whoever answers the most questions correctly gets the most points.",
+  lbR1: "Every correct answer = 1 point", lbR2: "Each question counts once per week", lbR3: "The board resets every week (on Sunday), everyone starts again", lbR4: "Everyone takes part automatically with a nickname, so nobody sees your real name",
+  leagueIntro: "The weekly league", board: "Leaderboard", howXp: "How it works", lbEmpty: "No points yet this week. Answer questions and be the first!", lbReroll: "Change name" });

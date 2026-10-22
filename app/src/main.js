@@ -3,11 +3,29 @@ import { App as CapApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { PushNotifications } from "@capacitor/push-notifications";
 import * as api from "./api.js";
 import { T, topicName as fallbackTopic } from "./i18n.js";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
+import "./ptr.js";
+import * as AD from "./adaptive.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
+const imgNursing = new URL("./img/nursing.webp", import.meta.url).href;
+const imgMedicine = new URL("./img/medicine.webp", import.meta.url).href;
+const imgOt = new URL("./img/ot.webp", import.meta.url).href;
+const imgPhysio = new URL("./img/physio.webp", import.meta.url).href;
+const imgRadio = new URL("./img/radiography.webp", import.meta.url).href;
+const icBookmark = new URL("./img/ic-bookmark.webp", import.meta.url).href;
+const icCards = new URL("./img/ic-cards.webp", import.meta.url).href;
+const icCheck = new URL("./img/ic-check.webp", import.meta.url).href;
+const icClip = new URL("./img/ic-clip.webp", import.meta.url).href;
+const icCross = new URL("./img/ic-cross.webp", import.meta.url).href;
+const icNewexam = new URL("./img/ic-newexam.webp", import.meta.url).href;
+const icPulse = new URL("./img/ic-pulse.webp", import.meta.url).href;
+const icQuestion = new URL("./img/ic-question.webp", import.meta.url).href;
+const icSparkle = new URL("./img/ic-sparkle.webp", import.meta.url).href;
+const icTarget = new URL("./img/ic-target.webp", import.meta.url).href;
 
 /* ---------------- state ---------------- */
 const app = document.getElementById("app");
@@ -44,6 +62,12 @@ const ent = () => st.ents.find((e) => e.track === TR() && new Date(e.until) > ne
 const hasAccess = () => !!st.profile && (st.profile.role === "admin" || st.freeMode || !!ent());
 const trackOf = (id) => st.tracks.find((x) => x.id === id);
 const trackName = (id) => { const x = trackOf(id); return x ? `${x.icon || ""} ${x[st.lang]}`.trim() : id; };
+// each track has its own league, named after the track (nursing keeps its original name)
+const leagueName = () => {
+  const tr = TR(), x = trackOf(tr);
+  if (tr === "nursing" || !x || !x[st.lang]) return t("league");
+  return st.lang === "he" ? `ליגת ${x.he}` : `${x.en} League`;
+};
 const topicName = (k, lang) => { const x = st.topics[k]; return x ? x[lang] : fallbackTopic(k, lang); };
 const posKey = () => `pos:${st.user.id}:${TR()}`;
 const isAdmin = () => st.profile?.role === "admin";
@@ -62,6 +86,10 @@ const THEMES = {
   ot:          { l: ["#6D3FB5", "#ECE3FA", "#F8F5FD"], d: ["#A98BEA", "#2E2050", "#130F1F"] },
   radiography: { l: ["#B42357", "#FAE1EA", "#FDF4F7"], d: ["#EE6E9A", "#4A1529", "#1C0C12"] },
 };
+/* v2 look: a vivid gradient + a 3D character for each track */
+const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"], physio: ["#FFA05A", "#D9621A"], ot: ["#9B6BF6", "#5B2FC4"], radiography: ["#F4609A", "#B42357"] };
+const CHAR = { nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
+const gradOf = (id) => GRAD[id] || [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`];
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
   if (THEMES[id]) return THEMES[id];
@@ -72,7 +100,8 @@ function applyTheme() {
   const th = themeOf(st.profile?.track || "nursing");
   let el = document.getElementById("track-theme");
   if (!el) { el = document.createElement("style"); el.id = "track-theme"; document.head.appendChild(el); }
-  const v = ([a, s, b], dark) => `--accent:${a};--accent-soft:${s};--bg:${b};--on-accent:${dark ? b : "#FFFFFF"};`;
+  const gr = gradOf(st.profile?.track || "nursing");
+  const v = ([a, s, b], dark) => `--accent:${a};--accent-soft:${s};--bg:${b};--on-accent:${dark ? b : "#FFFFFF"};--g1:${gr[0]};--g2:${gr[1]};`;
   el.textContent = `:root{${v(th.l)}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${v(th.d, true)}}}
 :root[data-theme="dark"]{${v(th.d, true)}}
@@ -83,24 +112,33 @@ html,body{transition:background-color .3s}`;
 function stopTimer() { if (S?.tick) { clearInterval(S.tick); S.tick = null; } }
 function watermark(on) {
   wm.hidden = !on;
-  if (on) $("wm-text").innerHTML = Array(120).fill(`<span>${esc(st.user?.email || "")}</span>`).join("");
+  if (on) $("wm-text").innerHTML = Array(120).fill(`<span>${esc(st.user?.email || "guest")}</span>`).join("");
 }
-function frame(inner, { protect = false, wide = false, nav = null } = {}) {
+function frame(inner, { protect = false, wide = false, nav = null, nobrand = false } = {}) {
   stopTimer();
   watermark(false);
   applyTheme();
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
-  app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "") + (nav ? " has-nav" : "");
+  app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "") + (nav ? " has-nav" : "") + (nobrand ? " nobrand" : "") + (inner.includes("h-hero") ? " hv" : "") + (inner.includes('class="splash"') ? " sp" : "");
   app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
   <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${nav ? navHtml(nav) : ""}${inner}`;
   if (nav) bindNav();
+  try {
+    sessionStorage.removeItem("rs-res");
+    const k = nav ? (nav === "newx" ? "exams" : nav) : RESTORE().find(([, f]) => f === S?.screen)?.[0];
+    if (k) sessionStorage.setItem("rs-nav", k);
+  } catch {}
   app.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
     st.lang = b.dataset.l; store.set("lang", st.lang);
     if (st.user) api.updateProfile(st.lang, null).catch(() => {});
     (S?.screen || route)();
   }));
   window.scrollTo(0, 0);
+}
+// first screen while the app opens: branded gradient instead of a bare spinner
+function bootSplash() {
+  frame(`<div class="splash"><img class="h-deco d1" src="${icClip}" alt=""><img class="h-deco d2" src="${icPulse}" alt=""><div class="sp-mark">${st.lang === "he" ? "מ" : "M"}</div><h1>${t("name")}</h1><p>${t("tag")}</p><div class="spin"></div></div>`);
 }
 function loading() { frame(`<div class="loading"><div class="spin"></div></div>`); }
 function msgHtml() { return st.ui.msg ? `<div class="banner ${st.ui.msgBad ? "bad" : ""}">${esc(st.ui.msg)}</div>` : ""; }
@@ -139,12 +177,43 @@ window.addEventListener("offline", netBar);
 window.addEventListener("online", netBar);
 
 /* ---------------- boot ---------------- */
+// links in confirm-signup / reset-password emails come back as musmach://auth#access_token=...
+let lastAuthUrl = "";
+function linkBad() { flash(t("linkBad"), true); if (st.user) route(); else login(); }
+async function handleAuthUrl(url) {
+  if (!url || !url.startsWith("musmach://") || url === lastAuthUrl) return;
+  lastAuthUrl = url;
+  Browser.close().catch(() => {});
+  try {
+    const p = new URLSearchParams(url.split("#").slice(1).join("&") + "&" + (url.split("?")[1] || "").split("#")[0]);
+    const at = p.get("access_token"), rt = p.get("refresh_token");
+    if (!at || !rt) { linkBad(); return; }
+    const { data, error } = await api.supabase.auth.setSession({ access_token: at, refresh_token: rt });
+    if (error || !data?.session) { linkBad(); return; }
+    if (p.get("type") === "recovery") return newPassword();
+    await afterLogin(data.session.user);
+  } catch { linkBad(); }
+}
+// Screenshots are blocked for everyone except admins. The native shell reads this flag (iOS: polls localStorage; Android: JS bridge).
+function syncScreenLock() {
+  try {
+    const admin = !!(st.profile && st.profile.role === "admin");
+    if (admin) localStorage.setItem("rs-admin", "1"); else localStorage.removeItem("rs-admin");
+    window.MusmachNative?.secure?.(!admin);
+  } catch {}
+}
+const RESTORE = () => [["home", home], ["exams", myExams], ["qs", myQuestions], ["stats", stats], ["tools", tools], ["plans", plans], ["account", account], ["journey", journey], ["league", league], ["cards", cards]];
+const warmNav = () => { try { return sessionStorage.getItem("rs-nav"); } catch { return null; } };
 async function boot() {
-  loading();
+  if (warmNav()) loading(); else bootSplash();
+  syncScreenLock(); setInterval(syncScreenLock, 1500);
   CapApp.addListener("backButton", () => { if (S?.back) S.back(); else route(); }).catch(() => {});
+  CapApp.addListener("appUrlOpen", (e) => handleAuthUrl(e.url)).catch(() => {});
+  CapApp.getLaunchUrl().then((l) => { if (l?.url) handleAuthUrl(l.url); }).catch(() => {});
   // opened from a "reset password" email: ask for the new password first
   let recovery = /type=recovery/.test(location.hash);
   api.auth.onChange((event) => { if (event === "PASSWORD_RECOVERY") { recovery = true; newPassword(); } });
+  askPushOnLaunch();
   const session = await api.auth.session().catch(() => null);
   if (session && recovery) return newPassword();
   if (session) await afterLogin(session.user); else login();
@@ -152,7 +221,7 @@ async function boot() {
 
 async function afterLogin(user) {
   st.user = user;
-  loading();
+  if (!warmNav()) bootSplash();
   try {
     const dev = await deviceInfo();
     const ok = await api.registerDevice(dev.id, dev.label);
@@ -205,11 +274,19 @@ function route() {
     if (st.tracks?.length === 1) return autoTrack(st.tracks[0].id);
     return chooseTrack();
   }
-  if (!hasAccess() && !store.get(`skip-plans:${st.user.id}:${TR()}`)) return plans();
   // opened from a friend's challenge link (?c=CODE)
   const fcode = new URLSearchParams(location.search).get("c");
   if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
   if (!store.get(`intro:${st.user.id}`)) return intro();
+  const rs = (() => { try { return JSON.parse(sessionStorage.getItem("rs-res")); } catch { return null; } })();
+  if (rs && !st.ui.warmUsed) {
+    st.ui.warmUsed = true;
+    if (rs.t === "x" && rs.id) return api.getExam(rs.id).then((row) => runExam(row)).catch(() => home());
+    if (rs.t === "p" && rs.src) return practice(rs.src).then(() => { if (S?.mode === "practice" && rs.i > 0 && rs.src.kind !== "seq" && rs.i < S.items.length) { S.i = rs.i; question(); } });
+  }
+  const w = warmNav(), tab = w && RESTORE().find((x) => x[0] === w);
+  if (tab && !st.ui.warmUsed) { st.ui.warmUsed = true; return tab[1](); }
+  if (!hasAccess() && !st.ui.paywallSeen) { st.ui.paywallSeen = true; st.ui.trialOffer = true; return plans(); }
   home();
 }
 
@@ -226,8 +303,11 @@ async function autoTrack(id) {
 /* ---------------- auth ---------------- */
 function login() {
   S = { screen: login };
+  try { sessionStorage.removeItem("rs-nav"); } catch {}
   const u = st.ui;
   frame(`${msgHtml()}
+  <div class="hero-brand"><div class="hb-he">מוסמך</div><div class="hb-sig">Musmach</div><div class="hb-tag">${t("heroTag")}</div></div>
+  <div class="card"><button class="primary" type="button" id="gst">${t("guestBtn")}</button><p class="muted" style="text-align:center;margin:10px 0 0">${t("guestOr")}</p></div>
   <form class="card" id="f" novalidate>
     <h2>${u.signup ? t("signup") : t("login")}</h2>
     <div class="field"><label for="em">${t("email")}</label><input id="em" type="email" dir="ltr" autocomplete="email" autocapitalize="off"></div>
@@ -236,11 +316,27 @@ function login() {
     <button class="primary" type="submit" id="sb">${t("cont")}</button>
     <p class="muted">${u.signup ? t("haveAcct") : t("noAcct")} <button type="button" class="link" id="sw">${u.signup ? t("login") : t("signup")}</button></p>
     ${u.signup ? "" : `<p class="muted"><button type="button" class="link" id="fg">${t("forgot")}</button></p>`}
-  </form>${legalLinks()}`);
+  </form>
+  <div class="social"><div class="or"><span>${t("orWith")}</span></div>${Capacitor.getPlatform() === "ios" ? `<button type="button" id="apl" class="sbtn apple"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.7c1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7 0 0-2.7-1-2.7-4.1zM14.1 5.5c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.7-1.3z"/></svg><span>${t("appleBtn")}</span></button>` : ""}<button type="button" id="ggl" class="sbtn google"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.5-.2-2.2H12v4.2h5.9c-.3 1.400-1 2.500-2.100 3.300v2.700h3.400c2-1.800 3.300-4.600 3.300-8z"/><path fill="#34A853" d="M12 23c2.900 0 5.300-1 7.100-2.600l-3.400-2.700c-1 .6-2.200 1-3.700 1-2.800 0-5.200-1.900-6-4.500H2.500v2.800C4.300 20.500 7.900 23 12 23z"/><path fill="#FBBC05" d="M6 14.200c-.2-.6-.3-1.300-.3-2s.1-1.400.3-2V7.400H2.500C1.800 8.800 1.400 10.400 1.400 12.200s.4 3.400 1.100 4.800L6 14.200z"/><path fill="#EA4335" d="M12 5.800c1.600 0 3 .6 4.100 1.600l3-3C17.300 2.700 14.900 1.500 12 1.500 7.900 1.500 4.300 4 2.500 7.400L6 10.200c.8-2.600 3.200-4.400 6-4.400z"/></svg><span>${t("googleBtn")}</span></button></div>
+  ${legalLinks()}`, { nobrand: true });
   bindLegal();
   st.ui.msg = null;
   const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
   $("sw").onclick = () => { u.signup = !u.signup; login(); };
+  $("gst").onclick = async () => {
+    $("gst").disabled = true;
+    const { data, error } = await api.auth.guest();
+    if (error || !data?.user) { $("gst").disabled = false; return err(authMsg(error || "guest")); }
+    await afterLogin(data.user);
+  };
+  const social = (id, fn) => { if (!$(id)) return; $(id).onclick = async () => {
+    $(id).disabled = true;
+    try { const r = await fn(); if (r?.error) throw r.error; if (r?.data?.user) await afterLogin(r.data.user); }
+    catch (ex) { if (!/cancel|1001|dismiss/i.test(String(ex?.message || ex))) err(t("socialErr")); }
+    finally { if ($(id)) $(id).disabled = false; }
+  }; };
+  social("apl", () => api.auth.apple());
+  social("ggl", () => api.auth.google());
   if ($("fg")) $("fg").onclick = async () => {
     const em = $("em").value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return err(t("badEmail"));
@@ -311,11 +407,22 @@ function newPassword() {
   };
 }
 function blocked() {
-  frame(`<div class="card"><h2>${t("acct")}</h2><p>${t("tooMany")}</p>${SUPPORT ? `<p class="muted">${t("support")}: <bdi dir="ltr">${esc(SUPPORT)}</bdi></p>` : ""}
+  frame(`<div class="card"><h2>${t("acct")}</h2><p>${t("devLimit")}</p>
+  <button class="primary" id="mv">${t("devMove")}</button><div class="err" id="mverr" hidden></div>
+  ${SUPPORT ? `<p class="muted">${t("support")}: <bdi dir="ltr">${esc(SUPPORT)}</bdi></p>` : ""}
   <button class="ghost" id="lo">${t("logout")}</button></div>`);
   $("lo").onclick = logout;
+  $("mv").onclick = async () => {
+    if (!confirm(t("devMoveQ"))) return;
+    $("mv").disabled = true;
+    const dev = await deviceInfo();
+    const ok = await api.moveToThisDevice(dev.id, dev.label).catch(() => false);
+    if (ok) return afterLogin(st.user);
+    $("mverr").textContent = t("devMoveNo"); $("mverr").hidden = false; $("mv").disabled = false;
+  };
 }
 async function logout() {
+  try { const pk = st.user && store.get(pushKey()); if (pk?.token) { await api.removePushToken(pk.token); store.set(pushKey(), { on: false }); } } catch { /* ignore */ }
   await api.auth.signOut().catch(() => {});
   await logoutPurchases();
   st.user = null; st.profile = null; st.answers = new Map(); st.marks = new Set();
@@ -334,16 +441,20 @@ function allowedTracks() {
 const canSwitch = () => allowedTracks().length > 1;
 const soonName = (x) => (st.lang === "he" ? x.he : x.en);
 // small card on home: which tracks are coming
-const soonStrip = () => (st.soon || []).length ? `<div class="card soonbox"><b>${t("soonTitle")}</b><div class="chips">${st.soon.map((x) => `<span class="chip">${esc(x.icon || "")} ${esc(soonName(x))}</span>`).join("")}</div><span class="muted">${t("soonD")}</span></div>` : "";
+const soonStrip = () => "";
 
 function chooseTrack(pending) {
   S = { screen: () => chooseTrack(pending), back: st.profile?.track ? route : null };
   const cur = st.profile?.track, first = !cur;
   const list = allowedTracks();
-  const card = (x) => { const c = themeOf(x.id).l; return `<button class="plan ${(pending || cur) === x.id ? "on" : ""}" data-k="${esc(x.id)}" style="border-color:${c[0]};background:${c[2]};color:#0F1E33;border-inline-start-width:6px"><span class="dot" style="border-color:${c[0]}"></span>
-      <span class="info"><b>${esc(trackName(x.id))}</b><span class="muted" style="color:#4A5A6E">${esc(x[st.lang + "_desc"] || "")}</span></span></button>`; };
+  const card = (x) => { const c = themeOf(x.id).l, on = (pending || cur) === x.id;
+    const g = gradOf(x.id), pic = CHAR[x.id];
+    return `<button class="trk-card ${on ? "on" : ""}" data-k="${esc(x.id)}" style="--c1:${c[0]};--g1:${g[0]};--g2:${g[1]}">${pic ? `<img class="trk-img" src="${pic}" alt="" loading="eager">` : `<span class="trk-ico">${esc(x.icon || "")}</span>`}<b>${esc(x[st.lang] || x.id)}</b>${on ? '<span class="trk-ok">✓</span>' : ""}</button>`; };
+  // tracks that are being prepared: shown locked, nobody can enter
+  const soonCard = (x) => { const c = themeOf(x.id).l;
+    return `<div class="trk-card soon" aria-disabled="true"><span class="trk-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="M9.3 7.1l5.4 9.8"/></svg></span><b>${esc(x[st.lang] || x.id)}</b><span class="trk-d">${t("soonTag")}</span></div>`; };
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
-    <div class="plans">${list.map(card).join("")}</div>
+    <div class="trk-grid">${list.map(card).join("")}${(st.soon || []).map(soonCard).join("")}</div>
     ${first && pending ? `<div class="banner">⚠️ ${t("lockWarn")}</div>
       <div class="actions"><button class="primary" id="ok">${t("confirmTrack")}</button><button class="ghost" id="no">${t("pickOther")}</button></div>` : ""}
   </div>${cur ? `<button class="ghost" id="bk">${t("home")}</button>` : ""}${legalLinks()}`);
@@ -361,7 +472,7 @@ function chooseTrack(pending) {
     } catch (e) { flash(errMsg(e), true); chooseTrack(); }
   };
   if ($("ok")) $("ok").onclick = () => pick(pending);
-  app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => {
+  app.querySelectorAll(".trk-card").forEach((b) => (b.onclick = () => {
     const k = b.dataset.k;
     if (first && !isAdmin()) return chooseTrack(k); // first choice needs a confirm
     if (k !== cur) pick(k);
@@ -370,16 +481,19 @@ function chooseTrack(pending) {
 
 /* ---------------- plans + purchase ---------------- */
 function plans() {
-  S = { screen: plans, back: hasAccess() ? route : null };
+  S = { screen: plans, back: st.ui.fromTools ? tools : hasAccess() ? route : null };
+  const trial = st.ui.trialOffer && !hasAccess();
   const d = new Date(); d.setMonth(d.getMonth() + 3);
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
-  const pm = priceOf(TR(), "month"), pe = priceOf(TR(), "exam");
+  const pm = priceOf(TR(), "month"), p2 = priceOf(TR(), "two"), pe = priceOf(TR(), "exam");
   frame(`${msgHtml()}
+  ${st.ui.fromTools ? `<button class="ghost" id="pbk">←</button>` : ""}
   <div class="card">
     <h2>${t("choose")}</h2>
     <span class="chip" ${canSwitch() ? 'id="trk" role="button" style="align-self:flex-start;cursor:pointer"' : 'style="align-self:flex-start"'}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>
     <div class="plans">
       <button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>
+      <button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
@@ -389,10 +503,12 @@ function plans() {
     <h3>${t("haveCode")}</h3>
     <div class="field"><label for="cd">${t("code")}</label><div class="row2"><input id="cd" dir="ltr" autocomplete="off" autocapitalize="characters"><button class="ghost" id="ap">${t("apply")}</button></div></div>
   </div>
-  <div class="card"><p class="muted">${t("freeNote")}</p><button class="ghost" id="fr">${t("tryFree")}</button></div>
+  ${trial ? `<button class="ghost" id="tf" style="width:100%">${t("continueFree")}</button>` : ""}
   ${legalLinks()}`);
   bindLegal();
   st.ui.msg = null;
+  if ($("pbk")) $("pbk").onclick = tools;
+  if ($("tf")) $("tf").onclick = () => { st.ui.trialOffer = false; home(); };
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   if ($("go")) $("go").onclick = async () => {
@@ -418,7 +534,6 @@ function plans() {
       flash(r === "used" ? t("codeUsed") : t("codeBad"), true); plans();
     } catch (e) { flash(errMsg(e), true); plans(); }
   };
-  $("fr").onclick = () => { store.set(`skip-plans:${st.user.id}:${TR()}`, true); home(); };
 }
 // the store confirms the purchase to our server (webhook); poll the profile until the plan shows up
 async function waitForActivation() {
@@ -429,6 +544,14 @@ async function waitForActivation() {
     if (hasAccess()) { flash(t("activated")); return route(); }
   }
   flash(t("payPending")); home();
+}
+
+const HSUB = { navQs: "hSubQs", navExams: "hSubExams", navStats: "hSubStats", navTools: "hSubTools", navNew: "hSubNew" };
+const heroTop = (trk) => `<div class="hv-top"><div class="hv-brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><span><b>${t("name")}</b><small ${trk && canSwitch() ? 'id="trk" role="button"' : ""}>${esc(trackName(TR()))}${trk && canSwitch() ? " ⇄" : ""}</small></span></div><div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>`;
+const heroArt = () => `<img class="h-deco d1" src="${icClip}" alt=""><img class="h-deco d2" src="${icPulse}" alt="">${CHAR[TR()] ? `<img class="h-char" src="${CHAR[TR()]}" alt="">` : ""}`;
+// gradient header with the track's 3D character, shared by every main page
+function pageHero(k, extra = "") {
+  return `<div class="h-hero ph">${heroTop(false)}<div class="h-txt"><h2>${t(k)}</h2><p>${t(HSUB[k])}</p>${extra}</div>${heroArt()}</div>`;
 }
 
 /* ---------------- home ---------------- */
@@ -451,8 +574,9 @@ const ICON = {
   stats: '<path d="M3 21h18M6 17v-5M11 17V6M16 17V9M20 17v-3"/>',
   tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
 };
-const NAV = [["home", "navHome", () => home()], ["newx", "navNew", () => newExam()], ["exams", "navExams", () => myExams()], ["qs", "navQs", () => myQuestions()], ["stats", "navStats", () => stats()], ["tools", "navTools", () => tools()]];
+const NAV = [["home", "navHome", () => home()], ["exams", "navExams", () => myExams()], ["qs", "navQs", () => myQuestions()], ["stats", "navStats", () => stats()], ["tools", "navTools", () => tools()]];
 function navHtml(on) {
+  if (on === "newx") on = "exams";
   return `<nav class="tabs" aria-label="${t("name")}">${NAV.map(([k, label]) => `<button class="tab ${k === on ? "on" : ""}" data-nav="${k}" ${k === on ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg><span>${t(label)}</span></button>`).join("")}</nav>`;
 }
 function bindNav() {
@@ -487,6 +611,8 @@ async function fillAnnouncement() {
   const list = (await api.announcements(TR()).catch(() => [])).filter((a) => !seen.has(a.id));
   const box = $("annw"); if (!box || !list.length) return;
   const a = list[0];
+  // a "show once" announcement is marked as seen the moment it is shown
+  if (a.once) { seen.add(a.id); store.set(key, [...seen].slice(-50)); }
   box.innerHTML = `<div class="newbox ann" role="status"><div class="newbox-h"><b>📢 ${esc(a.title)}</b><button class="link" id="annx">${t("gotIt")}</button></div>${a.body ? `<p class="ann-b">${esc(a.body)}</p>` : ""}</div>`;
   $("annx").onclick = () => { seen.add(a.id); store.set(key, [...seen].slice(-50)); box.innerHTML = ""; fillAnnouncement(); };
 }
@@ -505,59 +631,53 @@ function home() {
   const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
   const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
   frame(`${msgHtml()}<div id="annw"></div>${newBox}
-  ${!hasAccess() ? `<button class="banner" id="lock" style="border:0;text-align:start;cursor:pointer">🔒 ${t("locked")}</button>` : ""}
-  <div class="welcome"><h2>${greet} 👋</h2>
-    <div class="chips"><span class="chip cool" ${canSwitch() ? 'id="trk" role="button" style="cursor:pointer"' : ""}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}<span class="chip ${hasAccess() ? "ok" : ""}">${pkg}</span></div></div>
-  ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
-  <div id="openx"><button class="examcta" id="nx2"><span class="jicon" aria-hidden="true">📝</span><span><b>${t("startExam")}</b><small>${t("startExamD")}</small></span><span aria-hidden="true">${fwd()}</span></button></div>
-  <div id="missionw">${missionCard(null, "loading")}</div>
+  <div class="h-hero">${heroTop(true)}${heroArt()}
+    <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
+    <div id="missionw">${missionCard(null, "loading")}</div></div>
   <div class="hero">
     <div class="hero-row">
-      <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
       <div class="hero-txt">
         <span class="eyebrow">${t("progress")}</span>
         <div class="bignum"><b>${tt.done}</b><span>/</span><b>${tt.n}</b></div>
-        <span class="muted">${t("solved")} · ${t("inBank")}</span>
-        ${tt.done ? `<span class="okline">${t("accuracy")} ${pctOf(tt.right, tt.done)}%</span>` : ""}
+        <div class="gbar hb"><i style="width:${pct}%"></i></div>
+        <span class="muted">${t("solved")} · ${t("inBank")}${tt.done ? ` · ${t("accuracy")} ${pctOf(tt.right, tt.done)}%` : ""}</span>
       </div>
+      <div class="ring2" style="--p:${pct}"><span>${pct}%</span></div>
+    </div>
+    <div class="stats4">
+      <div class="s4"><img src="${icCheck}" alt=""><span><b>${tt.right}</b><small>${t("fRight")}</small></span></div>
+      <div class="s4"><img src="${icCross}" alt=""><span><b>${tt.wrong}</b><small>${t("fWrong")}</small></span></div>
+      <div class="s4"><img src="${icQuestion}" alt=""><span><b>${Math.max(0, tt.n - tt.done)}</b><small>${t("sUn")}</small></span></div>
+      <div class="s4"><img src="${icBookmark}" alt=""><span><b>${st.marks.size}</b><small>${t("bookmarks")}</small></span></div>
     </div>
     <button class="primary" id="go">${t("cont2")} ${fwd()}</button>
   </div>
+  ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
+  <div id="openx"></div>
+  <div class="acts4">
+    <button class="act-c c1" id="nx2"><img src="${icNewexam}" alt=""><b>${t("startExam")}</b><small>${t("navNew")}</small><i aria-hidden="true">${fwd()}</i></button>
+    <button class="act-c c2" id="smr"><img src="${icSparkle}" alt=""><b>${t("smart")}</b><small>${t("smartD")}</small><i aria-hidden="true">${fwd()}</i></button>
+    <button class="act-c c3" id="mis"><img src="${icCards}" alt=""><b>${t("mistakes")}</b><small>${tt.wrong} ${t("qs")}</small><i aria-hidden="true">${fwd()}</i></button>
+    <button class="act-c c4" id="bm"><img src="${icBookmark}" alt=""><b>${t("bookmarks")}</b><small>${st.marks.size} ${t("qs")}</small><i aria-hidden="true">${fwd()}</i></button>
+  </div>
   <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
   <div id="leaguew"></div>
-  <div class="section-title">${t("quick")}</div>
-  <div class="grid">
-    <button class="tile" id="mis"><b>${t("mistakes")}</b><span class="n">${tt.wrong}</span></button>
-    <button class="tile" id="smr"><b>${t("smart")}</b><span>${t("smartD")}</span></button>
-    <button class="tile" id="una"><b>${t("unansweredQs")}</b><span class="n">${Math.max(0, tt.n - tt.done)}</span></button>
-    <button class="tile" id="bm"><b>${t("bookmarks")}</b><span class="n">${st.marks.size}</span></button>
-    <button class="tile" id="srch"><b>🔍 ${t("search")}</b><span>${t("searchD")}</span></button>
-    <button class="tile" id="clc"><b>${t("calcT")}</b><span>${t("calcD")}</span></button>
-    <button class="tile" id="rfp"><b>${t("refT")}</b><span>${t("refD")}</span></button>
-    <button class="tile" id="fl"><b>${t("flash")}</b><span>EN · עב</span></button>
-  </div>
   <div class="card"><div id="goalw">${goalCard([])}</div></div>
-  <details class="topics-d"><summary>${t("bytopic")} <span class="muted">(${Object.keys(st.counts).length})</span></summary>
-  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${added[k] ? `<span class="newtag">+${added[k]} ${t("newBadge")}</span> ` : ""}${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div></details>
   ${soonStrip()}
   ${legalLinks()}`, { wide: true, nav: "home" });
   bindLegal();
   st.ui.msg = null;
   fillAnnouncement();
-  $("una").onclick = () => practice({ kind: "unanswered" });
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
-  if ($("lock")) $("lock").onclick = plans;
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
   $("nx2").onclick = newExam;
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
   $("bm").onclick = () => practice({ kind: "ids", ids: [...st.marks] });
-  $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
-  app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   // async parts: activity chart + an unfinished exam to continue
   bindGoal([]);
   fillMission().then(fillJourney).then(fillLeague);
-  $("smr").onclick = smartReview; $("clc").onclick = () => calcTrainer(home); $("rfp").onclick = () => refPage(home); $("srch").onclick = () => searchPage(home);
+  $("smr").onclick = smartReview;
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
   api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
   api.myExams(st.user.id, TR()).then((list) => {
@@ -585,14 +705,15 @@ function newExam() {
     api.examCount(TR(), cfg.topics, cfg.pool).then((n) => { counts.set(k, n); if (S?.screen === newExam && key() === k) draw(); })
       .catch(() => counts.set(k, undefined));
   };
-  const draw = () => {
+  const draw0 = () => {
     ensureCount();
     const est = cfg.topics.length ? cfg.topics.reduce((a, k) => a + (st.counts[k] || 0), 0) : totals().n;
     const real = counts.get(key()), match = real ?? est, avail = Math.min(EXAM_MAX, match) || 0;
     if (cfg.n > avail && avail) { if (real != null) note = `${t("askedFor")} ${cfg.n}, ${t("onlyAvail")} ${avail}`; cfg.n = avail; }
     const opts = [10, 25, 50, 100, 150, 180].filter((n) => n <= avail);
     const seg = (id, a, b, on) => `<div class="seg" role="group"><button class="segb ${on ? "on" : ""}" data-s="${id}" data-v="1"><b>${a[0]}</b>${a[1] ? `<small>${a[1]}</small>` : ""}</button><button class="segb ${!on ? "on" : ""}" data-s="${id}" data-v="0"><b>${b[0]}</b>${b[1] ? `<small>${b[1]}</small>` : ""}</button></div>`;
-    frame(`<h2 class="page-h">${t("navNew")}</h2>
+    frame(`${pageHero("navNew")}
+    ${adaptCard()}
     <div class="card exb">
       <h3>${t("exSettings")}</h3>
       <div class="exgrid">
@@ -626,7 +747,8 @@ function newExam() {
   const summary = (avail) => {
     const tl = cfg.topics.length ? cfg.topics.map((k) => topicName(k, st.lang)).join(", ") : t("allTopics");
     const pl = t({ all: "poolAll", unanswered: "poolUn", wrong: "poolWrong", saved: "poolSaved" }[cfg.pool]);
-    frame(`<h2 class="page-h">${t("navNew")}</h2>
+    frame(`${pageHero("navNew")}
+    ${adaptCard()}
     <div class="card exb"><h3>${t("summaryT")}</h3>
       <dl class="sumlist">
         <dt>${t("qCount")}</dt><dd>${cfg.n}</dd>
@@ -652,6 +774,8 @@ function newExam() {
       } catch (e) { $("er").textContent = errMsg(e); $("er").hidden = false; $("ms").disabled = false; }
     };
   };
+  // frame() scrolls to the top; keep the position when only an option changed
+  const draw = () => { const y = window.scrollY; draw0(); window.scrollTo(0, y); };
   draw();
 }
 
@@ -708,6 +832,7 @@ function examQ() {
   S.screen = examQ;
   const q = S.items[S.i], c = q[st.lang], tot = S.items.length, sel = S.picked[S.i];
   const locked = S.guided && sel != null;
+  setTimeout(() => { try { if (S?.mode === "exam" && !S.ended && S.screen === examQ) sessionStorage.setItem("rs-res", JSON.stringify({ t: "x", id: S.ex.id })); } catch {} }, 0);
   frame(`${qHead(S.i + 1, tot)}
   <div class="card">${qBody(q, S.i + 1, tot)}
     <div class="opts">${c.o.map((o, k) => `<button class="opt ${!S.guided && sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
@@ -758,6 +883,76 @@ async function examEnd() {
   api.saveMock(st.user.id, TR(), score, S.items.length).catch(() => {});
   examResult(ex, S.items, "all");
 }
+/* ---------------- adaptive exam (85-145 questions) ---------------- */
+const adaptCard = () => TR() !== "nursing" ? "" : `<div class="card adcard"><h3>🧠 ${t("adTitle")}</h3><p class="muted">${t("adD")}</p><button class="primary" id="adp">${t("adBtn")}</button></div>`;
+app.addEventListener("click", (e) => { if (e.target.closest("#adp")) adaptIntro(); });
+async function adaptIntro() {
+  loading();
+  let rows;
+  try { rows = await api.adaptivePool(TR()); } catch { flash(t("adErr"), true); return newExam(); }
+  if ((rows || []).length < AD.ADAPT.MAX + 10) { flash(t("adNotEnough"), true); return newExam(); }
+  const pool = rows.map((r) => ({ id: +r.id, topic: r.topic, b: AD.difficulty(r.c, r.n) }));
+  const bs = pool.map((q) => q.b);
+  S = { screen: newExam, back: newExam, mode: "adaptive", A: { pool, bs, tPass: AD.passTheta(bs), resp: [], seen: new Set(), topicN: {}, items: [], t0: Date.now() } };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">🧠 ${t("adTitle")}</h2></div>
+  <div class="card"><h3>${t("adRules")}</h3><ul class="rules"><li>${t("adR1")}</li><li>${t("adR2")}</li><li>${t("adR3")}</li></ul>
+  <div class="actions"><button class="primary" id="ads">${t("adStart")}</button></div></div>`);
+  $("bk").onclick = newExam; $("ads").onclick = adaptNext;
+}
+async function adaptNext() {
+  const A = S.A, n = A.resp.length, est = AD.estimate(A.resp), v = AD.verdict(n, est.theta, est.se, A.tPass);
+  if (n && v.done) return adaptEnd(est, v);
+  for (let tries = 0; tries < 5; tries++) {
+    const pick = AD.pickNext(A.pool, A.seen, est.theta, A.topicN);
+    if (!pick) return adaptEnd(est, v);
+    try {
+      const [q] = await api.questions({ track: TR(), ids: [pick.id], limit: 1 });
+      if (q) return adaptQ(q, pick.b);
+    } catch { flash(t("adErr"), true); return adaptQ(null); }
+    A.seen.add(pick.id);
+  }
+  adaptEnd(est, v);
+}
+function adaptQ(q, b, sel = null) {
+  const A = S.A, n = A.resp.length + 1;
+  if (!q) { frame(`<div class="card"><p>${t("adErr")}</p><button class="primary" id="rt">${t("retry") || "OK"}</button></div>`); $("rt").onclick = adaptNext; return; }
+  const c = q[st.lang];
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button>
+    <div class="progress"><i style="width:${Math.min(100, (n / AD.ADAPT.MIN) * 100)}%"></i></div><span class="timer">${n}</span></div>
+  <div class="card"><div class="qmeta"><span class="tag">${esc(topicName(q.topic, st.lang))}</span><span>${t("adQ")} ${n}</span></div>
+    <div class="qtext">${esc(c.q)}</div>
+    <div class="opts">${c.o.map((o, k) => `<button class="opt ${sel === k ? "sel" : ""}" data-k="${k}"><span class="l">${LET[st.lang][k]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div class="mocknav stickynav"><button class="primary" id="adn" ${sel == null ? "disabled" : ""}>${t("adNext")} ${fwd()}</button></div></div>`, { protect: true });
+  $("bk").onclick = () => { if (confirm(t("adExitQ"))) newExam(); };
+  app.querySelectorAll(".opt").forEach((o) => (o.onclick = () => adaptQ(q, b, +o.dataset.k)));
+  $("adn").onclick = () => {
+    const ok = sel === q.answer;
+    A.resp.push({ b, ok }); A.seen.add(q.id); A.topicN[q.topic] = (A.topicN[q.topic] || 0) + 1; A.items.push({ q, picked: sel, ok });
+    st.answers.set(q.id, ok);
+    api.saveAnswer(st.user.id, TR(), q.id, sel, ok).catch(() => {});
+    adaptNext();
+  };
+}
+function adaptEnd(est, v) {
+  const A = S.A, n = A.items.length, right = A.items.filter((x) => x.ok).length;
+  const score = Math.round(100 * AD.expected(est.theta, A.bs));
+  api.saveMock(st.user.id, TR(), score, 100).catch(() => {});
+  if (st.best == null || score > st.best) st.best = score;
+  const by = {}; A.items.forEach((x) => { const r = (by[x.q.topic] = by[x.q.topic] || [0, 0]); r[1]++; if (x.ok) r[0]++; });
+  const weak = Object.entries(by).filter(([, [a, b]]) => b >= 3 && a / b < 0.6).map(([k]) => k);
+  const title = v.level === "ready" ? t("adReady") : v.level === "close" ? t("adClose") : t("adNot");
+  S = { ...S, screen: () => adaptEnd(est, v), back: route };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">🧠 ${t("adTitle")}</h2></div>
+  <div class="card score">${ringSvg(score, 140)}<h2>${title}</h2>
+    <p class="muted"><b>${t("adScore")}: ${score}</b><br>${t("adScoreD")}</p>
+    <div class="rw"><div><b class="okc">${right}</b><span>${t("rightN")}</span></div><div><b class="badc">${n - right}</b><span>${t("wrongN")}</span></div><div><b>${n}</b><span>${t("qCount")}</span></div></div>
+    <p class="muted">${t("adNote")}</p></div>
+  <div class="section-title">${t("strengths")}</div>${topicBars(Object.entries(by).map(([k, [a, b]]) => ({ k, a, b })))}
+  ${weak.length ? `<div class="section-title">${t("reviewTopics")}</div><div class="chips">${weak.map((k) => `<span class="chip warm">${esc(topicName(k, st.lang))}</span>`).join("")}</div>` : ""}
+  <div class="section-title">${t("review")}</div><div class="review protect">${A.items.map((x, i) => { const c2 = x.q[st.lang], pk = x.picked; return `<div class="rv"><span class="st ${x.ok ? "okc" : "badc"}">${i + 1}. ${x.ok ? t("correct") : t("wrong")}</span><span>${esc(c2.q)}</span>${x.ok ? "" : `<span class="muted">${t("yourAns")}: ${esc(c2.o[pk])}</span>`}<span class="muted">${t("rightAns")}: <b>${esc(c2.o[x.q.answer])}</b></span><span class="muted" style="white-space:pre-line">${esc(c2.e || t("noExp"))}</span></div>`; }).join("")}</div>
+  <div class="actions"><button class="primary" id="hm">${t("home")}</button></div>`, { protect: true });
+  $("bk").onclick = route; $("hm").onclick = route;
+}
 // result / view / analysis of one exam
 function examResult(ex, items, part = "all") {
   const picked = items.map((q) => { const i = ex.ids.indexOf(q.id); const v = ex.picked?.[i]; return v == null ? null : +v; });
@@ -805,19 +1000,19 @@ async function openExam(ex, part) {
 /* ---------------- my exams ---------------- */
 async function myExams() {
   S = { screen: myExams };
-  frame(`<h2 class="page-h">${t("navExams")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "exams" });
+  frame(`${pageHero("navExams")}<div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "exams" });
   let list;
   try { list = await api.myExams(st.user.id, TR()); }
-  catch (e) { if (S?.screen !== myExams) return; frame(`<h2 class="page-h">${t("navExams")}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button></div>`, { wide: true, nav: "exams" }); $("rt").onclick = myExams; return; }
+  catch (e) { if (S?.screen !== myExams) return; frame(`${pageHero("navExams")}<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button></div>`, { wide: true, nav: "exams" }); $("rt").onclick = myExams; return; }
   if (S?.screen !== myExams) return;
   let armed = null;
   const draw = () => {
-    frame(`<div class="page-hrow"><h2 class="page-h">${t("navExams")}</h2><button class="primary slim" id="nw">+ ${t("navNew")}</button></div>
+    frame(`${pageHero("navExams", `<button class="primary slim" id="nw">+ ${t("navNew")}</button>`)}
     <p class="muted">${list.length} ${t("examsFound")}</p>
     ${!list.length ? `<div class="card"><p class="muted">${t("noExams")}</p><button class="primary" id="nw2">${t("newExamGo")}</button></div>` : ""}
     <div class="xlist">${list.map((x) => {
       const n = x.ids.length, done = x.status === "done", ans = (x.picked || []).filter((v) => v != null).length, set = x.settings || {};
-      return `<div class="xrow">
+      return `<div class="xrow ${done ? "done" : "open"}">
         <div class="xmain"><b>${t("examNo")} #${x.id}</b><span class="muted">${fmtDate(x.created_at)} · ${fmtTime(x.created_at)}</span>
           <span class="xtags"><span class="tag">${set.timed ? "⏱ " + t("timed") : t("untimed")}</span><span class="tag">${set.guided ? t("guided") : t("unguided")}</span></span></div>
         <div class="xstat ${done ? "okline" : ""}">${done ? `${t("doneSt")} · <b>${pctOf(x.score, n)}%</b> <span class="muted">(${x.score}/${n})</span>` : `${t("openSt")} · ${ans}/${n}`}</div>
@@ -844,18 +1039,27 @@ async function myQuestions(keep) {
   const Q = keep || { filter: "all", shown: 20, rows: null, cache: new Map() };
   S = { screen: () => myQuestions(Q) };
   if (!Q.rows) {
-    frame(`<h2 class="page-h">${t("navQs")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
+    frame(`${pageHero("navQs")}<div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
     try { Q.rows = await api.answerHistory(st.user.id, TR()); }
-    catch (e) { frame(`<h2 class="page-h">${t("navQs")}</h2><div class="card"><p>${esc(errMsg(e))}</p></div>`, { wide: true, nav: "qs" }); return; }
+    catch (e) { frame(`${pageHero("navQs")}<div class="card"><p>${esc(errMsg(e))}</p></div>`, { wide: true, nav: "qs" }); return; }
   }
   const rows = Q.rows.filter((r) => Q.filter === "all" || (Q.filter === "right" && r.correct) || (Q.filter === "wrong" && !r.correct) || (Q.filter === "saved" && st.marks.has(r.question_id)));
   const page = rows.slice(0, Q.shown), need = page.map((r) => r.question_id).filter((id) => !Q.cache.has(id));
   if (need.length) {
-    frame(`<h2 class="page-h">${t("navQs")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
+    frame(`${pageHero("navQs")}<div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "qs" });
     try { (await api.questionsByIds(TR(), need)).forEach((q) => Q.cache.set(q.id, q)); } catch { /* show what we have */ }
   }
   const keyPoint = (q) => { const { per, gen } = parseExp(q[st.lang].e); return (per[q.answer] || gen || "").split("\n")[0]; };
-  frame(`<h2 class="page-h">${t("navQs")}</h2>
+  frame(`${pageHero("navQs")}
+  <div class="sc-grid">
+    <button class="sc" id="una"><span class="ti" style="--tc:#2F80ED"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></span><b>${t("unansweredQs")}</b></button>
+    <button class="sc" id="srch"><span class="ti" style="--tc:#0EA5A4"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span><b>${t("search")}</b></button>
+    <button class="sc" id="clc"><span class="ti" style="--tc:#16A34A"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg></span><b>${t("calcT")}</b></button>
+    <button class="sc" id="rfp"><span class="ti" style="--tc:#4F46E5"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span><b>${t("refT")}</b></button>
+    <button class="sc" id="fl"><span class="ti" style="--tc:#EC4899"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h13a1 1 0 0 1 1 1v11"/></svg></span><b>${t("flash")}</b></button>
+  </div>
+  <details class="topics-d"><summary>${t("bytopic")} <span class="muted">(${Object.keys(st.counts).length})</span></summary>
+  <div class="list">${Object.keys(st.counts).sort().map((k) => `<button class="li" data-t="${esc(k)}"><span>${esc(topicName(k, st.lang))} <span class="sub">${esc(topicName(k, st.lang === "he" ? "en" : "he"))}</span></span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div></details>
   <p class="muted">${Q.rows.length} ${t("qsSolved")}</p>
   <div class="chips">${[["all", "fAll"], ["right", "fRight"], ["wrong", "fWrong"], ["saved", "fSaved"]].map(([v, l]) => `<button class="chip pick ${Q.filter === v ? "cool" : ""}" data-f="${v}">${t(l)}</button>`).join("")}</div>
   ${!rows.length ? `<div class="card"><p class="muted">${t("noItems")}</p></div>` : ""}
@@ -867,6 +1071,10 @@ async function myQuestions(keep) {
   ${rows.length > Q.shown ? `<button class="ghost" id="more">${t("loadMore")} (${rows.length - Q.shown})</button>` : ""}`, { wide: true, nav: "qs" });
   app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { Q.filter = b.dataset.f; Q.shown = 20; myQuestions(Q); }));
   if ($("more")) $("more").onclick = () => { Q.shown += 20; myQuestions(Q); };
+  $("una").onclick = () => practice({ kind: "unanswered" });
+  $("srch").onclick = () => searchPage(() => myQuestions(Q)); $("clc").onclick = () => calcTrainer(() => myQuestions(Q)); $("rfp").onclick = () => refPage(() => myQuestions(Q));
+  $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
+  app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   app.querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => viewQuestion(Q.cache.get(+b.dataset.q), Q.rows.find((r) => r.question_id === +b.dataset.q)?.picked, () => myQuestions(Q))));
 }
 function viewQuestion(q, picked, back) {
@@ -893,7 +1101,7 @@ function viewQuestion(q, picked, back) {
 /* ---------------- statistics ---------------- */
 async function stats() {
   S = { screen: stats };
-  frame(`<h2 class="page-h">${t("navStats")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "stats" });
+  frame(`${pageHero("navStats")}<div class="loading"><div class="spin"></div></div>`, { wide: true, nav: "stats" });
   // fast path: small server-side summary; falls back to downloading everything on an older database
   let sum = null, hist = [], exams = [], act = [], ts = null;
   [sum, act, ts] = await Promise.all([api.statsSummary(TR()).catch(() => null), api.activity(st.user.id, TR(), 14), api.topicStats(TR()).catch(() => null)]);
@@ -912,14 +1120,14 @@ async function stats() {
     exQ = fin.reduce((a, x) => a + (x.picked || []).filter((v) => v != null).length, 0); exS = fin.reduce((a, x) => a + (x.used || 0), 0); nExams = fin.length;
     best = fin.length ? Math.max(...fin.map((x) => pctOf(x.score, x.ids.length))) : st.best;
   }
-  const level = tt.n ? Math.min(5, (right / tt.n) * 5) : 0;
+  const level = tt.n ? Math.min(10, (right / tt.n) * 10) : 0;
   const byT = Object.keys(st.counts).sort().map((k) => ({ k, b: st.counts[k] }));
-  frame(`<h2 class="page-h">${t("navStats")}</h2>
+  frame(`${pageHero("navStats")}
   <div class="stat-top">
     <div class="card st-main">${ringSvg(pctOf(done, tt.n), 110)}<div><div class="bignum"><b>${done}</b><span>/</span><b>${tt.n}</b></div><span class="muted">${t("solved")} · ${t("inBank")}</span></div></div>
     <div class="card st-box"><span class="muted">${t("firstTry")}</span><span class="pct">${pctOf(first, done)}%</span><span>${first} / ${done} ${t("correctAns")}</span></div>
     <div class="card st-box"><span class="muted">${t("curAvg")}</span><span class="pct">${pctOf(right, done)}%</span><span>${right} / ${done} ${t("correctAns")}</span></div>
-    <div class="card st-box"><span class="muted">${t("level")}</span><span class="pct">${level.toFixed(1)}<small>/5</small></span><div class="lvl"><i style="left:${(level / 5) * 100}%"></i></div><span class="muted" style="font-size:12px">${t("levelD")}</span></div>
+    <div class="card st-box"><span class="muted">${t("level")}</span><span class="pct">${level.toFixed(1)}<small>/10</small></span><div class="lvl"><i style="left:${(level / 10) * 100}%"></i></div><span class="muted" style="font-size:12px">${t("levelD")}</span></div>
   </div>
   <div class="card defs"><div class="big-stat"><div class="tile"><span>${t("uniqueQs")}</span><span class="n">${done}</span></div><div class="tile"><span>${t("attemptsN")}</span><span class="n">${attempts}</span></div></div>
     <p class="muted" style="font-size:13px">ℹ️ ${t("statsDefs")}</p></div>
@@ -945,8 +1153,10 @@ async function stats() {
 /* ---------------- tools ---------------- */
 function tools() {
   S = { screen: tools };
-  frame(`${msgHtml()}<h2 class="page-h">${t("navTools")}</h2>
+  st.ui.fromTools = false;
+  frame(`${msgHtml()}${pageHero("navTools")}
   <div class="tools-grid">
+    <div class="card"><h3>⭐ ${t("subsT")}</h3><p class="muted">${hasAccess() ? t("subsOn") : t("subsOff")}</p><button class="primary" id="sub">${hasAccess() ? t("manage") : t("choose")}</button></div>
     <div class="card"><h3>${t("acct")}</h3><p class="muted">${t("acctD")}</p><button class="primary" id="ac">${t("acct")}</button></div>
     <div class="card"><h3>${t("refT")}</h3><p class="muted">${t("refD")}</p><button class="primary" id="rfp">${t("refT")}</button></div>
     <div class="card"><h3>${t("calcT")}</h3><p class="muted">${t("calcD")}</p><button class="primary" id="clc">${t("calcT")}</button></div>
@@ -955,14 +1165,16 @@ function tools() {
     <div class="card"><h3>👋 ${t("introAgain")}</h3><p class="muted">${t("introAgainD")}</p><button class="ghost" id="ina">${t("introAgain")}</button></div>
     <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
     <div class="card"><h3>${t("jTitle")}</h3><p class="muted">${t("jBuildD")}</p><button class="primary" id="jt">${t("jTitle")}</button></div>
-    <div class="card"><h3>🏆 ${t("league")}</h3><p class="muted">${t("leagueJoinD")}</p><button class="primary" id="lgt2">${t("league")}</button></div>
+    ${lbOK() ? `<div class="card"><h3>🏆 ${leagueName()}</h3><p class="muted">${t("leagueJoinD")}</p><button class="primary" id="lgt2">${leagueName()}</button></div>` : ""}
     ${reminderCard()}
+    ${pushCard()}
     <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
   </div>
   ${legalLinks()}`, { wide: true, nav: "tools" });
-  bindLegal(); st.ui.msg = null; bindReminder();
+  bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("lgt2").onclick = league;
+  $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions"); st.ui.fromTools = true; plans(); };
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); if ($("lgt2")) $("lgt2").onclick = league;
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
@@ -993,19 +1205,13 @@ function streakOf(rows, mdays = st.missionDays || []) {
   return n;
 }
 function missionCard(m, state) {
-  if (state === "loading") return `<div class="mission sk"><span class="eyebrow">${t("mission")}</span><div class="spin sm"></div></div>`;
-  if (state === "error") return `<div class="mission"><span class="eyebrow">${t("mission")}</span><p class="muted">${t("missionErr")}</p><button class="ghost slim" id="mretry">${t("retry")}</button></div>`;
+  const pill = (id, cls, sub, mid = "") => `<button class="mpill ${cls}" ${id ? `id="${id}"` : ""}><img class="mp-i" src="${icTarget}" alt=""><span class="mp-t"><b>${t("mission")}</b><small>${sub}</small></span>${mid}<span aria-hidden="true">${fwd()}</span></button>`;
+  if (state === "loading") return pill("", "sk", `<span class="spin sm"></span>`);
+  if (state === "error") return pill("mretry", "", t("missionErr") + " · " + t("retry"));
   if (!m) return "";
   const n = m.ids.length, done = (m.picked || []).filter((v) => v != null).length;
-  if (m.status === "done") return `<div class="mission done"><div class="mission-h"><span class="badge-ok" aria-hidden="true">✓</span><div><b>${t("missionDone")}</b><span class="muted">${m.correct}/${n} ${t("rightN")} · ${t("missionDoneD")}</span></div></div>
-    <button class="ghost slim" id="mres">${t("seeResults")}</button></div>`;
-  const k = (x) => (m.kinds || []).filter((v) => v === x).length;
-  return `<div class="mission">
-    <div class="mission-h"><div><span class="eyebrow">${t("mission")}</span><h2>${n} ${t("qs")}</h2></div><span class="mleft">${t("left")} <b>${n - done}</b></span></div>
-    <div class="gbar" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${done}"><i style="width:${pctOf(done, n)}%"></i></div>
-    <div class="mkinds">${k("review") ? `<span>🔁 ${k("review")} ${t("kReview")}</span>` : ""}${k("weak") ? `<span>🎯 ${k("weak")} ${t("kWeak")}</span>` : ""}${k("mix") ? `<span>🧩 ${k("mix")} ${t("kMix")}</span>` : ""}</div>
-    <button class="primary" id="mgo">${done ? t("contMission") : t("startMission")} ${fwd()}</button>
-  </div>`;
+  if (m.status === "done") return pill("mres", "ok", `${m.correct}/${n} ${t("rightN")} · ${t("seeResults")}`);
+  return pill("mgo", "", `${done} / ${n} ${t("qs")} · ${done ? t("contMission") : t("startMission")}`);
 }
 async function fillMission() {
   const w = $("missionw"); if (!w) return;
@@ -1023,7 +1229,7 @@ async function fillMission() {
   $("missionw").innerHTML = missionCard(st.mission);
   if ($("mgo")) $("mgo").onclick = () => missionRun(st.mission);
   if ($("mres")) $("mres").onclick = () => missionFinish();
-  scheduleReminders();
+  scheduleReminders(); refreshPush();
 }
 async function missionRun(m) {
   loading();
@@ -1098,7 +1304,7 @@ async function missionFinish() {
   const days = await api.missionDays(st.user.id, TR()).catch(() => st.missionDays || []);
   st.missionDays = days;
   const act = await api.activity(st.user.id, TR(), 60).catch(() => []);
-  scheduleReminders();
+  scheduleReminders(); refreshPush();
   const n = res.total, c = res.correct, topics = res.topics || [];
   xpToast(res.xp);
   S = { screen: missionFinish, back: route };
@@ -1107,7 +1313,7 @@ async function missionFinish() {
     <h2>${t("bravo")}</h2>
     <div class="rw"><div><b class="okc">${c}</b><span>${t("rightN")}</span></div><div><b class="badc">${n - c}</b><span>${t("wrongN")}</span></div><div><b>🔥 ${streakOf(act, days)}</b><span>${t("streak")}</span></div></div>
     <p class="muted">${t("streakNote")}</p>
-    ${res.xp ? `<p class="okc"><b>+${res.xp} XP</b> · ${t("league")}</p>` : ""}
+    ${res.xp ? `<p class="okc"><b>+${res.xp} XP</b> · ${leagueName()}</p>` : ""}
   </div>
   <div class="section-title">${topics.length ? t("reviewTopics") : t("allGood")}</div>
   ${topics.length ? `<div class="chips">${topics.map((k) => `<button class="chip pick cool" data-tp="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>` : ""}
@@ -1160,6 +1366,84 @@ function bindReminder() {
       } catch { $("rer").textContent = t("remDenied"); $("rer").hidden = false; return; }
     }
     r.on = !r.on; store.set(remKey(), r); await scheduleReminders(); tools();
+  };
+}
+
+/* ---------------- push notifications (iPhone only; the student opts in) ---------------- */
+const pushKey = () => `push:${st.user.id}`;
+const canPush = () => Capacitor.getPlatform() === "ios";
+let pushWired = false;
+async function registerPush() {
+  if (!canPush() || !st.user) return;
+  try {
+    if (!pushWired) {
+      pushWired = true;
+      PushNotifications.addListener("registration", (r) => {
+        if (!st.user) return;
+        store.set(pushKey(), { on: true, token: r.value });
+        api.savePushToken(st.user.id, r.value, st.profile?.track).catch(() => {});
+      });
+      PushNotifications.addListener("registrationError", () => {});
+    }
+    await PushNotifications.register();
+  } catch { /* push unavailable */ }
+}
+// on every launch: if the student already said yes, refresh the token (tokens can change)
+// first time on the home screen: iOS asks the student once (the system dialog); if notifications
+// are already allowed (e.g. study reminders), the phone is registered silently. A student who
+// turned it off in "tools" is never asked again.
+let pushAsking = false;
+// like most apps: the iOS "allow notifications?" dialog appears on the very first launch.
+// The phone's token is saved to the account later, once the student is signed in (refreshPush).
+async function askPushOnLaunch() {
+  if (!canPush()) return;
+  try {
+    const p = await PushNotifications.checkPermissions();
+    if (p.receive !== "prompt" && p.receive !== "prompt-with-rationale") return;
+    await new Promise((r) => setTimeout(r, 800));
+    await PushNotifications.requestPermissions();
+    if (st.user) refreshPush();
+  } catch { /* ignore */ }
+}
+async function refreshPush() {
+  if (!canPush() || !st.user || pushAsking) return;
+  const s = store.get(pushKey());
+  if (s && !s.on) return;
+  pushAsking = true;
+  try {
+    let p = await PushNotifications.checkPermissions();
+    if (p.receive === "prompt" || p.receive === "prompt-with-rationale") {
+      await new Promise((r) => setTimeout(r, 1500));
+      p = await PushNotifications.requestPermissions();
+    }
+    if (p.receive === "granted") await registerPush();
+    else store.set(pushKey(), { on: false });
+  } catch { /* ignore */ } finally { pushAsking = false; }
+}
+function pushCard() {
+  if (!canPush()) return "";
+  const on = !!store.get(pushKey())?.on;
+  return `<div class="card"><h3>🔔 ${t("pushT")}</h3><p class="muted">${t("pushD")}</p>
+    <button class="${on ? "ghost" : "primary"}" id="pon">${on ? t("remOff") : t("remOn")}</button>
+    <div class="err" id="per" hidden></div></div>`;
+}
+function bindPush() {
+  if (!$("pon")) return;
+  $("pon").onclick = async () => {
+    const cur = store.get(pushKey());
+    if (cur?.on) {
+      if (cur.token) api.removePushToken(cur.token).catch(() => {});
+      store.set(pushKey(), { on: false });
+      return tools();
+    }
+    try {
+      let p = await PushNotifications.checkPermissions();
+      if (p.receive !== "granted") p = await PushNotifications.requestPermissions();
+      if (p.receive !== "granted") { $("per").textContent = t("remDenied"); $("per").hidden = false; return; }
+    } catch { $("per").textContent = t("remDenied"); $("per").hidden = false; return; }
+    await registerPush();
+    store.set(pushKey(), { on: true, token: store.get(pushKey())?.token });
+    tools();
   };
 }
 
@@ -1357,81 +1641,46 @@ function zones(L) {
   const n = (L.board || []).length;
   return { n, up: L.group_tier < 4 ? Math.ceil(n * 0.2) : 0, down: L.group_tier > 1 && n >= 5 ? Math.floor(n * 0.2) : 0 };
 }
+// weekly leaderboard per track: phone app only; one point per correct answer
+const lbOK = () => Capacitor.isNativePlatform();
 async function fillLeague() {
   const w = $("leaguew"); if (!w) return;
-  let L, C;
-  try { [L, C] = await Promise.all([api.getLeague(TR()), api.dailyChallenge(TR()).catch(() => null)]); }
-  catch { w.innerHTML = ""; return; } // database not updated yet: hide
+  if (!lbOK()) { w.innerHTML = ""; return; }
+  let L;
+  try { L = await api.lbBoard(TR()); if (!L.member) { await api.lbJoin(TR()); L = await api.lbBoard(TR()); } } catch { w.innerHTML = ""; return; } // database not updated yet: hide
   if (S?.screen !== home || !$("leaguew")) return;
-  const chDone = C ? (C.answers || []).length : 0, chN = C ? (C.ids || []).length : 0;
-  if (!L.member) {
-    $("leaguew").innerHTML = `<button class="jcta" id="lgo"><span class="jicon" aria-hidden="true">🏆</span><span><b>${t("league")}</b><small>${t("leagueJoinD")}</small></span><span aria-hidden="true">${fwd()}</span></button>`;
-  } else {
-    const me = (L.board || []).findIndex((x) => x.me) + 1;
-    $("leaguew").innerHTML = `<button class="jcta" id="lgo"><span class="jdays lg"><b>#${me || "–"}</b><small>${t("rank")}</small></span>
-      <span><b>${tierName(L.group_tier)}</b><small>${(L.board || []).find((x) => x.me)?.xp || 0} XP · ${t("weekEnds")} ${timeLeft(L.week_end)}</small>
-      ${chN ? `<small>⚡ ${t("dailyCh")}: ${chDone}/${chN}</small>` : ""}</span><span aria-hidden="true">${fwd()}</span></button>`;
+  {
+    w.innerHTML = `<button class="jcta" id="lgo"><span class="jdays lg"><b>#${L.me?.rank ?? "–"}</b><small>${t("rank")}</small></span>
+      <span><b>${esc(L.me?.nick || "")}</b><small>${L.me?.pts || 0} ${t("lbPts")} · ${t("weekEnds")} ${timeLeft(L.week_end)}</small></span><span aria-hidden="true">${fwd()}</span></button>`;
   }
   $("lgo").onclick = () => league();
 }
 
 async function league() {
   S = { screen: league, back: route };
-  frame(`<h2 class="page-h">${t("league")}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true });
-  let L, C;
-  try { [L, C] = await Promise.all([api.getLeague(TR()), api.dailyChallenge(TR()).catch(() => null)]); }
+  frame(`<h2 class="page-h">${leagueName()}</h2><div class="loading"><div class="spin"></div></div>`, { wide: true });
+  let L;
+  try { L = await api.lbBoard(TR()); if (!L.member) { await api.lbJoin(TR()); L = await api.lbBoard(TR()); } }
   catch (e) {
-    frame(`<h2 class="page-h">${t("league")}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`, { wide: true });
+    frame(`<h2 class="page-h">${leagueName()}</h2><div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button><button class="ghost" id="hm">${t("home")}</button></div>`, { wide: true });
     $("rt").onclick = league; $("hm").onclick = route; return;
   }
   if (S?.screen !== league) return;
-  if (L.member && L.last) return leagueResult(L.last);
-  const s = L.settings || {};
-  const rules = `<ul class="rules"><li>📝 ${t("xpMission")}: <b>${s.xp_mission} XP</b></li><li>⚡ ${t("xpChallenge")}: <b>${s.xp_challenge} XP</b></li><li>🔁 ${t("xpReview")}: <b>${s.xp_review} XP</b></li><li>⏱ ${t("xpMock")} (${s.mock_min_q}+ ${t("qs")}): <b>${s.xp_mock} XP</b></li></ul>
-    <p class="muted" style="font-size:13px">${t("xpCap")}: ${s.daily_cap} XP · ${t("xpNoRepeat")}</p>`;
-  if (!L.member) {
-    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("league")}</h2></div>
-    <div class="card lg-intro"><div class="big-emoji" aria-hidden="true">🏆</div><h2>${t("leagueIntro")}</h2><p class="muted">${t("leagueIntroD")}</p>${rules}
-      <div class="field"><label for="nk">${t("nick")}</label><input id="nk" maxlength="20" value="${esc(L.nickname || "")}" placeholder="${t("nickPh")}" autocomplete="off"></div>
-      <p class="muted" style="font-size:13px">🔒 ${t("nickPrivacy")}</p>
-      <div class="err" id="er" hidden></div>
-      <button class="primary" id="jn">${t("joinLeague")}</button></div>
-    ${friendCard()}`, { wide: true });
-    $("bk").onclick = route;
-    $("jn").onclick = async () => {
-      const nick = $("nk").value.trim();
-      if (nick.length < 2 || /[@<>]/.test(nick)) { $("er").textContent = t("nickBad"); $("er").hidden = false; return; }
-      $("jn").disabled = true;
-      try { await api.leagueJoin(TR(), nick); league(); } catch (e) { $("jn").disabled = false; $("er").textContent = /nickname/.test(e?.message || "") ? t("nickBad") : errMsg(e); $("er").hidden = false; }
-    };
-    bindFriend(); return;
-  }
-  const z = zones(L), board = L.board || [], meI = board.findIndex((x) => x.me), myXp = board[meI]?.xp || 0;
-  const target = z.up && meI >= z.up ? board[z.up - 1].xp - myXp + 1 : 0;
-  const chDone = C ? (C.answers || []).length : 0, chN = C ? (C.ids || []).length : 0, chRight = C ? (C.answers || []).filter((a) => a.correct).length : 0;
-  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("league")}</h2></div>
+  const rules = `<ul class="rules"><li>✅ ${t("lbR1")}</li><li>🔁 ${t("lbR2")}</li><li>📅 ${t("lbR3")}</li><li>🔒 ${t("lbR4")}</li></ul>`;
+  const top = L.top || [], me = L.me || {};
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${leagueName()}</h2></div>
   <div class="lg-hero">
-    <div class="lg-tier"><span class="lg-emoji" aria-hidden="true">${TIER[L.group_tier][0]}</span><b>${t(TIER[L.group_tier][1])}</b><small>${esc(L.nickname)}</small></div>
-    <div class="lg-stats"><div><b>#${meI + 1}</b><span>${t("of")} ${z.n}</span></div><div><b>${myXp}</b><span>XP ${t("thisWeek")}</span></div></div>
+    <div class="lg-tier"><span class="lg-emoji" aria-hidden="true">🏆</span><b>${esc(me.nick || "")}</b></div>
+    <div class="lg-stats"><div><b>#${me.rank ?? "–"}</b><span>${t("of")} ${L.size}</span></div><div><b>${me.pts || 0}</b><span>${t("lbPts")} ${t("thisWeek")}</span></div></div>
     <div class="lg-timer">⏳ ${t("weekEnds")} <b id="lgt">${timeLeft(L.week_end)}</b></div>
-    <div class="lg-today"><span>${t("todayXp")}: ${L.today_xp}/${s.daily_cap}</span><div class="gbar"><i style="width:${pctOf(L.today_xp, s.daily_cap)}%"></i></div></div>
   </div>
-  <div class="banner jphase">${L.group_tier >= 4 ? t("topTier") : meI < z.up ? `⬆️ ${t("inUpZone")} ${tierName(L.group_tier + 1)}` : `${t("toNext")}${tierName(L.group_tier + 1)}: ${t("beTop")} ${z.up} ${t("firstN")}${target ? ` · ${t("need")} <bdi>${target} XP</bdi>` : ""}`}</div>
-  ${chN ? `<div class="card ch-card"><div class="card-h"><h3>⚡ ${t("dailyCh")}</h3><span class="muted">${chDone}/${chN}</span></div>
-    <p class="muted">${chDone >= chN ? `${t("chDone")} ${chRight}/${chN}` : t("dailyChD")}</p>
-    ${chDone >= chN ? "" : `<button class="primary" id="chg">${chDone ? t("contMission") : t("chStart")}</button>`}</div>` : ""}
   <div class="section-title">${t("board")}</div>
-  <div class="card board">${board.map((x, i) => `<div class="brow ${x.me ? "me" : ""} ${i < z.up ? "up" : ""} ${z.down && i >= z.n - z.down ? "down" : ""}"><span class="brk">${i + 1}</span><span class="bnk">${esc(x.nick)}${x.me ? ` <small>(${t("you")})</small>` : ""}</span><span class="bxp"><bdi>${x.xp} XP</bdi></span></div>`).join("")}
-    <p class="muted" style="font-size:12px">${z.up ? `🟢 ${t("upZone")}` : ""} ${z.down ? `· 🔴 ${t("downZone")}` : ""}</p></div>
-  ${friendCard()}
+  <div class="card board">${top.length ? top.map((x) => `<div class="brow ${x.me ? "me" : ""}"><span class="brk">${x.rank}</span><span class="bnk">${esc(x.nick)}${x.me ? ` <small>(${t("you")})</small>` : ""}</span><span class="bxp">${x.pts}</span></div>`).join("") : `<p class="muted">${t("lbEmpty")}</p>`}</div>
   <div class="card"><h3>${t("howXp")}</h3>${rules}</div>
-  <div class="small-links"><button class="link" id="lnk">${t("changeNick")}</button><button class="link" id="llv">${st.ui.leaveArmed ? t("leaveSure") : t("leaveLeague")}</button></div>`, { wide: true });
+  <div class="small-links"><button class="link" id="lnk">${t("lbReroll")}</button></div>`, { wide: true });
   $("bk").onclick = route;
-  if ($("chg")) $("chg").onclick = () => challengeRun(C);
   const tick = setInterval(() => { if (S?.screen !== league || !$("lgt")) return clearInterval(tick); $("lgt").textContent = timeLeft(L.week_end); }, 30000);
-  $("lnk").onclick = () => { const v = prompt(t("nick"), L.nickname); if (v && v.trim().length >= 2) api.leagueJoin(TR(), v.trim()).then(league).catch((e) => alert(errMsg(e))); };
-  $("llv").onclick = async () => { if (!st.ui.leaveArmed) { st.ui.leaveArmed = true; return league(); } st.ui.leaveArmed = false; await api.leagueLeave(TR()).catch(() => {}); league(); };
-  bindFriend();
+  $("lnk").onclick = () => api.lbReroll(TR()).then(league).catch((e) => alert(errMsg(e)));
 }
 function leagueResult(last) {
   S = { screen: () => leagueResult(last), back: route };
@@ -1485,7 +1734,7 @@ function challengeDone() {
   S = { screen: challengeDone, back: league };
   frame(`<div class="card score celebrate"><div class="big-emoji" aria-hidden="true">⚡</div><h2>${t("chDone")} ${right}/${tot}</h2>
     ${xp ? `<p class="okc"><b>+${xp} XP</b></p>` : ""}<p class="muted">${t("chTomorrow")}</p>
-    <button class="primary" id="ok">${t("league")}</button></div>`);
+    <button class="primary" id="ok">${leagueName()}</button></div>`);
   $("ok").onclick = league;
 }
 
@@ -1571,7 +1820,7 @@ function friendBoard(code, board) {
   <div class="card score celebrate"><div class="big-emoji" aria-hidden="true">${winner?.me ? "🏆" : "🤝"}</div><h2>${winner ? (winner.me ? t("youWon") : `${esc(winner.nick)} ${t("leads")}`) : t("waiting")}</h2>
     <p class="muted">${t("rule")}</p></div>
   <div class="card board">${(board || []).map((x, i) => `<div class="brow ${x.me ? "me" : ""}"><span class="brk">${x.finished ? i + 1 : "…"}</span><span class="bnk">${esc(x.nick)}${x.me ? ` <small>(${t("you")})</small>` : ""}</span><span class="bxp">${x.finished ? `${x.correct} ✓ · ${clockText(x.seconds)}` : t("playing")}</span></div>`).join("")}</div>
-  <div class="actions"><button class="primary" id="rf2">${t("refresh")}</button><button class="ghost" id="lg">${t("league")}</button></div>`);
+  <div class="actions"><button class="primary" id="rf2">${t("refresh")}</button><button class="ghost" id="lg">${leagueName()}</button></div>`);
   $("bk").onclick = league; $("lg").onclick = league;
   $("rf2").onclick = () => friendStart(code);
 }
@@ -1584,13 +1833,19 @@ function friendNick() {
 
 
 /* ---------------- first-time intro (short, can be skipped) ---------------- */
+// the welcome line names the student's own track (not always nursing)
+function introWelcome() {
+  const x = trackOf(TR()), n = x && x[st.lang];
+  if (!n) return t("in1D");
+  return st.lang === "he" ? `מתכוננים למבחן הרישוי ב${n}, עם הסבר לכל תשובה.` : `Practice for the ${n.toLowerCase()} licensing exam with explanations for every answer.`;
+}
 function intro(i = 0) {
   const steps = [["🎯", "in1T", "in1D"], ["📝", "in2T", "in2D"], ["🔁", "in3T", "in3D"], ["📊", "in4T", "in4D"]];
   const done = () => { store.set(`intro:${st.user.id}`, 1); home(); };
   S = { screen: () => intro(i), back: done };
   const [em, h, d] = steps[i], last = i === steps.length - 1;
   frame(`<div class="card intro">
-    <div class="big-emoji" aria-hidden="true">${em}</div><h2>${t(h)}</h2><p class="muted">${t(d)}</p>
+    <div class="big-emoji" aria-hidden="true">${em}</div><h2>${t(h)}</h2><p class="muted">${i === 0 ? introWelcome() : t(d)}</p>
     <div class="dots" aria-hidden="true">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
     <button class="primary" id="in">${last ? t("inGo") : t("next") + " " + fwd()}</button>
     ${last ? "" : `<button class="link" id="sk">${t("skip")}</button>`}
@@ -1755,9 +2010,11 @@ async function practice(src) {
     } else {
       const after = src.kind === "seq" ? (store.get(posKey()) || 0) : 0;
       items = await api.questions({ track: TR(), topic: src.topic || null, afterId: after, limit: BATCH });
+      if (!items.length && after && !hasAccess()) return plans(); // free sample used up
       if (!items.length && after) { store.set(posKey(), 0); items = await api.questions({ track: TR(), limit: BATCH }); }
     }
-    if (!items.length) { frame(`<div class="card"><p class="muted">${hasAccess() ? t("noItems") : t("locked")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
+    if (!items.length && !hasAccess()) return plans();
+    if (!items.length) { frame(`<div class="card"><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
     keepTerms(items);
     S = { mode: "practice", src, items, i: 0, ans: [], picked: [], start: Date.now(), tick: null, back: route };
     question();
@@ -1796,6 +2053,7 @@ function question() {
     <div id="fb"></div>
   </div>`, { protect: true });
   const el = $("tm"), upd = () => clock(el, Math.floor((Date.now() - S.start) / 1000)); upd(); S.tick = setInterval(upd, 1000);
+  try { sessionStorage.setItem("rs-res", JSON.stringify({ t: "p", src: S.src, i: S.i })); } catch {}
   $("bk").onclick = route; bindMark(q);
   app.querySelectorAll(".opt").forEach((b) => (b.onclick = () => pick(+b.dataset.k)));
   if (S.picked[S.i] != null) feedback(S.picked[S.i]);
@@ -1891,14 +2149,17 @@ async function topicNext(topic, afterId) {
 }
 
 /* ---------------- term cards ---------------- */
+// term cards are kept per track (older saved terms belong to nursing, the only track at the time)
+const termsKey = () => `terms:${TR()}`;
+const termsGet = () => store.get(termsKey()) || (TR() === "nursing" ? store.get("terms") : null) || {};
 function keepTerms(items) {
-  const all = store.get("terms") || {};
+  const all = termsGet();
   for (const q of items) for (const [en, he] of q.terms || []) all[en] = { en, he, t: q.topic };
-  store.set("terms", all);
+  store.set(termsKey(), all);
 }
 function cards() {
   S = { screen: cards, back: route };
-  const list = Object.values(store.get("terms") || {});
+  const list = Object.values(termsGet());
   if (!list.length) { frame(`<div class="card"><h2>${t("flash")}</h2><p class="muted">${t("noItems")}</p><button class="ghost" id="hm">${t("home")}</button></div>`); $("hm").onclick = route; return; }
   const i = st.ui.flashI % list.length, c = list[i], other = st.lang === "he" ? "en" : "he";
   frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><div class="progress"><i style="width:${((i + 1) / list.length) * 100}%"></i></div><span class="timer">${i + 1}/${list.length}</span></div>
@@ -1953,8 +2214,12 @@ function account() {
   const until = e ? new Date(e.until).toISOString().slice(0, 10) : "";
   frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("home")}">${bwd()}</button><h2 style="flex:1">${t("acct")}</h2></div>
   ${msgHtml()}
+  ${st.user.is_anonymous ? `<form class="card" id="up" novalidate><p>${t("guestNote")}</p>
+    <div class="field"><label for="ue">${t("email")}</label><input id="ue" type="email" dir="ltr" autocomplete="email" autocapitalize="off"></div>
+    <div class="field"><label for="up1">${t("pass")}</label><input id="up1" type="password" dir="ltr" autocomplete="new-password"></div>
+    <div class="err" id="uer" hidden></div><button class="primary" type="submit" id="usb">${t("saveAcct")}</button></form>` : ""}
   <div class="card">
-    <div class="acct"><span class="who"><bdi dir="ltr">${esc(st.user.email)}</bdi></span><span class="tag">${plan}${hasAccess() && until ? ` · ${t("until")} <bdi>${until}</bdi>` : ""}</span></div>
+    <div class="acct"><span class="who"><bdi dir="ltr">${st.user.email ? esc(st.user.email) : t("guestName")}</bdi></span><span class="tag">${plan}${hasAccess() && until ? ` · ${t("until")} <bdi>${until}</bdi>` : ""}</span></div>
     ${!hasAccess() ? `<button class="primary" id="pl">${t("choose")}</button>` : ""}
     <div class="field"><label for="ex">${t("changeExam")}</label><div class="row2"><input id="ex" type="date" value="${esc(p.exam_date || "")}"><button class="ghost" id="sx">${t("saveDate")}</button></div></div>
     ${storeAvailable ? `<button class="ghost" id="mg">${t("manage")}</button>` : ""}
@@ -1969,7 +2234,17 @@ function account() {
   if ($("pl")) $("pl").onclick = plans;
   $("sx").onclick = async () => { const v = $("ex").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; flash("✓"); account(); };
   if ($("mg")) $("mg").onclick = () => openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions");
-  $("lo").onclick = logout;
+  $("lo").onclick = () => { if (st.user.is_anonymous && !confirm(t("guestOut"))) return; logout(); };
+  if ($("up")) $("up").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const em = $("ue").value.trim(), pw = $("up1").value, er = (m) => { $("uer").textContent = m; $("uer").hidden = false; };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return er(t("badEmail"));
+    if (pw.length < 8) return er(t("shortPass"));
+    $("usb").disabled = true;
+    const { error } = await api.auth.upgrade(em, pw);
+    if (error) { $("usb").disabled = false; return er(authMsg(error)); }
+    flash(t("saveDone")); account();
+  };
   $("del").onclick = async () => {
     if (!st.ui.delArmed) { st.ui.delArmed = true; return account(); }
     st.ui.delArmed = false;

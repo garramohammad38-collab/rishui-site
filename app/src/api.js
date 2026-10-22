@@ -18,14 +18,37 @@ async function pageAll(make, max = 20000) {
 // questions already loaded in this session are kept in memory (saves time and the daily limit)
 const qcache = new Map();
 
+// inside the apps the email links open the app itself (custom scheme); on the web they open the web app
+const authRedirect = () => (window.Capacitor?.isNativePlatform?.() ? "musmach://auth" : window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/");
+
 export const auth = {
   session: async () => (await supabase.auth.getSession()).data.session,
   signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-  resend: (email) => supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" } }),
-  signUp: (email, password) => supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" } }),
+  resend: (email) => supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: authRedirect() } }),
+  signUp: (email, password) => supabase.auth.signUp({ email, password, options: { emailRedirectTo: authRedirect() } }),
   // the link in the email opens the web app, where the student picks a new password
-  reset: (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: window.__env.VITE_APP_URL || "https://garramohammad38-collab.github.io/rishui-site/app/" }),
+  reset: (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirect() }),
   setPassword: (password) => supabase.auth.updateUser({ password }),
+  // guest: an anonymous account, so progress is saved and can later be upgraded to a real one
+  guest: () => supabase.auth.signInAnonymously(),
+  upgrade: (email, password) => supabase.auth.updateUser({ email, password }, { emailRedirectTo: authRedirect() }),
+  // Sign in with Apple: the iPhone itself gives a signed token, Supabase checks it (no browser needed)
+  apple: async () => {
+    const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
+    const raw = crypto.randomUUID() + crypto.randomUUID();
+    const hashed = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw)))).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const r = await SignInWithApple.authorize({ clientId: "com.mgara.rishui", redirectURI: "https://bbslhbcmfjfjbvqqcebg.supabase.co/auth/v1/callback", scopes: "email name", state: "musmach", nonce: hashed });
+    const token = r?.response?.identityToken;
+    if (!token) throw new Error("no apple token");
+    return supabase.auth.signInWithIdToken({ provider: "apple", token, nonce: raw });
+  },
+  // Google must open in the real browser (it blocks sign-in inside the app view); the app is reopened by musmach://auth
+  google: async () => {
+    const native = !!window.Capacitor?.isNativePlatform?.();
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: authRedirect(), skipBrowserRedirect: native } });
+    if (error) throw error;
+    if (native && data?.url) { const { Browser } = await import("@capacitor/browser"); await Browser.open({ url: data.url }); }
+  },
   signOut: () => supabase.auth.signOut(),
   onChange: (fn) => supabase.auth.onAuthStateChange(fn),
 };
@@ -53,6 +76,10 @@ export async function entitlements(uid) {
 export async function registerDevice(id, label) {
   return must(await supabase.rpc("register_device", { p_device_id: id, p_label: label }));
 }
+// student changed phone: move the account to this device (once every 30 days)
+export async function moveToThisDevice(id, label) {
+  return must(await supabase.rpc("move_to_this_device", { p_device_id: id, p_label: label }));
+}
 // "free mode": everything open, no subscription needed (switch in the admin panel)
 export async function freeMode() {
   try {
@@ -66,6 +93,9 @@ export async function counts(track) {
 // a page of questions; topic optional; ids optional (mistakes, saved, mock)
 export async function questions({ track, topic = null, afterId = 0, limit = 20, ids = null }) {
   return must(await supabase.rpc("get_questions", { p_track: track, p_topic: topic, p_after_id: afterId, p_limit: limit, p_ids: ids }));
+}
+export async function adaptivePool(track) {
+  return must(await supabase.rpc("adaptive_pool", { p_track: track }));
 }
 export async function questionsByIds(track, ids) {
   const need = [...new Set(ids)].filter((id) => !qcache.has(id));
@@ -89,7 +119,13 @@ export async function myAnswers(uid, track) {
 }
 export async function saveAnswer(uid, track, qid, picked, correct) {
   must(await supabase.from("answers").upsert({ user_id: uid, track, question_id: qid, picked, correct, answered_at: new Date().toISOString() }));
+  // weekly leaderboard (phone app only): the server re-checks the answer and ignores people who did not join
+  if (correct && window.Capacitor?.isNativePlatform?.()) supabase.rpc("lb_point", { p_track: track, p_qid: qid, p_picked: picked }).then(() => {}, () => {});
 }
+export async function lbBoard(track) { return must(await supabase.rpc("lb_board", { p_track: track })); }
+export async function lbJoin(track) { return must(await supabase.rpc("lb_join", { p_track: track })); }
+export async function lbReroll(track) { return must(await supabase.rpc("lb_reroll", { p_track: track })); }
+export async function lbLeave(track) { must(await supabase.rpc("lb_leave", { p_track: track })); }
 export async function myBookmarks(uid, track) {
   return (await pageAll(() => supabase.from("bookmarks").select("question_id").eq("user_id", uid).eq("track", track).order("question_id"))).map((r) => r.question_id);
 }
@@ -109,7 +145,7 @@ export async function bestMock(uid, track) {
 }
 // admin announcements for this track (or for everyone); the database hides expired / switched-off ones
 export async function announcements(track) {
-  const { data, error } = await supabase.from("announcements").select("id,title,body,created_at")
+  const { data, error } = await supabase.from("announcements").select("*")
     .or(`track.is.null,track.eq.${track}`).order("created_at", { ascending: false }).limit(5);
   return error ? [] : data || [];
 }
@@ -125,6 +161,9 @@ export async function deleteAccount() {
 }
 
 /* ---------- exams, activity, history ---------- */
+export async function getExam(id) {
+  return must(await supabase.from("exams").select("*").eq("id", id).single());
+}
 export async function examIds(track, n, topics = null, pool = "all") {
   return must(await supabase.rpc("exam_ids", { p_track: track, p_n: n, p_topics: topics?.length ? topics : null, p_pool: pool }));
 }
@@ -214,4 +253,12 @@ export async function examCount(track, topics, pool) {
 }
 export async function browseQuestions(track, { q = "", topic = null, status = "all", offset = 0, limit = 30 } = {}) {
   return must(await supabase.rpc("browse_questions", { p_track: track, p_q: q, p_topic: topic || null, p_status: status, p_offset: offset, p_limit: limit }));
+}
+
+// push notifications: remember this phone's APNs token for the signed-in student
+export async function savePushToken(uid, token, track) {
+  must(await supabase.from("push_tokens").upsert({ token, user_id: uid, platform: "ios", track: track || null, updated_at: new Date().toISOString() }));
+}
+export async function removePushToken(token) {
+  await supabase.from("push_tokens").delete().eq("token", token);
 }
