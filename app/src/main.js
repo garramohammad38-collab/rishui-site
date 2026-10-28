@@ -1847,7 +1847,7 @@ function intro(i = 0) {
   frame(`<div class="card intro">
     <div class="big-emoji" aria-hidden="true">${em}</div><h2>${t(h)}</h2><p class="muted">${i === 0 ? introWelcome() : t(d)}</p>
     <div class="dots" aria-hidden="true">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
-    <button class="primary" id="in">${last ? t("inGo") : t("next") + " " + fwd()}</button>
+    <button class="primary" id="in">${last ? t("inGo") : t("nxt") + " " + fwd()}</button>
     ${last ? "" : `<button class="link" id="sk">${t("skip")}</button>`}
   </div>`);
   $("in").onclick = () => (last ? done() : intro(i + 1));
