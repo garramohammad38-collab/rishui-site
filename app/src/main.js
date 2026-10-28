@@ -53,7 +53,7 @@ let S = null; // current session (quiz / mock / screen state)
 const t = (k) => T[st.lang][k];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (id) => document.getElementById(id);
-const LET = { en: ["A", "B", "C", "D"], he: ["א", "ב", "ג", "ד"] };
+const LET = { en: ["A", "B", "C", "D", "E"], he: ["א", "ב", "ג", "ד", "ה"] };
 const fwd = () => (st.lang === "he" ? "←" : "→");
 const bwd = () => (st.lang === "he" ? "→" : "←");
 const today = () => new Date().toLocaleDateString("en-CA"); // the student's own date
@@ -160,10 +160,11 @@ for (const ev of ["copy", "cut", "contextmenu", "selectstart", "dragstart"])
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return saveExam();
+  if (st.user && watchedDev) api.deviceOk(watchedDev).then((ok) => { if (ok === false) kickedOut(); }).catch(() => {});
   // back in the app after a while: refresh question totals (new questions may have been added)
   if (st.user && st.profile?.track && Date.now() - (st.loadedAt || 0) > 10 * 60e3) {
     st.loadedAt = Date.now();
-    api.counts(TR()).then((c) => { st.counts = Object.fromEntries(c.map((r) => [r.topic, Number(r.n)])); if (S?.screen === home) home(); }).catch(() => {});
+    api.counts(TR()).then((c) => { st.counts = Object.fromEntries(c.filter((r) => !String(r.topic).startsWith("exam_")).map((r) => [r.topic, Number(r.n)])); if (S?.screen === home) home(); }).catch(() => {});
   }
 });
 // a small bar while there is no internet; answers are kept and sent again when it is back
@@ -226,6 +227,7 @@ async function afterLogin(user) {
     const dev = await deviceInfo();
     const ok = await api.registerDevice(dev.id, dev.label);
     if (!ok) return blocked();
+    watchThisDevice(user.id, dev.id);
     await loadUserData();
     try { api.setTz(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch { /* ignore */ }
     await initPurchases(user.id).catch(() => {});
@@ -240,6 +242,18 @@ async function afterLogin(user) {
     frame(`<div class="card"><p>${esc(errMsg(e))}</p><button class="primary" id="rt">${t("retry")}</button></div>`);
     $("rt").onclick = () => afterLogin(user);
   }
+}
+// another phone signed in to this account: this one signs out right away
+let stopWatch = null, watchedDev = null;
+function watchThisDevice(uid, devId) {
+  stopWatch?.(); watchedDev = devId;
+  stopWatch = api.watchDevice(uid, devId, kickedOut);
+}
+async function kickedOut() {
+  if (!st.user) return;
+  stopWatch?.(); stopWatch = null;
+  flash(t("kicked"), true);
+  await logout();
 }
 async function deviceInfo() {
   let id = store.get("device-id");
@@ -263,7 +277,7 @@ async function loadUserData() {
   st.answers = new Map(answers.map((r) => [r.question_id, r.correct]));
   st.marks = new Set(marks);
   st.loadedAt = Date.now();
-  st.counts = Object.fromEntries(counts.map((r) => [r.topic, Number(r.n)]));
+  st.counts = Object.fromEntries(counts.filter((r) => !String(r.topic).startsWith("exam_")).map((r) => [r.topic, Number(r.n)]));
   st.best = best;
 }
 function route() {
@@ -654,6 +668,7 @@ function home() {
   </div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div id="openx"></div>
+  <button class="card" id="pst" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("pastEx")}</b><br><small class="muted">${t("pastExD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
   <div class="acts4">
     <button class="act-c c1" id="nx2"><img src="${icNewexam}" alt=""><b>${t("startExam")}</b><small>${t("navNew")}</small><i aria-hidden="true">${fwd()}</i></button>
     <button class="act-c c2" id="smr"><img src="${icSparkle}" alt=""><b>${t("smart")}</b><small>${t("smartD")}</small><i aria-hidden="true">${fwd()}</i></button>
@@ -672,6 +687,7 @@ function home() {
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
   $("nx2").onclick = newExam;
+  $("pst").onclick = pastExams;
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
   $("bm").onclick = () => practice({ kind: "ids", ids: [...st.marks] });
   // async parts: activity chart + an unfinished exam to continue
@@ -687,6 +703,27 @@ function home() {
       <div class="row2"><button class="primary" id="umr">${t("contExam")} ${fwd()}</button><button class="ghost" id="nx3">${t("startExam")}</button></div></div>`;
     $("umr").onclick = () => runExam(x); $("nx3").onclick = newExam;
   }).catch(() => {});
+}
+
+/* ---------------- past (reconstructed) exams ---------------- */
+const MONTHS = { he: ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"], en: ["January","February","March","April","May","June","July","August","September","October","November","December"] };
+async function pastExams() {
+  S = { screen: pastExams, back: route };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("pastEx")}</h2></div><p class="muted">${t("pastExNote")}</p><div id="pl"><span class="spin"></span></div>`, { nav: "exams" });
+  $("bk").onclick = route;
+  let list = [];
+  try { list = await api.sessionList(TR()); } catch { $("pl").innerHTML = `<p class="muted">${t("adErr")}</p>`; return; }
+  if (!list.length) { $("pl").innerHTML = `<p class="muted">${t("noItems")}</p>`; return; }
+  $("pl").innerHTML = `<div class="list">${list.map((x) => `<button class="li" data-s="${x.id}"><span>${esc(MONTHS[st.lang === "he" ? "he" : "en"][(x.month || 1) - 1])} ${x.year}${x.label ? ` <span class="sub">${esc(x.label)}</span>` : ""}</span><span class="count">${x.n} ${t("qs")}</span></button>`).join("")}</div>`;
+  $("pl").querySelectorAll("[data-s]").forEach((b) => { b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const ids = await api.sessionIds(Number(b.dataset.s));
+      if (!ids.length) { b.disabled = false; return; }
+      const row = await api.createExam({ track: TR(), settings: { timed: false, guided: true, topics: [], pool: "all", past: Number(b.dataset.s), deadline: null }, ids, picked: ids.map(() => null), time_limit: null });
+      runExam(row);
+    } catch (e) { b.disabled = false; flash(errMsg(e), true); }
+  }; });
 }
 
 /* ---------------- new exam (builder) ---------------- */
@@ -2032,10 +2069,12 @@ function qBody(q, num, tot) {
   const c = q[st.lang], on = st.marks.has(q.id);
   return `<div class="qmeta"><span class="tag">${esc(topicName(q.topic, st.lang))}</span><span>${t("q")} ${num} ${t("of")} ${tot}</span></div>
   <div class="qtools"><button class="tool ${on ? "on" : ""}" id="mk">${on ? "★ " + t("saved") : "☆ " + t("save")}</button>${S?.mode === "exam" && !S.guided ? "" : `<button class="tool" id="rf">📋 ${t("refT")}</button>`}</div>
-  <div class="qtext">${esc(c.q)}</div>
+  <div class="qtop${(c.img || q.he?.img) ? " hasimg" : ""}"><div class="qtext">${esc(c.q)}</div>
+  ${(c.img || q.he?.img) ? `<img class="qimg" src="${esc(c.img || q.he.img)}" alt="" loading="lazy">` : ""}</div>
   ${q.terms?.length ? `<div class="terms">${q.terms.map((x) => `<span class="term"><bdi>${esc(x[0])}</bdi> · <bdi>${esc(x[1])}</bdi></span>`).join("")}</div>` : ""}`;
 }
 function bindMark(q) {
+  const im = app.querySelector(".qimg"); if (im) im.onclick = () => im.classList.toggle("zoom");
   if ($("rf")) $("rf").onclick = refSheet;
   $("mk").onclick = () => {
     const on = !st.marks.has(q.id);
@@ -2069,7 +2108,7 @@ function pick(k) {
 function parseExp(e, lang) {
   const per = {}, gen = [];
   String(e || "").split(/\n+/).forEach((line) => {
-    const m = line.match(/^\s*([✓✔✗✘xX])\s*([A-Da-dא-ד])\s*[–—\-:.)]\s*(.+)$/);
+    const m = line.match(/^\s*([✓✔✗✘xX])\s*([A-Ea-eא-ה])\s*[–—\-:.)]\s*(.+)$/);
     const k = m ? LET.en.indexOf(m[2].toUpperCase()) >= 0 ? LET.en.indexOf(m[2].toUpperCase()) : LET.he.indexOf(m[2]) : -1;
     if (k >= 0) per[k] = m[3].trim(); else if (line.trim()) gen.push(line.trim());
   });
@@ -2083,13 +2122,36 @@ function markTerms(html, q) {
   const re = new RegExp(`(${words.map((w) => esc(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
   return html.replace(re, '<mark class="term-hl">$1</mark>');
 }
+// website on a wide screen: explanation as tidy sections (the phone app keeps its own layout)
+const wideWeb = () => Capacitor.getPlatform() === "web" && window.innerWidth >= 900;
+function revealWide(q, k) {
+  const c = q[st.lang], ok = k === q.answer, { per, gen } = parseExp(c.e, st.lang), L = LET[st.lang], he = st.lang === "he";
+  const lines = gen.split("\n"), sum = [], about = [], pts = []; let cur = sum;
+  lines.forEach((ln) => {
+    const m = ln.match(/^(על המחלה|About the condition)\s*:\s*(.*)$/), p = ln.match(/^(נקודות למבחן|Exam points)\s*:\s*(.*)$/);
+    if (m) { cur = about; if (m[2]) about.push(m[2]); } else if (p) { cur = pts; if (p[2]) pts.push(p[2]); } else cur.push(ln);
+  });
+  const fmt = (x) => markTerms(esc(x), q);
+  const rows = [0, 1, 2, 3, 4].filter((n) => per[n]).map((n) => `<div class="${n === q.answer ? "y" : "n"}${n === k ? " picked" : ""}"><b>${L[n]}</b><span>${fmt(per[n])}</span></div>`).join("");
+  return `<div class="ex">
+    <b class="verdict ${ok ? "okc" : "badc"}">${ok ? t("correct") : k == null ? t("none") : t("wrong")} · ${t("rightAns")}: ${L[q.answer]}</b>
+    ${sum.length ? `<div><h3>${he ? "בקצרה" : "In short"}</h3><p class="sum">${fmt(sum.join(" "))}</p></div>` : ""}
+    ${rows ? `<div><h3>${he ? "למה כל תשובה" : "Each answer"}</h3><div class="why">${rows}</div></div>` : ""}
+    ${about.length ? `<div><h3>${he ? "על המחלה" : "About the condition"}</h3><p>${fmt(about.join(" "))}</p></div>` : ""}
+    ${pts.length ? `<div><h3>${he ? "נקודות למבחן" : "Exam points"}</h3><ul>${pts.map((x) => `<li>${fmt(x.replace(/^[•\-]\s*/, ""))}</li>`).join("")}</ul></div>` : ""}
+    <div class="ref"><strong>${t("source")}:</strong> <bdi dir="ltr">${esc(q.source)}</bdi></div></div>`;
+}
 function reveal(q, k) {
   const c = q[st.lang], ok = k === q.answer, { per, gen } = parseExp(c.e, st.lang), L = LET[st.lang];
+  if (wideWeb() && (gen || Object.keys(per).length)) {
+    app.querySelectorAll(".opt").forEach((b) => { const n = +b.dataset.k; b.disabled = true; b.classList.remove("sel"); if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong"); });
+    return revealWide(q, k);
+  }
   app.querySelectorAll(".opt").forEach((b) => {
     const n = +b.dataset.k; b.disabled = true; b.classList.remove("sel");
     if (n === q.answer) b.classList.add("right"); else if (n === k) b.classList.add("wrong");
   });
-  const why = per[q.answer] || "", others = [0, 1, 2, 3].filter((n) => n !== q.answer && per[n]);
+  const why = per[q.answer] || "", others = [0, 1, 2, 3, 4].filter((n) => n !== q.answer && per[n]);
   const hasAny = !!(why || gen || others.length);
   const fmt = (x) => markTerms(esc(x), q);
   return `<div class="explain">

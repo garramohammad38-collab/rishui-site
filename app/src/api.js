@@ -76,6 +76,16 @@ export async function entitlements(uid) {
 export async function registerDevice(id, label) {
   return must(await supabase.rpc("register_device", { p_device_id: id, p_label: label }));
 }
+// check-only: is this phone still the account's active device?
+export async function deviceOk(id) {
+  return must(await supabase.rpc("device_ok", { p_device_id: id }));
+}
+// instant notice when another phone takes the account over (this phone's device row gets kicked_at)
+export function watchDevice(uid, id, onKicked) {
+  const ch = supabase.channel(`dev-${uid}-${id}`).on("postgres_changes", { event: "UPDATE", schema: "public", table: "devices", filter: `user_id=eq.${uid}` },
+    (p) => { if (p.new?.device_id === id && p.new?.kicked_at) onKicked(); }).subscribe();
+  return () => { supabase.removeChannel(ch); };
+}
 // student changed phone: move the account to this device (once every 30 days)
 export async function moveToThisDevice(id, label) {
   return must(await supabase.rpc("move_to_this_device", { p_device_id: id, p_label: label }));
@@ -262,3 +272,7 @@ export async function savePushToken(uid, token, track) {
 export async function removePushToken(token) {
   await supabase.from("push_tokens").delete().eq("token", token);
 }
+
+// past (reconstructed) exams
+export async function sessionList(track) { return must(await supabase.rpc("session_list", { p_track: track })); }
+export async function sessionIds(id) { return must(await supabase.rpc("session_ids", { p_session: id })); }
