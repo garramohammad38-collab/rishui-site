@@ -630,7 +630,10 @@ function topicBars(rows) {
 // newest admin announcement the student hasn't closed yet
 async function fillAnnouncement() {
   const key = `ann-seen:${st.user.id}`, seen = new Set(store.get(key) || []);
-  const list = (await api.announcements(TR()).catch(() => [])).filter((a) => !seen.has(a.id));
+  // only live announcements, and only ones written after this account was created (admins can read old / switched-off ones in the table)
+  const since = st.profile?.created_at ? Date.parse(st.profile.created_at) : 0, now = Date.now();
+  const list = (await api.announcements(TR()).catch(() => [])).filter((a) => !seen.has(a.id) && a.active !== false
+    && (!a.expires_at || Date.parse(a.expires_at) > now) && Date.parse(a.created_at) >= since);
   const box = $("annw"); if (!box || !list.length) return;
   const a = list[0];
   // a "show once" announcement is marked as seen the moment it is shown
