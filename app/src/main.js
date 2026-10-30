@@ -513,7 +513,7 @@ function plans() {
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
-    ${storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="wa">${t("webPayBtn")}</button>`}
+    ${storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="bit">${t("bitBtn")}</button><button class="ghost" id="wa">${t("webPayBtn")}</button>`}
   </div>
   <div class="card">
     <h3>${t("haveCode")}</h3>
@@ -524,6 +524,7 @@ function plans() {
   bindLegal();
   st.ui.msg = null;
   if ($("pbk")) $("pbk").onclick = tools;
+  if ($("bit")) $("bit").onclick = () => openUrl("https://www.bitpay.co.il/app/me/9D1B41C8-EF74-829E-CC1F-A0ED8B57C15E55C2");
   if ($("wa")) $("wa").onclick = () => {
     const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
     const msg = `${t("webPayMsg")}\n${trackName(TR())} · ${names[st.ui.plan] || ""} · ${WEBP[st.ui.plan] || ""}\n${st.user?.email || ""}`;
