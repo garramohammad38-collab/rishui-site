@@ -321,7 +321,7 @@ function login() {
   const u = st.ui;
   frame(`${msgHtml()}
   <div class="hero-brand"><div class="hb-he">מוסמך</div><div class="hb-sig">Musmach</div><div class="hb-tag">${t("heroTag")}</div></div>
-  ${Capacitor.getPlatform() === "web" ? "" : `<div class="card"><button class="primary" type="button" id="gst">${t("guestBtn")}</button><p class="muted" style="text-align:center;margin:10px 0 0">${t("guestOr")}</p></div>`}
+  <div class="card"><button class="primary" type="button" id="gst">${t("guestBtn")}</button><p class="muted" style="text-align:center;margin:10px 0 0">${t("guestOr")}</p></div>
   <form class="card" id="f" novalidate>
     <h2>${u.signup ? t("signup") : t("login")}</h2>
     <div class="field"><label for="em">${t("email")}</label><input id="em" type="email" dir="ltr" autocomplete="email" autocapitalize="off"></div>
