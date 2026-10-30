@@ -661,6 +661,7 @@ async function viewStats() {
     h += `<h3>🎓 الطلاب بالتطبيق</h3>` + cardsHtml([
       ["سجّلوا اليوم", num(ap.new_today)], [`سجّلوا آخر ${statDays} يوم`, num(ap.new_users), `من أصل ${num(ap.users)}`],
       ["حلّوا أسئلة اليوم", num(ap.active_today)], ["حلّوا أسئلة آخر 7 أيام", num(ap.active_7)],
+      ["ضيوف (بدون تسجيل) اليوم", num(ap.guests_today || 0)], [`ضيوف آخر ${statDays} يوم`, num(ap.guests_new || 0), `المجموع: ${num(ap.guests || 0)}`],
       [`إجابات آخر ${statDays} يوم`, num(ap.answers), `${acc}% صحيحة`], ["طلاب شغّالين بالفترة", num(ap.active)],
       ["امتحانات خلصت", num(ap.exams_done)], ["مهمات يومية خلصت", num(ap.missions_done)]]);
     h += `<div class="card"><b>كل يوم: <span style="color:var(--ok)">■</span> سجّلوا جديد · <span style="color:var(--accent)">■</span> حلّوا أسئلة</b>${bars(ap.signups_by_day, ["n", "a"], ["var(--ok)", "var(--accent)"])}</div>`;
