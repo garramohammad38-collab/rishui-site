@@ -499,7 +499,9 @@ function plans() {
   const trial = st.ui.trialOffer && !hasAccess();
   const d = new Date(); d.setMonth(d.getMonth() + 3);
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
-  const pm = priceOf(TR(), "month"), p2 = priceOf(TR(), "two"), pe = priceOf(TR(), "exam");
+  // website: no store price; show the fixed web prices (payment by Bit, activated by us)
+  const WEBP = { month: "₪99", two: "₪149", exam: "₪229" };
+  const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
   frame(`${msgHtml()}
   ${st.ui.fromTools ? `<button class="ghost" id="pbk">←</button>` : ""}
   <div class="card">
@@ -511,7 +513,7 @@ function plans() {
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
-    ${storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("storeOnly")}</p>`}
+    ${storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="wa">${t("webPayBtn")}</button>`}
   </div>
   <div class="card">
     <h3>${t("haveCode")}</h3>
@@ -522,6 +524,11 @@ function plans() {
   bindLegal();
   st.ui.msg = null;
   if ($("pbk")) $("pbk").onclick = tools;
+  if ($("wa")) $("wa").onclick = () => {
+    const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
+    const msg = `${t("webPayMsg")}\n${trackName(TR())} · ${names[st.ui.plan] || ""} · ${WEBP[st.ui.plan] || ""}\n${st.user?.email || ""}`;
+    openUrl(`https://wa.me/972503227701?text=${encodeURIComponent(msg)}`);
+  };
   if ($("tf")) $("tf").onclick = () => { st.ui.trialOffer = false; home(); };
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
   if ($("trk")) $("trk").onclick = () => chooseTrack();
