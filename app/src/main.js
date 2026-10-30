@@ -513,7 +513,7 @@ function plans() {
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
-    ${storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="bit">${t("bitBtn")}</button><button class="ghost" id="wa">${t("webPayBtn")}</button>`}
+    ${st.user?.is_anonymous ? `<p class="muted">${t("needAcct")}</p><button class="primary" id="mkacct">${t("saveAcct")}</button>` : (storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="bit">${t("bitBtn")}</button><button class="ghost" id="wa">${t("webPayBtn")}</button>`)}
   </div>
   <div class="card">
     <h3>${t("haveCode")}</h3>
@@ -524,6 +524,7 @@ function plans() {
   bindLegal();
   st.ui.msg = null;
   if ($("pbk")) $("pbk").onclick = tools;
+  if ($("mkacct")) $("mkacct").onclick = account;
   if ($("bit")) $("bit").onclick = () => openUrl("https://www.bitpay.co.il/app/me/9D1B41C8-EF74-829E-CC1F-A0ED8B57C15E55C2");
   if ($("wa")) $("wa").onclick = () => {
     const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
@@ -534,6 +535,7 @@ function plans() {
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   if ($("go")) $("go").onclick = async () => {
+    if (st.user?.is_anonymous) return account();
     const plan = st.ui.plan;
     if (plan === "exam") await api.updateProfile(null, $("ex").value).catch(() => {});
     $("go").disabled = true; $("go").textContent = t("buying");
@@ -724,7 +726,7 @@ async function pastExams() {
   $("bk").onclick = route;
   let list = [];
   try { list = await api.sessionList(TR()); } catch { $("pl").innerHTML = `<p class="muted">${t("adErr")}</p>`; return; }
-  if (!list.length) { $("pl").innerHTML = `<p class="muted">${t("noItems")}</p>`; return; }
+  if (!list.length) { $("pl").innerHTML = `<div class="card"><p class="muted" style="margin:0">${t("pastEmpty")}</p></div>`; return; }
   $("pl").innerHTML = `<div class="list">${list.map((x) => `<button class="li" data-s="${x.id}"><span>${esc(MONTHS[st.lang === "he" ? "he" : "en"][(x.month || 1) - 1])} ${x.year}${x.label ? ` <span class="sub">${esc(x.label)}</span>` : ""}</span><span class="count">${x.n} ${t("qs")}</span></button>`).join("")}</div>`;
   $("pl").querySelectorAll("[data-s]").forEach((b) => { b.onclick = async () => {
     b.disabled = true;
