@@ -144,11 +144,12 @@ function loading() { frame(`<div class="loading"><div class="spin"></div></div>`
 function msgHtml() { return st.ui.msg ? `<div class="banner ${st.ui.msgBad ? "bad" : ""}">${esc(st.ui.msg)}</div>` : ""; }
 function flash(msg, bad = false) { st.ui.msg = msg; st.ui.msgBad = bad; }
 function openUrl(url) { if (url) Browser.open({ url }).catch(() => window.open(url, "_blank")); }
-function legalLinks() {
-  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button><button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button>${st.user ? `<button class="link" id="lg-o">${t("logout")}</button>` : ""}</div>`;
+function legalLinks(ig = false) {
+  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button>${ig ? `<button class="link" id="lg-ig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg> Instagram</button>` : ""}<button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button>${st.user ? `<button class="link" id="lg-o">${t("logout")}</button>` : ""}</div>`;
 }
 function bindLegal() {
   if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
+  if ($("lg-ig")) $("lg-ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/");
   if ($("lg-o")) $("lg-o").onclick = logout;
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
   if ($("lg-p")) $("lg-p").onclick = () => openUrl(`${LEGAL}/privacy-${st.lang}.html`);
@@ -332,7 +333,7 @@ function login() {
     ${u.signup ? "" : `<p class="muted"><button type="button" class="link" id="fg">${t("forgot")}</button></p>`}
   </form>
   <div class="social"><div class="or"><span>${t("orWith")}</span></div>${Capacitor.getPlatform() === "ios" ? `<button type="button" id="apl" class="sbtn apple"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.7c1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7 0 0-2.7-1-2.7-4.1zM14.1 5.5c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.7-1.3z"/></svg><span>${t("appleBtn")}</span></button>` : ""}<button type="button" id="ggl" class="sbtn google"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.5-.2-2.2H12v4.2h5.9c-.3 1.400-1 2.500-2.100 3.300v2.700h3.400c2-1.800 3.300-4.600 3.300-8z"/><path fill="#34A853" d="M12 23c2.900 0 5.300-1 7.100-2.600l-3.400-2.700c-1 .6-2.200 1-3.700 1-2.800 0-5.200-1.900-6-4.500H2.500v2.800C4.300 20.500 7.900 23 12 23z"/><path fill="#FBBC05" d="M6 14.200c-.2-.6-.3-1.300-.3-2s.1-1.400.3-2V7.400H2.500C1.800 8.800 1.400 10.400 1.400 12.200s.4 3.400 1.100 4.800L6 14.200z"/><path fill="#EA4335" d="M12 5.800c1.600 0 3 .6 4.100 1.600l3-3C17.300 2.700 14.900 1.500 12 1.500 7.900 1.500 4.300 4 2.500 7.400L6 10.200c.8-2.600 3.200-4.400 6-4.400z"/></svg><span>${t("googleBtn")}</span></button></div>
-  ${legalLinks()}`, { nobrand: true });
+  ${legalLinks(true)}`, { nobrand: true });
   bindLegal();
   st.ui.msg = null;
   const err = (m) => { $("er").textContent = m; $("er").hidden = false; };
