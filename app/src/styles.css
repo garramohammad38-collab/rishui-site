@@ -777,3 +777,9 @@ img{-webkit-user-drag:none;user-drag:none}
 .li.dng .ttxt b{color:var(--bad)}
 .li.dng .tico{background:var(--bad-soft)}
 .li > i{opacity:.45;flex:none}
+
+/* hero flows down from the very top of the screen (under the status bar), square top, round bottom */
+@media (max-width:699px){
+  .app.hv{padding-top:0}
+  .app.hv .h-hero{margin-top:0;border-radius:0 0 34px 34px}
+}
