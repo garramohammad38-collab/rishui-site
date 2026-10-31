@@ -357,3 +357,6 @@ Object.assign(T.he, { lbPts: "נקודות", lbIntroD: "תחרות שבועית 
 Object.assign(T.en, { lbPts: "points", lbIntroD: "A weekly competition between students of your track: whoever answers the most questions correctly gets the most points.",
   lbR1: "Every correct answer = 1 point", lbR2: "Each question counts once per week", lbR3: "The board resets every week (on Sunday), everyone starts again", lbR4: "Everyone takes part automatically with a nickname, so nobody sees your real name",
   leagueIntro: "The weekly league", board: "Leaderboard", howXp: "How it works", lbEmpty: "No points yet this week. Answer questions and be the first!", lbReroll: "Change name" });
+
+Object.assign(T.en, { igT: "Follow us on Instagram" });
+Object.assign(T.he, { igT: "עקבו אחרינו באינסטגרם" });

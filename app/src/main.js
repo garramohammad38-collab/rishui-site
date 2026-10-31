@@ -1225,6 +1225,7 @@ function tools() {
   ${sec(t("toolsHelp"), list([
     row("hp", "💬", t("helpT"), t("helpD")),
     row("ina", "👋", t("introAgain"), t("introAgainD")),
+    row("ig", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c13584" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="#c13584" stroke="none"/></svg>`, t("igT"), "@Musmachapp"),
     row("lg-t", "📄", t("terms"), ""),
     row("lg-p", "🔒", t("privacy"), ""),
   ]))}
@@ -1232,7 +1233,7 @@ function tools() {
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions"); st.ui.fromTools = true; plans(); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); if ($("lgt2")) $("lgt2").onclick = league;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); if ($("lgt2")) $("lgt2").onclick = league;
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
