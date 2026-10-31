@@ -692,8 +692,7 @@ function home() {
   <div id="leaguew"></div>
   <div class="card"><div id="goalw">${goalCard([])}</div></div>
   ${soonStrip()}
-  ${legalLinks()}`, { wide: true, nav: "home" });
-  bindLegal();
+`, { wide: true, nav: "home" });
   st.ui.msg = null;
   fillAnnouncement();
   if ($("nok")) $("nok").onclick = () => { store.set(seenKey, st.counts); home(); };
@@ -1205,23 +1204,31 @@ async function stats() {
 function tools() {
   S = { screen: tools };
   st.ui.fromTools = false;
+  const row = (id, ico, title, sub, cls = "") => `<button class="li ${cls}" id="${id}"><span class="trow"><span class="tico">${ico}</span><span class="ttxt"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</span></span><i aria-hidden="true">${fwd()}</i></button>`;
+  const sec = (title, inner) => `<div class="section-title tsec">${title}</div>${inner}`;
+  const list = (rows) => `<div class="list">${rows.filter(Boolean).join("")}</div>`;
   frame(`${msgHtml()}${pageHero("navTools")}
-  <div class="tools-grid">
-    <div class="card"><h3>⭐ ${t("subsT")}</h3><p class="muted">${hasAccess() ? t("subsOn") : t("subsOff")}</p><button class="primary" id="sub">${hasAccess() ? t("manage") : t("choose")}</button></div>
-    <div class="card"><h3>${t("acct")}</h3><p class="muted">${t("acctD")}</p><button class="primary" id="ac">${t("acct")}</button></div>
-    <div class="card"><h3>${t("refT")}</h3><p class="muted">${t("refD")}</p><button class="primary" id="rfp">${t("refT")}</button></div>
-    <div class="card"><h3>${t("calcT")}</h3><p class="muted">${t("calcD")}</p><button class="primary" id="clc">${t("calcT")}</button></div>
-    <div class="card"><h3>${t("search")}</h3><p class="muted">${t("searchD")}</p><button class="primary" id="srch">${t("search")}</button></div>
-    <div class="card"><h3>${t("flash")}</h3><p class="muted">${t("cardsD")}</p><button class="primary" id="fl">${t("flash")}</button></div>
-    <div class="card"><h3>👋 ${t("introAgain")}</h3><p class="muted">${t("introAgainD")}</p><button class="ghost" id="ina">${t("introAgain")}</button></div>
-    <div class="card"><h3>${t("helpT")}</h3><p class="muted">${t("helpD")}</p><button class="primary" id="hp">${t("contact")}</button></div>
-    <div class="card"><h3>${t("jTitle")}</h3><p class="muted">${t("jBuildD")}</p><button class="primary" id="jt">${t("jTitle")}</button></div>
-    ${lbOK() ? `<div class="card"><h3>🏆 ${leagueName()}</h3><p class="muted">${t("leagueJoinD")}</p><button class="primary" id="lgt2">${leagueName()}</button></div>` : ""}
-    ${reminderCard()}
-    ${pushCard()}
-    <div class="card"><h3>${t("resetT")}</h3><p class="muted">${t("resetD")}</p><button class="danger" id="rs">${st.ui.resetArmed ? t("resetSure") : t("resetBtn")}</button></div>
-  </div>
-  ${legalLinks()}`, { wide: true, nav: "tools" });
+  ${sec(t("toolsAcct"), list([
+    row("sub", "⭐", t("subsT"), hasAccess() ? t("subsOn") : t("subsOff")),
+    row("ac", "👤", t("acct"), t("acctD")),
+    st.user ? row("lg-o", "🚪", t("logout"), "") : "",
+  ]))}
+  ${sec(t("toolsStudy"), list([
+    row("jt", "🧭", t("jTitle"), t("jBuildD")),
+    lbOK() ? row("lgt2", "🏆", leagueName(), t("leagueJoinD")) : "",
+    row("fl", "🗂️", t("flash"), t("cardsD")),
+    row("srch", "🔎", t("search"), t("searchD")),
+    row("rfp", "📚", t("refT"), t("refD")),
+    row("clc", "🧮", t("calcT"), t("calcD")),
+  ]))}
+  ${sec(t("toolsRemind"), `<div class="tools-grid">${reminderCard()}${pushCard()}</div>`)}
+  ${sec(t("toolsHelp"), list([
+    row("hp", "💬", t("helpT"), t("helpD")),
+    row("ina", "👋", t("introAgain"), t("introAgainD")),
+    row("lg-t", "📄", t("terms"), ""),
+    row("lg-p", "🔒", t("privacy"), ""),
+  ]))}
+  ${sec(t("toolsData"), list([row("rs", "🗑️", st.ui.resetArmed ? t("resetSure") : t("resetBtn"), t("resetD"), "dng")]))}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions"); st.ui.fromTools = true; plans(); };
