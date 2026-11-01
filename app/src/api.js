@@ -276,3 +276,7 @@ export async function removePushToken(token) {
 // past (reconstructed) exams
 export async function sessionList(track) { return must(await supabase.rpc("session_list", { p_track: track })); }
 export async function sessionIds(id) { return must(await supabase.rpc("session_ids", { p_session: id })); }
+
+// summaries (locked until published)
+export async function summaryList(track) { return must(await supabase.rpc("summary_list", { p_track: track })); }
+export async function summaryGet(id) { const r = must(await supabase.rpc("summary_get", { p_id: id })); return r?.[0] || null; }

@@ -683,6 +683,7 @@ function home() {
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   <div id="openx"></div>
   <button class="card" id="pst" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("pastEx")}</b><br><small class="muted">${t("pastExD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
+  <button class="card" id="smr" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("smrT")}</b><br><small class="muted">${t("smrD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
   <div class="acts4">
     <button class="act-c c1" id="nx2"><img src="${icNewexam}" alt=""><b>${t("startExam")}</b><small>${t("navNew")}</small><i aria-hidden="true">${fwd()}</i></button>
     <button class="act-c c2" id="smr"><img src="${icSparkle}" alt=""><b>${t("smart")}</b><small>${t("smartD")}</small><i aria-hidden="true">${fwd()}</i></button>
@@ -701,6 +702,8 @@ function home() {
   $("go").onclick = () => practice({ kind: "seq" });
   $("nx2").onclick = newExam;
   $("pst").onclick = pastExams;
+  $("smr").onclick = summaries;
+  api.summaryList(TR()).then((l) => { if (!l.length && $("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } }).catch(() => { if ($("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } });
   api.sessionList(TR()).then((l) => { if (!l.length && $("pst")) { $("pst").style.opacity = ".8"; $("pst").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("soonTag")}</span>`); } }).catch(() => {});
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
   $("bm").onclick = () => practice({ kind: "ids", ids: [...st.marks] });
@@ -738,6 +741,44 @@ async function pastExams() {
       runExam(row);
     } catch (e) { b.disabled = false; flash(errMsg(e), true); }
   }; });
+}
+
+/* ---------------- summaries (locked until published) ---------------- */
+function smrLocked() {
+  return `<div class="card" style="text-align:center"><div style="font-size:40px">🔒</div><h3>${t("smrSoon")}</h3><p class="muted" style="margin:0">${t("smrLockedD")}</p></div>`;
+}
+function smrBody(txt) {
+  const out = []; let ul = false;
+  for (const raw of String(txt || "").split("\n")) {
+    const l = raw.trim();
+    if (l.startsWith("- ")) { if (!ul) { out.push("<ul>"); ul = true; } out.push(`<li>${esc(l.slice(2))}</li>`); continue; }
+    if (ul) { out.push("</ul>"); ul = false; }
+    if (!l) continue;
+    out.push(l.startsWith("## ") ? `<h3 style="margin:16px 0 4px">${esc(l.slice(3))}</h3>` : `<p style="margin:6px 0">${esc(l)}</p>`);
+  }
+  if (ul) out.push("</ul>");
+  return out.join("");
+}
+async function summaries() {
+  S = { screen: summaries, back: route };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("smrT")}</h2></div><div id="sl"><span class="spin"></span></div>`, { wide: true });
+  $("bk").onclick = route;
+  let list = [];
+  try { list = await api.summaryList(TR()); } catch { $("sl").innerHTML = smrLocked(); return; }
+  if (!list.length) { $("sl").innerHTML = smrLocked(); return; }
+  const groups = new Map();
+  for (const x of list) { const k = x.topic || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+  $("sl").innerHTML = [...groups].map(([k, items]) => `${k ? `<h3 style="margin:16px 0 8px">${esc(k)}</h3>` : ""}<div class="list">${items.map((x) => `<button class="li" data-i="${x.id}"><span>${esc(x.title)}</span><i aria-hidden="true">${fwd()}</i></button>`).join("")}</div>`).join("");
+  $("sl").querySelectorAll("[data-i]").forEach((b) => { b.onclick = () => summaryView(Number(b.dataset.i)); });
+}
+async function summaryView(id) {
+  S = { screen: () => summaryView(id), back: summaries };
+  frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("smrT")}</h2></div><div id="sv"><span class="spin"></span></div>`, { wide: true });
+  $("bk").onclick = summaries;
+  let r = null;
+  try { r = await api.summaryGet(id); } catch { $("sv").innerHTML = `<p class="muted">${t("adErr")}</p>`; return; }
+  if (!r) { $("sv").innerHTML = `<div class="card" style="text-align:center"><p class="muted">${t("smrNeedSub")}</p><button class="primary" id="smp">${t("smrPlans")}</button></div>`; $("smp").onclick = plans; return; }
+  $("sv").innerHTML = `<div class="card"><h2 style="margin-top:0">${esc(r.title)}</h2>${smrBody(r.body)}</div>`;
 }
 
 /* ---------------- new exam (builder) ---------------- */

@@ -360,3 +360,8 @@ Object.assign(T.en, { lbPts: "points", lbIntroD: "A weekly competition between s
 
 Object.assign(T.en, { igT: "Follow us on Instagram" });
 Object.assign(T.he, { igT: "עקבו אחרינו באינסטגרם" });
+
+Object.assign(T.en, { smrT: "Summaries", smrD: "Condition, key signs and treatment", smrSoon: "Opens a week before the exam", smrLockedD: "The summaries open a week before your exam date, so you can review everything before the test.", smrNeedSub: "Summaries are available with a subscription." });
+Object.assign(T.he, { smrT: "סיכומים", smrD: "מחלה, סימנים עיקריים וטיפול", smrSoon: "ייפתח שבוע לפני המבחן", smrLockedD: "הסיכומים ייפתחו שבוע לפני מועד המבחן, כדי שתוכלו לחזור על הכל לפני הבחינה.", smrNeedSub: "הסיכומים זמינים למנויים." });
+Object.assign(T.en, { smrPlans: "See plans" });
+Object.assign(T.he, { smrPlans: "לצפייה במסלולים" });
