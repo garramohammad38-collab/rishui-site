@@ -783,3 +783,7 @@ img{-webkit-user-drag:none;user-drag:none}
   .app.hv{padding-top:0}
   .app.hv .h-hero{margin-top:0;border-radius:0 0 34px 34px}
 }
+
+/* splash: cover the whole screen, no light edges */
+.splash{position:fixed !important;inset:0;width:100%;height:100%;min-height:0;z-index:60;border-radius:0}
+.app.sp{background:transparent}
