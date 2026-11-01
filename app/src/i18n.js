@@ -367,3 +367,5 @@ Object.assign(T.en, { smrPlans: "See plans" });
 Object.assign(T.he, { smrPlans: "לצפייה במסלולים" });
 Object.assign(T.en, { pastLocked: "Locked", pastEmpty: "Reconstructed exams for this track will open when they are ready." });
 Object.assign(T.he, { pastLocked: "נעול", pastEmpty: "המבחנים המשוחזרים למסלול הזה ייפתחו כשיהיו מוכנים." });
+Object.assign(T.en, { waT: "Message us on WhatsApp" });
+Object.assign(T.he, { waT: "כתבו לנו בוואטסאפ" });

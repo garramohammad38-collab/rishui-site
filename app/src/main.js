@@ -145,10 +145,11 @@ function msgHtml() { return st.ui.msg ? `<div class="banner ${st.ui.msgBad ? "ba
 function flash(msg, bad = false) { st.ui.msg = msg; st.ui.msgBad = bad; }
 function openUrl(url) { if (url) Browser.open({ url }).catch(() => window.open(url, "_blank")); }
 function legalLinks(ig = false) {
-  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button>${ig ? `<button class="link" id="lg-ig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg> Instagram</button>` : ""}<button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button>${st.user ? `<button class="link" id="lg-o">${t("logout")}</button>` : ""}</div>`;
+  return `<div class="small-links"><button class="link" id="lg-c">✉️ ${t("contact")}</button>${ig ? `<button class="link" id="lg-wa"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-.8.7c-.9-.4-1.7-1.200-2-2l.7-.8-1-1.8z" fill="currentColor" stroke="none"/></svg> WhatsApp</button><button class="link" id="lg-ig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg> Instagram</button>` : ""}<button class="link" id="lg-t">${t("terms")}</button><button class="link" id="lg-p">${t("privacy")}</button>${st.user ? `<button class="link" id="lg-o">${t("logout")}</button>` : ""}</div>`;
 }
 function bindLegal() {
   if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
+  if ($("lg-wa")) $("lg-wa").onclick = () => openUrl("https://wa.me/972503227701");
   if ($("lg-ig")) $("lg-ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/");
   if ($("lg-o")) $("lg-o").onclick = logout;
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
@@ -1268,6 +1269,7 @@ function tools() {
     row("hp", "💬", t("helpT"), t("helpD")),
     row("ina", "👋", t("introAgain"), t("introAgainD")),
     row("ig", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c13584" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="#c13584" stroke="none"/></svg>`, t("igT"), "@Musmachapp"),
+    row("wa", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-.8.7c-.9-.4-1.7-1.200-2-2l.7-.8-1-1.8z" fill="#25a244" stroke="none"/></svg>`, t("waT"), "050-3227701"),
     row("lg-t", "📄", t("terms"), ""),
     row("lg-p", "🔒", t("privacy"), ""),
   ]))}
@@ -1275,7 +1277,7 @@ function tools() {
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions"); st.ui.fromTools = true; plans(); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); if ($("lgt2")) $("lgt2").onclick = league;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972503227701"); if ($("lgt2")) $("lgt2").onclick = league;
   $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
