@@ -124,7 +124,7 @@ async function start() {
 /* ---------- layout ---------- */
 const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what a limited admin may open
 function render() {
-  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["summaries","📘 ملخصات"],["pastex","📝 امتحانات سابقة"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["insights","🔍 تحليل المستخدمين"],["summaries","📘 ملخصات"],["pastex","📝 امتحانات سابقة"],["ann","📢 إعلانات"],["stats","أرقام"]];
   const isAdmin = me.role === "admin";
   const tabs = isAdmin ? allTabs : allTabs.filter(t => EDITOR_TABS.includes(t[0]));
   if (!tabs.some(t => t[0] === tab)) tab = "list";
@@ -136,7 +136,7 @@ function render() {
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, summaries: viewSummaries, pastex: viewPastEx, ann: viewAnn, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, insights: viewInsights, summaries: viewSummaries, pastex: viewPastEx, ann: viewAnn, stats: viewStats })[tab]();
 }
 
 
@@ -654,6 +654,36 @@ async function viewUsers() {
   $("upg").textContent = `صفحة ${s.page + 1} من ${pages}`;
   $("upr").disabled = s.page === 0; $("unx").disabled = s.page + 1 >= pages;
   $("upr").onclick = () => { s.page--; viewUsers(); }; $("unx").onclick = () => { s.page++; viewUsers(); };
+}
+
+/* ---------- user insights: why people stopped ---------- */
+let insSeg = "all";
+async function viewInsights() {
+  $("body").innerHTML = `<div class="card"><span class="muted">بحمّل…</span></div>`;
+  const { data, error } = await sb.rpc("admin_user_insights");
+  if (error) { $("body").innerHTML = `<div class="msg bad">${esc(error.message)}<br><span class="muted">شغّل supabase/migration-31-user-insights.sql بـ SQL Editor</span></div>`; return; }
+  const FREE = 30, now = Date.now(), day = 864e5;
+  const rows = (data || []).map(u => ({ ...u, n: +u.n_answers, ago: u.last_at ? Math.floor((now - new Date(u.last_at)) / day) : null, age: Math.floor((now - new Date(u.created_at)) / day) }));
+  const seg = {
+    never: u => u.n === 0 && !u.paid,
+    low: u => u.n > 0 && u.n < FREE && !u.paid,
+    limit: u => u.n >= FREE && !u.paid,
+    paid: u => u.paid,
+    gone: u => u.n > 0 && u.ago >= 7 && !u.paid,
+    active: u => u.n > 0 && u.ago < 7,
+  };
+  const names = { all: "الكل", never: "سجّل وما حلّ ولا سؤال", low: `حلّ أقل من ${FREE} وتوقف`, limit: `خلّص الـ ${FREE} المجانية وما دفع`, gone: "اختفى من 7 أيام+", active: "ناشط (آخر 7 أيام)", paid: "دافع" };
+  const cnt = k => k === "all" ? rows.length : rows.filter(seg[k]).length;
+  const total = rows.length || 1, pct = n => Math.round(100 * n / total);
+  const fun = [["سجّلوا", rows.length], ["حلّوا سؤال", rows.filter(u => u.n > 0).length], [`وصلوا لـ ${FREE}`, rows.filter(u => u.n >= FREE).length], ["دفعوا", rows.filter(u => u.paid).length]];
+  const list = (insSeg === "all" ? rows : rows.filter(seg[insSeg])).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const fmtAgo = u => u.ago == null ? "—" : u.ago === 0 ? "اليوم" : `قبل ${u.ago} يوم`;
+  $("body").innerHTML = `<div class="card"><h3>وين بيضيعوا الناس؟</h3>
+    ${fun.map(([n, v], i) => `<div class="li"><span>${n}</span><span class="muted">${num(v)} · ${pct(v)}%${i ? ` <span class="muted">(من اللي قبلو: ${fun[i-1][1] ? Math.round(100 * v / fun[i-1][1]) : 0}%)</span>` : ""}</span><div class="lbar" style="width:${pct(v)}%"></div></div>`).join("")}</div>
+    <div class="card"><h3>فئات المستخدمين</h3><div class="row" style="justify-content:flex-start;flex-wrap:wrap">${Object.keys(names).map(k => `<button class="btn ${k === insSeg ? "" : "ghost"}" data-seg="${k}" style="flex:none">${names[k]} (${cnt(k)})</button>`).join("")}</div>
+    <p class="muted">${insSeg === "limit" ? "هدول أقرب ناس للدفع: كلمهم وقدّم لهم كود أو خصم." : insSeg === "never" ? "سجّلوا وما جرّبوا: غالباً ما فهموا شو يعملوا أو التطبيق ما عجبهم من أول شاشة." : insSeg === "low" ? "جرّبوا شوي وتركوا: شوف أي شاشة/موضوع وقفوا عنده." : ""}</p>
+    <div class="tbl"><table><thead><tr><th>الإيميل</th><th>سجّل</th><th>المسار</th><th>أسئلة</th><th>% صح</th><th>أيام نشاط</th><th>آخر نشاط</th><th>امتحانات (بدأ/خلّص)</th><th>مهمات يومية</th><th>أجهزة</th><th>موعد الامتحان</th><th>الحالة</th></tr></thead><tbody>${list.slice(0, 300).map(u => `<tr><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${esc(String(u.created_at).slice(0, 10))}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td><b>${num(u.n)}</b></td><td>${u.n ? Math.round(100 * u.n_correct / u.n) + "%" : "—"}</td><td>${num(u.active_days)}</td><td>${fmtAgo(u)}</td><td>${num(u.exams_started)}/${num(u.exams_done)}</td><td>${num(u.missions_done)}</td><td>${num(u.devices)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${u.paid ? `<span class="pill">دافع</span>` : u.n >= FREE ? `<span class="pill" style="background:#FFF3E0">وصل للحد</span>` : u.n === 0 ? `<span class="muted">ما جرّب</span>` : `<span class="muted">مجاني</span>`}</td></tr>`).join("") || `<tr><td colspan="12" class="muted">ما في</td></tr>`}</tbody></table></div>${list.length > 300 ? `<p class="muted">بيعرض أول 300 من ${list.length}</p>` : ""}</div>`;
+  $("body").querySelectorAll("[data-seg]").forEach(b => b.onclick = () => { insSeg = b.dataset.seg; viewInsights(); });
 }
 
 /* ---------- stats ---------- */
