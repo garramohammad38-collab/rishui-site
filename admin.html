@@ -124,7 +124,7 @@ async function start() {
 /* ---------- layout ---------- */
 const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what a limited admin may open
 function render() {
-  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["summaries","📘 ملخصات"],["pastex","📝 امتحانات سابقة"],["ann","📢 إعلانات"],["stats","أرقام"]];
   const isAdmin = me.role === "admin";
   const tabs = isAdmin ? allTabs : allTabs.filter(t => EDITOR_TABS.includes(t[0]));
   if (!tabs.some(t => t[0] === tab)) tab = "list";
@@ -136,7 +136,53 @@ function render() {
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, ann: viewAnn, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, summaries: viewSummaries, pastex: viewPastEx, ann: viewAnn, stats: viewStats })[tab]();
+}
+
+
+/* ---------- summaries (ملخصات) ---------- */
+async function viewSummaries() {
+  const { data } = await sb.from("summaries").select("id,topic,title,sort,published").eq("track", curTrack).order("topic").order("sort").order("id");
+  const rows = data || [], pub = rows.filter(r => r.published).length;
+  $("body").innerHTML = `<div class="card"><h3>ملخصات مسار ${esc(trackLabel(curTrack))}: ${pub} مفتوح من ${rows.length}</h3>
+    <p class="muted">الملخصات مقفولة عن الطلاب (🔒 ייפתח שבוע לפני המבחן) لحد ما تفتحها. بتفتح فقط لمن عنده اشتراك.</p>
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" id="sopen" style="flex:none">🔓 افتح كل ملخصات المسار</button><button class="btn ghost" id="sclose" style="flex:none">🔒 سكّر كل ملخصات المسار</button></div></div>
+    <form class="card" id="sf"><h3>ملخص جديد</h3>
+    <div class="row"><div><label>العنوان (مرض)</label><input id="stt" required placeholder="מחלה"></div><div><label>الموضوع</label><input id="stp" placeholder="مثلاً: קרדיולוגיה"></div><div style="max-width:120px"><label>الترتيب</label><input id="sso" type="number" value="0"></div></div>
+    <label>النص (## عنوان فرعي، - نقطة، وباقي السطور فقرات)</label><textarea id="sbd" rows="9" required placeholder="## סימנים עיקריים&#10;- ...&#10;## טיפול&#10;- ..."></textarea>
+    <button class="btn" type="submit" style="align-self:flex-start">إضافة (مقفول)</button></form>
+    <div class="card"><h3>الملخصات</h3><div class="tbl"><table><thead><tr><th>العنوان</th><th>الموضوع</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.title)}</td><td>${esc(r.topic || "")}</td><td>${r.published ? "🔓 مفتوح" : "🔒 مقفول"}</td><td><button class="btn ghost" data-sid="${r.id}" data-p="${r.published ? 0 : 1}">${r.published ? "سكّر" : "افتح"}</button></td></tr>`).join("") || `<tr><td colspan="4" class="muted">ما في ملخصات لهالمسار لسا.</td></tr>`}</tbody></table></div></div>`;
+  const setAll = async v => { const { error } = await sb.from("summaries").update({ published: v }).eq("track", curTrack); msg(error ? error.message : (v ? "انفتحت كل الملخصات" : "انسكرت كل الملخصات"), !error); render(); };
+  $("sopen").onclick = () => confirm("افتح كل ملخصات هالمسار للطلاب؟") && setAll(true);
+  $("sclose").onclick = () => setAll(false);
+  document.querySelectorAll("[data-sid]").forEach(b => b.onclick = async () => { const { error } = await sb.from("summaries").update({ published: b.dataset.p === "1" }).eq("id", b.dataset.sid); if (error) msg(error.message, false); render(); });
+  $("sf").onsubmit = async e => { e.preventDefault(); const { error } = await sb.from("summaries").insert({ track: curTrack, title: $("stt").value.trim(), topic: $("stp").value.trim() || null, body: $("sbd").value, sort: +$("sso").value || 0, published: false }); msg(error ? error.message : "انضاف الملخص (مقفول)", !error); render(); };
+}
+
+/* ---------- past exams (امتحانات سابقة) ---------- */
+async function viewPastEx() {
+  const { data: ss } = await sb.from("exam_sessions").select("*").eq("track", curTrack).order("year", { ascending: false }).order("month", { ascending: false, nullsFirst: false });
+  const cnt = {};
+  for (let from = 0; ; from += 1000) {
+    const { data: qs } = await sb.from("questions").select("session_id,published").eq("track", curTrack).not("session_id", "is", null).order("id").range(from, from + 999);
+    (qs || []).forEach(q => { const c = cnt[q.session_id] || (cnt[q.session_id] = { n: 0, p: 0 }); c.n++; if (q.published) c.p++; });
+    if (!qs || qs.length < 1000) break;
+  }
+  const list = ss || [];
+  const live = s => s.published && (cnt[s.id]?.p || 0) > 0;
+  $("body").innerHTML = `<div class="card"><h3>امتحانات سابقة (שחזורים) لمسار ${esc(trackLabel(curTrack))}: ${list.filter(live).length} ظاهر للطلاب من ${list.length}</h3>
+    <p class="muted">"افتح" بينشر الجلسة وكل أسئلتها، و"سكّر" بيخفيها. الطالب بيشوف الامتحان بس إذا الجلسة منشورة وفيها أسئلة منشورة. إذا ما في ولا امتحان ظاهر بيطلع 🔒 בקרוב.</p>
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" id="paopen" style="flex:none">🔓 افتح الكل</button><button class="btn ghost" id="paclose" style="flex:none">🔒 سكّر الكل</button></div>
+    <div class="tbl"><table><thead><tr><th>الامتحان</th><th>أسئلة منشورة / كل</th><th>الحالة</th><th></th></tr></thead><tbody>${list.map(s => { const c = cnt[s.id] || { n: 0, p: 0 }; return `<tr><td>${esc((s.month ? s.month + "/" : "") + s.year)} ${esc(s.label || "")}</td><td dir="ltr">${c.p} / ${c.n}</td><td>${live(s) ? "🔓 ظاهر" : "🔒 مخفي"}</td><td><button class="btn ghost" data-xid="${s.id}" data-p="${live(s) ? 0 : 1}">${live(s) ? "سكّر" : "افتح"}</button></td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">ما في جلسات لهالمسار.</td></tr>`}</tbody></table></div></div>`;
+  const setIds = async (ids, v) => {
+    if (!ids.length) return;
+    const a = await sb.from("exam_sessions").update({ published: v }).in("id", ids);
+    const b = await sb.from("questions").update({ published: v }).in("session_id", ids);
+    const err = a.error || b.error; msg(err ? err.message : (v ? "انفتح" : "انسكر"), !err); render();
+  };
+  $("paopen").onclick = () => confirm("افتح كل امتحانات هالمسار للطلاب؟") && setIds(list.map(s => s.id), true);
+  $("paclose").onclick = () => setIds(list.map(s => s.id), false);
+  document.querySelectorAll("[data-xid]").forEach(b => b.onclick = () => setIds([+b.dataset.xid], b.dataset.p === "1"));
 }
 
 /* ---------- list ---------- */
