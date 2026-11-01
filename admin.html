@@ -438,8 +438,11 @@ async function viewCodes() {
     <div class="row"><div><label>الكود</label><input id="c" dir="ltr" value="${randCode()}"></div><div><label>عدد الاستخدامات</label><input id="n" type="number" min="1" value="30"></div>
     <div><label>صالح لحد</label><input id="v" type="date" value="${d.toISOString().slice(0,10)}"></div><div><label>ملاحظة (لمين)</label><input id="nt" placeholder="مثلاً: كلية تل أبيب، دورة أيلول"></div>
     <div><label>بيفتح مسار</label><select id="ct">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}<option value="all">كل المسارات</option></select></div></div>
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn ghost" type="button" id="q1" style="flex:none">🎟 كود لشخص واحد</button><button class="btn ghost" type="button" id="q30" style="flex:none">👥 كود لـ 30 شخص</button><span class="muted">بيعبّي الخانات (كود جديد + عدد الاستخدامات) وإنت بتختار المسار والتاريخ.</span></div>
     <button class="btn" type="submit">إنشاء</button></form>
-    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>المسار</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
+    <div class="card"><h3>الأكواد</h3><div class="tbl"><table><thead><tr><th>الكود</th><th>المسار</th><th>متبقي</th><th>لحد</th><th>ملاحظة</th><th>مين استخدمه</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>`;
+  $("q1").onclick = () => { $("c").value = randCode(); $("n").value = 1; };
+  $("q30").onclick = () => { $("c").value = randCode(); $("n").value = 30; };
   $("f").onsubmit = async e => {
     e.preventDefault();
     const { error } = await sb.from("access_codes").insert({ code: $("c").value.trim().toUpperCase(), uses_left: +$("n").value, valid_until: $("v").value, note: $("nt").value.trim() || null, track: $("ct").value });
@@ -447,7 +450,14 @@ async function viewCodes() {
     render();
   };
   const { data } = await sb.from("access_codes").select("*").order("created_at", { ascending: false }).limit(200);
-  $("rows").innerHTML = (data || []).map(r => `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.track === "all" ? "كل المسارات" : esc(trackLabel(r.track))}</td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">ما في أكواد</td></tr>`;
+  const { data: rd } = await sb.from("code_redemptions").select("code,user_id,redeemed_at").limit(2000);
+  const uids = [...new Set((rd || []).map(x => x.user_id))];
+  const mail = {};
+  if (uids.length) { const { data: pf } = await sb.from("profiles").select("id,email").in("id", uids); (pf || []).forEach(x => mail[x.id] = x.email); }
+  const used = {}; (rd || []).forEach(x => (used[x.code] || (used[x.code] = [])).push(x));
+  $("rows").innerHTML = (data || []).map(r => { const u = used[r.code] || []; return `<tr><td dir="ltr"><b>${esc(r.code)}</b></td><td>${r.track === "all" ? "كل المسارات" : esc(trackLabel(r.track))}</td><td>${r.uses_left}</td><td dir="ltr">${r.valid_until}</td><td>${esc(r.note || "")}</td><td dir="ltr" style="text-align:start">${u.length ? u.map(x => `${esc(mail[x.user_id] || "؟")} <span class="muted">${esc(String(x.redeemed_at).slice(0, 10))}</span>`).join("<br>") : `<span class="muted">ما حدا</span>`}</td><td>${r.uses_left > 0 ? `<button class="btn ghost" data-off="${esc(r.code)}" style="flex:none;padding:4px 10px">إلغاء</button>` : ""}${u.length ? "" : ` <button class="btn ghost" data-rm="${esc(r.code)}" style="flex:none;padding:4px 10px;color:#C0392B">حذف</button>`}</td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">ما في أكواد</td></tr>`;
+  $("rows").querySelectorAll("[data-off]").forEach(b => b.onclick = async () => { if (!confirm("تلغي الكود " + b.dataset.off + "؟ (ما بيشتغل بعدها)")) return; const { error } = await sb.from("access_codes").update({ uses_left: 0 }).eq("code", b.dataset.off); if (error) alert(error.message); viewCodes(); });
+  $("rows").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { if (!confirm("تحذف الكود " + b.dataset.rm + "؟")) return; const { error } = await sb.from("access_codes").delete().eq("code", b.dataset.rm); if (error) alert(error.message); viewCodes(); });
 }
 function randCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "RS-"; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random()*a.length)]; return s; }
 
