@@ -365,3 +365,5 @@ Object.assign(T.en, { smrT: "Summaries", smrD: "Condition, key signs and treatme
 Object.assign(T.he, { smrT: "סיכומים", smrD: "מחלה, סימנים עיקריים וטיפול", smrSoon: "ייפתח שבוע לפני המבחן", smrLockedD: "הסיכומים ייפתחו שבוע לפני מועד המבחן, כדי שתוכלו לחזור על הכל לפני הבחינה.", smrNeedSub: "הסיכומים זמינים למנויים." });
 Object.assign(T.en, { smrPlans: "See plans" });
 Object.assign(T.he, { smrPlans: "לצפייה במסלולים" });
+Object.assign(T.en, { pastLocked: "Locked", pastEmpty: "Reconstructed exams for this track will open when they are ready." });
+Object.assign(T.he, { pastLocked: "נעול", pastEmpty: "המבחנים המשוחזרים למסלול הזה ייפתחו כשיהיו מוכנים." });
