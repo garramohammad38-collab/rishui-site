@@ -2,8 +2,8 @@ import { Capacitor } from "@capacitor/core";
 import { Purchases } from "@revenuecat/purchases-capacitor";
 
 // product ids (practical optometry uses "optometryprac"): rishui_<track>_monthly, rishui_<track>_2months and rishui_<track>_until_exam
-const productRe = /^rishui_([a-z]+)_(monthly|2months|until_exam)$/;
-const KIND = { monthly: "month", "2months": "two", until_exam: "exam" };
+const productRe = /^rishui_([a-z]+)_(monthly|2months|until_exam|n1|n2|n3)$/;
+const KIND = { monthly: "month", "2months": "two", until_exam: "exam", n1: "month", n2: "two", n3: "exam" };
 const platform = Capacitor.getPlatform(); // "ios" | "android" | "web"
 export const storeAvailable = platform === "ios" || platform === "android";
 

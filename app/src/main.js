@@ -5,7 +5,7 @@ import { Device } from "@capacitor/device";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
 import * as api from "./api.js?v=20261102p";
-import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102m";
+import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102q";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
 import "./ptr.js?v=20261102i";
@@ -578,8 +578,7 @@ function plans() {
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
   // website: no store price; show the fixed web prices (payment by Bit, activated by us)
   const OPT = String(TR()).startsWith("optometry");
-  if (OPT && st.ui.plan !== "month" && st.ui.plan !== "two") st.ui.plan = "month";
-  const WEBP = OPT ? { month: "₪99", two: "₪169" } : { month: "₪99", two: "₪149", exam: "₪229" };
+    const WEBP = { month: "₪99", two: "₪169", exam: "₪269" };
   const partName = OPT ? `${t("optTitle")} · ${TR() === "optometry_prac" ? t("optPractical") : t("optTheory")}` : trackName(TR());
   const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
   frame(`${msgHtml()}
@@ -590,10 +589,9 @@ function plans() {
     <div class="plans">
       ${`<button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>`}
       ${`<button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>`}
-      ${OPT ? "" : `<button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>`}
+      ${`<button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>`}
     </div>
-    <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
-    <p class="muted" style="font-size:12.5px;line-height:1.6;margin:10px 0 4px">${t("payLegal").replace("{t}", `<a href="#" id="pl-t" style="color:inherit;text-decoration:underline">${t("terms")}</a>`).replace("{p}", `<a href="#" id="pl-p" style="color:inherit;text-decoration:underline">${t("privacy")}</a>`)}</p>
+        <p class="muted" style="font-size:12.5px;line-height:1.6;margin:10px 0 4px">${t("payLegal").replace("{t}", `<a href="#" id="pl-t" style="color:inherit;text-decoration:underline">${t("terms")}</a>`).replace("{p}", `<a href="#" id="pl-p" style="color:inherit;text-decoration:underline">${t("privacy")}</a>`)}</p>
     ${st.user?.is_anonymous ? `<p class="muted">${t("needAcct")}</p><button class="primary" id="mkacct">${t("saveAcct")}</button>` : (storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted" style="font-weight:600">${t("payCash")}</p><button class="primary" id="bit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-inline-end:8px"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><circle cx="16.5" cy="14.5" r="1.2"/></svg>${t("bitBtn")}</button><p class="muted" style="text-align:center;margin:6px 0 0" dir="ltr">Bit · 050-322-7701</p><button class="ghost" id="wa"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-inline-end:8px"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-1 .7a5 5 0 0 1-2.2-2.2l.7-1-1-1.8z"/></svg>${t("webPayBtn")}</button>`)}
   </div>
   <div class="card">
@@ -620,7 +618,6 @@ function plans() {
   if ($("go")) $("go").onclick = async () => {
     if (st.user?.is_anonymous) return account();
     const plan = st.ui.plan;
-    if (plan === "exam") await api.updateProfile(null, $("ex").value).catch(() => {});
     $("go").disabled = true; $("go").textContent = t("buying");
     const r = await buy(TR(), plan);
     if (r === "cancelled") return plans();
