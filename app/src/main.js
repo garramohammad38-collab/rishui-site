@@ -1370,7 +1370,7 @@ function tools() {
   ${sec(t("toolsData"), list([row("rs", "🗑️", st.ui.resetArmed ? t("resetSure") : t("resetBtn"), t("resetD"), "dng")]))}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   if ($("jt")) $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
-  $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "android" ? "https://play.google.com/store/account/subscriptions" : "https://apps.apple.com/account/subscriptions"); st.ui.fromTools = true; plans(); };
+  $("sub").onclick = () => { if (hasAccess() && !isAdmin()) return openUrl(Capacitor.getPlatform() === "android" ? "https://play.google.com/store/account/subscriptions" : "https://apps.apple.com/account/subscriptions"); st.ui.fromTools = true; plans(); };
   $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972503227701"); if ($("lgt2")) $("lgt2").onclick = league;
   if ($("rfp")) $("rfp").onclick = () => refPage(tools); if ($("clc")) $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
