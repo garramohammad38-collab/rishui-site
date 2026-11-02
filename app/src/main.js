@@ -556,7 +556,7 @@ function plans() {
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
   // website: no store price; show the fixed web prices (payment by Bit, activated by us)
   const OPT = String(TR()).startsWith("optometry");
-  if (OPT) st.ui.plan = "month";
+  if (OPT && st.ui.plan !== "month" && st.ui.plan !== "two") st.ui.plan = "month";
   const WEBP = OPT ? { month: "₪99", two: "₪169" } : { month: "₪99", two: "₪149", exam: "₪229" };
   const partName = OPT ? `${t("optTitle")} · ${TR() === "optometry_prac" ? t("optPractical") : t("optTheory")}` : trackName(TR());
   const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
