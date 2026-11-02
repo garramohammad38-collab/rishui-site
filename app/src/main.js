@@ -116,6 +116,8 @@ function watermark(on) {
   if (on) $("wm-text").innerHTML = Array(120).fill(`<span>${esc(st.user?.email || "guest")}</span>`).join("");
 }
 function frame(inner, { protect = false, wide = false, nav = null, nobrand = false } = {}) {
+  try { if (window.__scrPlans) sessionStorage.setItem("scr", "plans"); else sessionStorage.removeItem("scr"); } catch { /* ignore */ }
+  window.__scrPlans = false;
   stopTimer();
   watermark(false);
   applyTheme();
@@ -307,6 +309,7 @@ function route() {
   if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
   if (!store.get(`intro:${st.user.id}`)) return intro();
   if (st.profile?.track === "optometry" && !st.ui.optPart) return optChooser();
+  try { if (sessionStorage.getItem("scr") === "plans" && !st.ui.scrUsed) { st.ui.scrUsed = true; st.ui.fromTools = true; return plans(); } } catch { /* ignore */ }
   const rs = (() => { try { return JSON.parse(sessionStorage.getItem("rs-res")); } catch { return null; } })();
   if (rs && !st.ui.warmUsed) {
     st.ui.warmUsed = true;
@@ -551,6 +554,7 @@ function chooseTrack(pending) {
 
 /* ---------------- plans + purchase ---------------- */
 function plans() {
+  window.__scrPlans = true;
   S = { screen: plans, back: st.ui.fromTools ? tools : hasAccess() ? route : null };
   const trial = st.ui.trialOffer && !hasAccess();
   const d = new Date(); d.setMonth(d.getMonth() + 3);
