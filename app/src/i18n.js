@@ -373,3 +373,6 @@ Object.assign(T.en, { optTitle: "Optometry", optTheory: "Theory exam", optPracti
 Object.assign(T.he, { optTitle: "אופטומטריה", optTheory: "מבחן עיוני", optPractical: "מבחן מעשי", optPracticalD: "תוכן המבחן המעשי בהכנה ויפתח בקרוב." });
 Object.assign(T.en, { optSources: "Sources" });
 Object.assign(T.he, { optSources: "מקורות" });
+
+Object.assign(T.en, { payLegal: "By subscribing you confirm that you have read and agree to the {t} and the {p}." });
+Object.assign(T.he, { payLegal: "בהרשמה אתה מאשר שקראת והסכמת ל{t} ול{p}." });
