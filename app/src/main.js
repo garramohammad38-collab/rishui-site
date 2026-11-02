@@ -268,6 +268,11 @@ async function deviceInfo() {
 async function loadUserData() {
   const uid = st.user.id;
   [st.profile, st.tracks, st.ents, st.freeMode, st.soon] = await Promise.all([api.getProfile(uid), api.tracks(), api.entitlements(uid), api.freeMode(), api.soonTracks().catch(() => [])]);
+  // admins can open tracks that are still "coming soon" (preview), everyone else only sees the locked card
+  if (st.profile?.role === "admin" && st.soon?.length) {
+    st.tracks = [...st.tracks, ...st.soon.map((x) => ({ ...x, preview: true }))].sort((a, b) => a.sort - b.sort);
+    st.soon = [];
+  }
   const profile = st.profile;
   if (!profile.track) return;
   const tr = profile.track;
