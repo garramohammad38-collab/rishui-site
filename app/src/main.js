@@ -1511,7 +1511,7 @@ async function missionFinish() {
     <h2>${t("bravo")}</h2>
     <div class="rw"><div><b class="okc">${c}</b><span>${t("rightN")}</span></div><div><b class="badc">${n - c}</b><span>${t("wrongN")}</span></div><div><b>🔥 ${streakOf(act, days)}</b><span>${t("streak")}</span></div></div>
     <p class="muted">${t("streakNote")}</p>
-    ${res.xp ? `<p class="okc"><b>+${res.xp} XP</b> · ${leagueName()}</p>` : ""}
+    ${res.xp ? `<p class="okc"><b>+${res.xp} XP</b>${String(TR()).startsWith("optometry") ? "" : ` · ${leagueName()}`}</p>` : ""}
   </div>
   <div class="section-title">${topics.length ? t("reviewTopics") : t("allGood")}</div>
   ${topics.length ? `<div class="chips">${topics.map((k) => `<button class="chip pick cool" data-tp="${esc(k)}">${esc(topicName(k, st.lang))}</button>`).join("")}</div>` : ""}
