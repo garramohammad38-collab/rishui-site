@@ -376,3 +376,6 @@ Object.assign(T.he, { optSources: "מקורות" });
 
 Object.assign(T.en, { payLegal: "By subscribing you confirm that you have read and agree to the {t} and the {p}." });
 Object.assign(T.he, { payLegal: "בהרשמה אתה מאשר שקראת והסכמת ל{t} ול{p}." });
+
+Object.assign(T.en, { payCash: "For cash / Bit, please contact us on WhatsApp.", webPayBtn: "Contact us on WhatsApp" });
+Object.assign(T.he, { payCash: "למזומן / ביט נא ליצור קשר בוואטסאפ", webPayBtn: "צרו קשר בוואטסאפ" });
