@@ -735,6 +735,7 @@ function home() {
   </div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
   ${stationsHtml}
+  ${OPP ? `<button class="card" id="ofx" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${st.lang === "he" ? "מבחן מלא" : "Full exam"}</b><br><small class="muted">${st.lang === "he" ? "כל העמדות ברצף, עם זמן לבחירתך" : "All stations in a row, time of your choice"}</small></span><i aria-hidden="true">${fwd()}</i></button>` : ""}
   <div id="openx"></div>
   ${OPH ? "" : `<button class="card" id="pst" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("pastEx")}</b><br><small class="muted">${t("pastExD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
   <button class="card" id="smr" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("smrT")}</b><br><small class="muted">${t("smrD")}</small></span><i aria-hidden="true">${fwd()}</i></button>`}
@@ -755,6 +756,7 @@ function home() {
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
   $("nx2").onclick = newExam;
+  if ($("ofx")) $("ofx").onclick = optFullExam;
   if ($("pst")) $("pst").onclick = pastExams;
   if ($("smr")) $("smr").onclick = summaries;
   if (!OPH) api.summaryList(TR()).then((l) => { if (!l.length && $("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } }).catch(() => { if ($("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } });
@@ -923,6 +925,42 @@ function newExam() {
   };
   // frame() scrolls to the top; keep the position when only an option changed
   const draw = () => { const y = window.scrollY; draw0(); window.scrollTo(0, y); };
+  draw();
+}
+
+/* ---------------- optometry practical: full exam (6 stations) ---------------- */
+function optFullExam() {
+  S = { screen: optFullExam, back: home };
+  const he = st.lang === "he";
+  const stations = Object.keys(st.counts).filter((k) => k.startsWith("optp_s")).sort();
+  const saved = store.get("optfull-cfg") || {};
+  const cfg = { per: saved.per || 10, min: saved.min ?? 0 };
+  const draw = () => {
+    frame(`<div class="qbar"><button class="back" id="bk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${he ? "מבחן מלא · מעשי" : "Full exam · Practical"}</h2></div>
+    <div class="card exb">
+      <p class="muted">${he ? "כל העמדות ברצף, שאלות אקראיות מכל עמדה." : "All stations in a row, random questions from each."}</p>
+      <div class="field"><label>${he ? "שאלות בכל עמדה" : "Questions per station"}</label><div class="chips">${[5, 10, 15, 20].map((n) => `<button class="chip pick ${cfg.per === n ? "cool" : ""}" data-per="${n}">${n}</button>`).join("")}</div></div>
+      <div class="field"><label>${he ? "זמן כולל" : "Total time"}</label><div class="chips">${[[0, he ? "ללא הגבלה" : "No limit"], [30, "30"], [60, "60"], [90, "90"], [120, "120"]].map(([m, l]) => `<button class="chip pick ${cfg.min === m ? "cool" : ""}" data-min="${m}">${l}${m ? " " + t("min") : ""}</button>`).join("")}</div></div>
+      <p class="muted">${stations.length} ${he ? "עמדות" : "stations"} · ${stations.length * cfg.per} ${t("qs")}</p>
+      <div class="err" id="er" hidden></div>
+      <button class="primary" id="go" ${stations.length ? "" : "disabled"}>${t("create")} ${fwd()}</button>
+    </div>`, { wide: true });
+    $("bk").onclick = home;
+    app.querySelectorAll("[data-per]").forEach((b) => (b.onclick = () => { cfg.per = +b.dataset.per; draw(); }));
+    app.querySelectorAll("[data-min]").forEach((b) => (b.onclick = () => { cfg.min = +b.dataset.min; draw(); }));
+    $("go").onclick = async () => {
+      store.set("optfull-cfg", cfg);
+      $("go").disabled = true;
+      try {
+        const lists = await Promise.all(stations.map((k) => api.examIds(TR(), cfg.per, [k], "all")));
+        const ids = lists.flat();
+        if (!ids.length) { $("er").textContent = t("noneMatch"); $("er").hidden = false; $("go").disabled = false; return; }
+        const limit = cfg.min ? cfg.min * 60 : null;
+        const row = await api.createExam({ track: TR(), settings: { timed: !!limit, guided: false, topics: stations, pool: "all", full: true, deadline: limit ? new Date(Date.now() + limit * 1000).toISOString() : null }, ids, picked: ids.map(() => null), time_limit: limit });
+        runExam(row);
+      } catch (e) { $("er").textContent = errMsg(e); $("er").hidden = false; $("go").disabled = false; }
+    };
+  };
   draw();
 }
 
