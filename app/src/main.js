@@ -548,16 +548,19 @@ function plans() {
   const d = new Date(); d.setMonth(d.getMonth() + 3);
   const exam = st.profile?.exam_date || d.toISOString().slice(0, 10);
   // website: no store price; show the fixed web prices (payment by Bit, activated by us)
-  const WEBP = { month: "₪99", two: "₪149", exam: "₪229" };
+  const OPT = String(TR()).startsWith("optometry");
+  if (OPT) st.ui.plan = "exam";
+  const WEBP = OPT ? { exam: "₪99" } : { month: "₪99", two: "₪149", exam: "₪229" };
+  const partName = OPT ? `${t("optTitle")} · ${TR() === "optometry_prac" ? t("optPractical") : t("optTheory")}` : trackName(TR());
   const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
   frame(`${msgHtml()}
   ${st.ui.fromTools ? `<button class="ghost" id="pbk">←</button>` : ""}
   <div class="card">
     <h2>${t("choose")}</h2>
-    <span class="chip" ${canSwitch() ? 'id="trk" role="button" style="align-self:flex-start;cursor:pointer"' : 'style="align-self:flex-start"'}>${esc(trackName(TR()))}${canSwitch() ? " · " + t("switchTrack") : ""}</span>
+    <span class="chip" ${canSwitch() ? 'id="trk" role="button" style="align-self:flex-start;cursor:pointer"' : 'style="align-self:flex-start"'}>${esc(partName)}${canSwitch() ? " · " + t("switchTrack") : ""}</span>
     <div class="plans">
-      <button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>
-      <button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>
+      ${OPT ? "" : `<button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>`}
+      ${OPT ? "" : `<button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>`}
       <button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
@@ -576,7 +579,7 @@ function plans() {
   if ($("bit")) $("bit").onclick = () => openUrl("https://www.bitpay.co.il/app/me/9D1B41C8-EF74-829E-CC1F-A0ED8B57C15E55C2");
   if ($("wa")) $("wa").onclick = () => {
     const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
-    const msg = `${t("webPayMsg")}\n${trackName(TR())} · ${names[st.ui.plan] || ""} · ${WEBP[st.ui.plan] || ""}\n${st.user?.email || ""}`;
+    const msg = `${t("webPayMsg")}\n${partName} · ${names[st.ui.plan] || ""} · ${WEBP[st.ui.plan] || ""}\n${st.user?.email || ""}`;
     openUrl(`https://wa.me/972503227701?text=${encodeURIComponent(msg)}`);
   };
   if ($("tf")) $("tf").onclick = () => { st.ui.trialOffer = false; home(); };
