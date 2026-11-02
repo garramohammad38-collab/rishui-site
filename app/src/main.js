@@ -565,7 +565,7 @@ function plans() {
       ${OPT ? "" : `<button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>`}
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
-    ${st.user?.is_anonymous ? `<p class="muted">${t("needAcct")}</p><button class="primary" id="mkacct">${t("saveAcct")}</button>` : (storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="bit">${t("bitBtn")}</button><button class="ghost" id="wa">${t("webPayBtn")}</button>`)}
+    ${st.user?.is_anonymous ? `<p class="muted">${t("needAcct")}</p><button class="primary" id="mkacct">${t("saveAcct")}</button>` : (storeAvailable ? `<button class="primary" id="go">${t("buy")}</button><button class="link" id="rs">${t("restore")}</button>` : `<p class="muted">${t("webPay")}</p><button class="primary" id="bit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-inline-end:8px"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><circle cx="16.5" cy="14.5" r="1.2"/></svg>${t("bitBtn")}</button><p class="muted" style="text-align:center;margin:6px 0 0" dir="ltr">Bit · 050-322-7701</p><button class="ghost" id="wa"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-inline-end:8px"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-1 .7a5 5 0 0 1-2.2-2.2l.7-1-1-1.8z"/></svg>${t("webPayBtn")}</button><button class="ghost" id="wac"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-inline-end:8px"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-1 .7a5 5 0 0 1-2.2-2.2l.7-1-1-1.8z"/></svg>${st.lang === "he" ? "צרו קשר בוואטסאפ" : "Contact us on WhatsApp"}</button>`)}
   </div>
   <div class="card">
     <h3>${t("haveCode")}</h3>
@@ -577,6 +577,7 @@ function plans() {
   st.ui.msg = null;
   if ($("pbk")) $("pbk").onclick = tools;
   if ($("mkacct")) $("mkacct").onclick = account;
+  if ($("wac")) $("wac").onclick = () => openUrl("https://wa.me/972503227701");
   if ($("bit")) $("bit").onclick = () => openUrl("https://www.bitpay.co.il/app/me/9D1B41C8-EF74-829E-CC1F-A0ED8B57C15E55C2");
   if ($("wa")) $("wa").onclick = () => {
     const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
