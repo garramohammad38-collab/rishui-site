@@ -310,7 +310,17 @@ function route() {
   const fcode = new URLSearchParams(location.search).get("c");
   if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
   if (!store.get(`intro:${st.user.id}`)) return intro();
-  if (st.profile?.track === "optometry" && !st.ui.optPart) return optChooser();
+  if (st.profile?.track === "optometry" && !st.ui.optPart) {
+    // remembered part: only while the person has an active subscription for it (or is admin); otherwise show the chooser as usual
+    const saved = store.get("optPart"), nowD = new Date();
+    const act = (id) => (st.ents || []).some((e) => e.track === id && new Date(e.until) > nowD);
+    if (saved && (isAdmin() || (saved === "theory" && act("optometry")) || (saved === "practical" && act("optometry_prac")))) {
+      st.ui.optPart = saved; loading();
+      loadUserData().then(() => route()).catch(() => { st.ui.optPart = null; optChooser(); });
+      return;
+    }
+    return optChooser();
+  }
   try { if (sessionStorage.getItem("scr") === "plans" && !st.ui.scrUsed) { st.ui.scrUsed = true; st.ui.fromTools = true; return plans(); } } catch { /* ignore */ }
   const rs = (() => { try { return JSON.parse(sessionStorage.getItem("rs-res")); } catch { return null; } })();
   if (rs && !st.ui.warmUsed) {
@@ -357,6 +367,7 @@ function optChooser() {
   app.querySelectorAll(".trk-card").forEach((b) => (b.onclick = async () => {
     if (b.dataset.k === "practical" && !isAdmin()) return flash(t("optPracticalD"));
     st.ui.optPart = b.dataset.k;
+    store.set("optPart", b.dataset.k);
     try { sessionStorage.setItem("optPart", b.dataset.k); } catch { /* private mode */ }
     loading();
     try { await loadUserData(); } catch (e) { st.ui.optPart = null; flash(errMsg(e), true); return optChooser(); }
