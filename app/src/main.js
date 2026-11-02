@@ -2181,8 +2181,7 @@ function qBody(q, num, tot) {
   const c = q[st.lang], on = st.marks.has(q.id);
   return `<div class="qmeta"><span class="tag">${esc(topicName(q.topic, st.lang))}</span><span>${t("q")} ${num} ${t("of")} ${tot}</span></div>
   <div class="qtools"><button class="tool ${on ? "on" : ""}" id="mk">${on ? "★ " + t("saved") : "☆ " + t("save")}</button>${S?.mode === "exam" && !S.guided ? "" : `<button class="tool" id="rf">📋 ${t("refT")}</button>`}</div>
-  <div class="qtop${(c.img || q.he?.img) ? " hasimg" : ""}"><div class="qtext">${esc(c.q)}</div>
-  ${(c.img || q.he?.img) ? `<img class="qimg" src="${esc(c.img || q.he.img)}" alt="" loading="lazy">` : ""}</div>
+  <div class="qtop${(c.img || q.he?.img) ? " hasimg" : ""}">${(c.img || q.he?.img) ? `<img class="qimg" src="${esc(c.img || q.he.img)}" alt="" loading="lazy">` : ""}<div class="qtext">${esc(c.q)}</div></div>
   ${q.terms?.length ? `<div class="terms">${q.terms.map((x) => `<span class="term"><bdi>${esc(x[0])}</bdi> · <bdi>${esc(x[1])}</bdi></span>`).join("")}</div>` : ""}`;
 }
 function bindMark(q) {
