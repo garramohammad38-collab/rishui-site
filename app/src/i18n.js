@@ -369,3 +369,5 @@ Object.assign(T.en, { pastLocked: "Locked", pastEmpty: "Reconstructed exams for 
 Object.assign(T.he, { pastLocked: "נעול", pastEmpty: "המבחנים המשוחזרים למסלול הזה ייפתחו כשיהיו מוכנים." });
 Object.assign(T.en, { waT: "Message us on WhatsApp" });
 Object.assign(T.he, { waT: "כתבו לנו בוואטסאפ" });
+Object.assign(T.en, { optTitle: "Optometry", optTheory: "Theory exam", optPractical: "Practical exam", optPracticalD: "The practical exam content is being prepared and will open soon." });
+Object.assign(T.he, { optTitle: "אופטומטריה", optTheory: "מבחן עיוני", optPractical: "מבחן מעשי", optPracticalD: "תוכן המבחן המעשי בהכנה ויפתח בקרוב." });

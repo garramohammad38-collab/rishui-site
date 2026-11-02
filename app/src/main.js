@@ -308,7 +308,22 @@ function route() {
   const w = warmNav(), tab = w && RESTORE().find((x) => x[0] === w);
   if (tab && !st.ui.warmUsed) { st.ui.warmUsed = true; return tab[1](); }
   if (!hasAccess() && !st.ui.paywallSeen) { st.ui.paywallSeen = true; st.ui.trialOffer = true; return plans(); }
+  if (TR() === "optometry" && !st.ui.optPart) return optChooser();
   home();
+}
+
+/* optometry: two separate parts (theory / practical) */
+function optChooser() {
+  S = { screen: optChooser, back: null };
+  const card = (k, ico, name, soon) => `<button class="trk-card" data-k="${k}" style="--c1:#2f6f86;--g1:${soon ? "#9aa3b5" : "#3a8aa6"};--g2:${soon ? "#7d869a" : "#1f5a73"}"><span class="trk-ico">${ico}</span><b>${name}</b>${soon ? `<span class="trk-d">${t("soonTag")}</span>` : ""}</button>`;
+  frame(`<div class="card"><h2>${t("optTitle")}</h2><div class="trk-grid">${card("theory", "📘", t("optTheory"), false)}${card("practical", "🔬", t("optPractical"), true)}</div></div>${canSwitch() ? `<button class="ghost" id="optbk">${t("switchTrack")}</button>` : ""}`);
+  app.querySelectorAll(".trk-card").forEach((b) => (b.onclick = () => {
+    if (b.dataset.k === "theory") { st.ui.optPart = "theory"; return route(); }
+    S = { screen: optChooser, back: optChooser };
+    frame(`<div class="qbar"><button class="back" id="obk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("optPractical")}</h2></div><div class="card" style="text-align:center"><div style="font-size:40px">🔒</div><h3>${t("soonTag")}</h3><p class="muted" style="margin:0">${t("optPracticalD")}</p></div>`);
+    $("obk").onclick = optChooser;
+  }));
+  if ($("optbk")) $("optbk").onclick = () => chooseTrack();
 }
 
 async function autoTrack(id) {
@@ -653,6 +668,7 @@ async function fillAnnouncement() {
 
 function home() {
   S = { screen: home };
+  setTimeout(() => { const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; optChooser(); }; }, 0);
   const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
   // "what's new": compare published counts per topic with what this student saw last time
   const seenKey = `seen-counts:${st.user.id}:${TR()}`;
@@ -666,7 +682,7 @@ function home() {
   const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
   frame(`${msgHtml()}<div id="annw"></div>${newBox}
   <div class="h-hero">${heroTop(true)}${heroArt()}
-    <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}</div>
+    <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}${TR() === "optometry" ? `<button class="chip" id="optsw" style="cursor:pointer">${t("optTheory")} · ${t("switchTrack")}</button>` : ""}</div>
     <div id="missionw">${missionCard(null, "loading")}</div></div>
   <div class="hero">
     <div class="hero-row">
