@@ -46,7 +46,7 @@ const st = {
   lang: store.get("lang") || "he",
   user: null, profile: null,
   answers: new Map(), marks: new Set(), counts: {}, best: null, tracks: [], topics: {}, ents: [],
-  ui: { signup: false, plan: "exam", msg: null, msgBad: false, flashI: 0, flashBack: false, delArmed: false },
+  ui: { optPart: (() => { try { return sessionStorage.getItem("optPart") || null; } catch { return null; } })(), signup: false, plan: "exam", msg: null, msgBad: false, flashI: 0, flashBack: false, delArmed: false },
 };
 let S = null; // current session (quiz / mock / screen state)
 
@@ -352,6 +352,7 @@ function optChooser() {
   app.querySelectorAll(".trk-card").forEach((b) => (b.onclick = async () => {
     if (b.dataset.k === "practical" && !isAdmin()) return flash(t("optPracticalD"));
     st.ui.optPart = b.dataset.k;
+    try { sessionStorage.setItem("optPart", b.dataset.k); } catch { /* private mode */ }
     loading();
     try { await loadUserData(); } catch (e) { st.ui.optPart = null; flash(errMsg(e), true); return optChooser(); }
     route();
@@ -707,7 +708,7 @@ async function fillAnnouncement() {
 
 function home() {
   S = { screen: home };
-  setTimeout(() => { const sb = $("optsrc"); if (sb) sb.onclick = optSources; const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; optChooser(); }; }, 0);
+  setTimeout(() => { const sb = $("optsrc"); if (sb) sb.onclick = optSources; const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; try { sessionStorage.removeItem("optPart"); } catch { /* ignore */ } optChooser(); }; }, 0);
   const OPH = String(TR()).startsWith("optometry"), OPP = TR() === "optometry_prac";
   const stationsHtml = OPP ? `<div class="section-title">${st.lang === "he" ? "עמדות" : "Stations"}</div><div class="list">${Object.keys(st.counts).filter((k) => k.startsWith("optp_s")).sort().map((k) => `<button class="li" data-tp="${esc(k)}"><span>${esc(topicName(k, st.lang))}</span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>` : "";
   const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
