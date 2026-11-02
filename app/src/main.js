@@ -698,6 +698,8 @@ async function fillAnnouncement() {
 function home() {
   S = { screen: home };
   setTimeout(() => { const sb = $("optsrc"); if (sb) sb.onclick = optSources; const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; optChooser(); }; }, 0);
+  const OPH = String(TR()).startsWith("optometry"), OPP = TR() === "optometry_prac";
+  const stationsHtml = OPP ? `<div class="section-title">${st.lang === "he" ? "עמדות" : "Stations"}</div><div class="list">${Object.keys(st.counts).filter((k) => k.startsWith("optp_s")).sort().map((k) => `<button class="li" data-tp="${esc(k)}"><span>${esc(topicName(k, st.lang))}</span><span class="count">${st.counts[k]} ${t("qs")}</span></button>`).join("")}</div>` : "";
   const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
   // "what's new": compare published counts per topic with what this student saw last time
   const seenKey = `seen-counts:${st.user.id}:${TR()}`;
@@ -712,7 +714,7 @@ function home() {
   frame(`${msgHtml()}<div id="annw"></div>${newBox}
   <div class="h-hero">${heroTop(true)}${heroArt()}
     <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}${st.profile?.track === "optometry" ? `<button class="chip" id="optsrc" style="cursor:pointer">📚 ${t("optSources")}</button><button class="chip" id="optsw" style="cursor:pointer">${st.ui.optPart === "practical" ? t("optPractical") : t("optTheory")} · ${t("switchTrack")}</button>` : ""}</div>
-    <div id="missionw">${missionCard(null, "loading")}</div></div>
+    <div id="missionw">${OPH ? "" : missionCard(null, "loading")}</div></div>
   <div class="hero">
     <div class="hero-row">
       <div class="hero-txt">
@@ -732,18 +734,19 @@ function home() {
     <button class="primary" id="go">${t("cont2")} ${fwd()}</button>
   </div>
   ${tt.n === 0 ? `<div class="banner">${t("noneYet")}</div>` : ""}
+  ${stationsHtml}
   <div id="openx"></div>
-  <button class="card" id="pst" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("pastEx")}</b><br><small class="muted">${t("pastExD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
-  <button class="card" id="smr" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("smrT")}</b><br><small class="muted">${t("smrD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
+  ${OPH ? "" : `<button class="card" id="pst" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("pastEx")}</b><br><small class="muted">${t("pastExD")}</small></span><i aria-hidden="true">${fwd()}</i></button>
+  <button class="card" id="smr" style="width:100%;display:flex;justify-content:space-between;align-items:center;text-align:start;margin-bottom:12px"><span><b>${t("smrT")}</b><br><small class="muted">${t("smrD")}</small></span><i aria-hidden="true">${fwd()}</i></button>`}
   <div class="acts4">
     <button class="act-c c1" id="nx2"><img src="${icNewexam}" alt=""><b>${t("startExam")}</b><small>${t("navNew")}</small><i aria-hidden="true">${fwd()}</i></button>
-    <button class="act-c c2" id="smr"><img src="${icSparkle}" alt=""><b>${t("smart")}</b><small>${t("smartD")}</small><i aria-hidden="true">${fwd()}</i></button>
+    <button class="act-c c2" id="smr2"><img src="${icSparkle}" alt=""><b>${t("smart")}</b><small>${t("smartD")}</small><i aria-hidden="true">${fwd()}</i></button>
     <button class="act-c c3" id="mis"><img src="${icCards}" alt=""><b>${t("mistakes")}</b><small>${tt.wrong} ${t("qs")}</small><i aria-hidden="true">${fwd()}</i></button>
     <button class="act-c c4" id="bm"><img src="${icBookmark}" alt=""><b>${t("bookmarks")}</b><small>${st.marks.size} ${t("qs")}</small><i aria-hidden="true">${fwd()}</i></button>
   </div>
-  <div id="journeyw">${!st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
-  <div id="leaguew"></div>
-  <div class="card"><div id="goalw">${goalCard([])}</div></div>
+  <div id="journeyw">${!OPH && !st.profile.exam_date ? `<div class="card exq"><h3>${t("examWhen")}</h3><p class="muted">${t("examWhenD")}</p><div class="row2"><input id="exd" type="date" aria-label="${t("examWhen")}"><button class="primary slim" id="exs">${t("saveDate")}</button></div></div>` : ""}</div>
+  ${OPH ? "" : `<div id="leaguew"></div>
+  <div class="card"><div id="goalw">${goalCard([])}</div></div>`}
   ${soonStrip()}
 `, { wide: true, nav: "home" });
   st.ui.msg = null;
@@ -752,18 +755,19 @@ function home() {
   if ($("trk")) $("trk").onclick = () => chooseTrack();
   $("go").onclick = () => practice({ kind: "seq" });
   $("nx2").onclick = newExam;
-  $("pst").onclick = pastExams;
-  $("smr").onclick = summaries;
-  api.summaryList(TR()).then((l) => { if (!l.length && $("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } }).catch(() => { if ($("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } });
-  api.sessionList(TR()).then((l) => { if (!l.length && $("pst")) { $("pst").style.opacity = ".8"; $("pst").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("pastLocked")}</span>`); } }).catch(() => {});
+  if ($("pst")) $("pst").onclick = pastExams;
+  if ($("smr")) $("smr").onclick = summaries;
+  if (!OPH) api.summaryList(TR()).then((l) => { if (!l.length && $("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } }).catch(() => { if ($("smr")) { $("smr").style.opacity = ".8"; $("smr").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("smrSoon")}</span>`); } });
+  if (!OPH) api.sessionList(TR()).then((l) => { if (!l.length && $("pst")) { $("pst").style.opacity = ".8"; $("pst").querySelector("small").insertAdjacentHTML("afterend", `<br><span class="chip warm" style="margin-top:6px">🔒 ${t("pastLocked")}</span>`); } }).catch(() => {});
   $("mis").onclick = () => practice({ kind: "ids", ids: [...st.answers].filter(([, c]) => !c).map(([id]) => id) });
   $("bm").onclick = () => practice({ kind: "ids", ids: [...st.marks] });
   // async parts: activity chart + an unfinished exam to continue
-  bindGoal([]);
-  fillMission().then(fillJourney).then(fillLeague);
-  $("smr").onclick = smartReview;
+  if (!OPH) bindGoal([]);
+  if (!OPH) fillMission().then(fillJourney).then(fillLeague);
+  $("smr2").onclick = smartReview;
+  app.querySelectorAll("[data-tp]").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.tp })));
   if ($("exs")) $("exs").onclick = async () => { const v = $("exd").value; if (!v) return; await api.updateProfile(null, v).catch(() => {}); st.profile.exam_date = v; home(); };
-  api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
+  if (!OPH) api.activity(st.user.id, TR(), 60).then((rows) => { if (S?.screen !== home) return; if ($("goalw")) { $("goalw").innerHTML = goalCard(rows); bindGoal(rows); } }).catch(() => {});
   api.myExams(st.user.id, TR()).then((list) => {
     const x = list.find((r) => r.status === "open"); if (!x || S?.screen !== home || !$("openx")) return;
     const done = (x.picked || []).filter((v) => v != null).length;
@@ -1197,8 +1201,8 @@ async function myQuestions(keep) {
   <div class="sc-grid">
     <button class="sc" id="una"><span class="ti" style="--tc:#2F80ED"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></span><b>${t("unansweredQs")}</b></button>
     <button class="sc" id="srch"><span class="ti" style="--tc:#0EA5A4"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span><b>${t("search")}</b></button>
-    <button class="sc" id="clc"><span class="ti" style="--tc:#16A34A"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg></span><b>${t("calcT")}</b></button>
-    <button class="sc" id="rfp"><span class="ti" style="--tc:#4F46E5"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span><b>${t("refT")}</b></button>
+    ${String(TR()).startsWith("optometry") ? "" : `<button class="sc" id="clc"><span class="ti" style="--tc:#16A34A"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg></span><b>${t("calcT")}</b></button>`}
+    ${String(TR()).startsWith("optometry") ? "" : `<button class="sc" id="rfp"><span class="ti" style="--tc:#4F46E5"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span><b>${t("refT")}</b></button>`}
     <button class="sc" id="fl"><span class="ti" style="--tc:#EC4899"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h13a1 1 0 0 1 1 1v11"/></svg></span><b>${t("flash")}</b></button>
   </div>
   <details class="topics-d"><summary>${t("bytopic")} <span class="muted">(${Object.keys(st.counts).length})</span></summary>
@@ -1215,7 +1219,7 @@ async function myQuestions(keep) {
   app.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { Q.filter = b.dataset.f; Q.shown = 20; myQuestions(Q); }));
   if ($("more")) $("more").onclick = () => { Q.shown += 20; myQuestions(Q); };
   $("una").onclick = () => practice({ kind: "unanswered" });
-  $("srch").onclick = () => searchPage(() => myQuestions(Q)); $("clc").onclick = () => calcTrainer(() => myQuestions(Q)); $("rfp").onclick = () => refPage(() => myQuestions(Q));
+  $("srch").onclick = () => searchPage(() => myQuestions(Q)); if ($("clc")) $("clc").onclick = () => calcTrainer(() => myQuestions(Q)); if ($("rfp")) $("rfp").onclick = () => refPage(() => myQuestions(Q));
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   app.querySelectorAll(".li").forEach((b) => (b.onclick = () => practice({ kind: "topic", topic: b.dataset.t })));
   app.querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => viewQuestion(Q.cache.get(+b.dataset.q), Q.rows.find((r) => r.question_id === +b.dataset.q)?.picked, () => myQuestions(Q))));
@@ -1295,6 +1299,7 @@ async function stats() {
 
 /* ---------------- tools ---------------- */
 function tools() {
+  const OPT_ = String(TR()).startsWith("optometry");
   S = { screen: tools };
   st.ui.fromTools = false;
   const row = (id, ico, title, sub, cls = "") => `<button class="li ${cls}" id="${id}"><span class="trow"><span class="tico">${ico}</span><span class="ttxt"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ""}</span></span><i aria-hidden="true">${fwd()}</i></button>`;
@@ -1307,12 +1312,12 @@ function tools() {
     st.user ? row("lg-o", "🚪", t("logout"), "") : "",
   ]))}
   ${sec(t("toolsStudy"), list([
-    row("jt", "🧭", t("jTitle"), t("jBuildD")),
-    lbOK() ? row("lgt2", "🏆", leagueName(), t("leagueJoinD")) : "",
+    OPT_ ? "" : row("jt", "🧭", t("jTitle"), t("jBuildD")),
+    lbOK() && !OPT_ ? row("lgt2", "🏆", leagueName(), t("leagueJoinD")) : "",
     row("fl", "🗂️", t("flash"), t("cardsD")),
     row("srch", "🔎", t("search"), t("searchD")),
-    row("rfp", "📚", t("refT"), t("refD")),
-    row("clc", "🧮", t("calcT"), t("calcD")),
+    OPT_ ? "" : row("rfp", "📚", t("refT"), t("refD")),
+    OPT_ ? "" : row("clc", "🧮", t("calcT"), t("calcD")),
   ]))}
   ${sec(t("toolsRemind"), `<div class="tools-grid">${reminderCard()}${pushCard()}</div>`)}
   ${sec(t("toolsHelp"), list([
@@ -1325,10 +1330,10 @@ function tools() {
   ]))}
   ${sec(t("toolsData"), list([row("rs", "🗑️", st.ui.resetArmed ? t("resetSure") : t("resetBtn"), t("resetD"), "dng")]))}`, { wide: true, nav: "tools" });
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
-  $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
+  if ($("jt")) $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess()) return openUrl(Capacitor.getPlatform() === "android" ? "https://play.google.com/store/account/subscriptions" : "https://apps.apple.com/account/subscriptions"); st.ui.fromTools = true; plans(); };
   $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972503227701"); if ($("lgt2")) $("lgt2").onclick = league;
-  $("rfp").onclick = () => refPage(tools); $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
+  if ($("rfp")) $("rfp").onclick = () => refPage(tools); if ($("clc")) $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
     if (!st.ui.resetArmed) { st.ui.resetArmed = true; return tools(); }
