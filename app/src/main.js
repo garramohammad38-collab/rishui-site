@@ -8,7 +8,7 @@ import * as api from "./api.js";
 import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102h";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
-import "./ptr.js";
+import "./ptr.js?v=20261102i";
 import * as AD from "./adaptive.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
 const imgNursing = new URL("./img/nursing.webp", import.meta.url).href;
@@ -288,6 +288,12 @@ async function loadUserData() {
   st.counts = Object.fromEntries(counts.filter((r) => !String(r.topic).startsWith("exam_")).map((r) => [r.topic, Number(r.n)]));
   st.best = best;
 }
+// pull-to-refresh: reload the data and redraw the current screen (no full page reload, so no blue splash)
+window.__ptrHandler = async () => {
+  if (!st.user) return;
+  try { await loadUserData(); } catch { /* offline: keep what we have */ }
+  if (S?.screen) S.screen(); else route();
+};
 function route() {
   S = null;
   if (!st.user) return login();

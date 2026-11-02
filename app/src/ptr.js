@@ -18,7 +18,9 @@
     el.style.transform = "translateY(" + (p / 1.5 - 20) + "px) rotate(" + p * 3 + "deg)";
   }, { passive: true });
   addEventListener("touchend", function () {
-    if (y0 != null && dy > LIMIT && top()) { el.style.transform = "translateY(40px)"; el.style.animation = "ptrspin .7s linear infinite"; setTimeout(function () { location.reload(); }, 150); }
+    if (y0 != null && dy > LIMIT && top()) { el.style.transform = "translateY(40px)"; el.style.animation = "ptrspin .7s linear infinite"; var done = function () { el.style.animation = ""; el.style.opacity = 0; el.style.transform = "translateY(-50px)"; };
+      if (window.__ptrHandler) { Promise.resolve().then(window.__ptrHandler).catch(function () {}).then(function () { setTimeout(done, 250); }); }
+      else setTimeout(function () { location.reload(); }, 150); }
     else { el.style.opacity = 0; el.style.transform = "translateY(-50px)"; }
     y0 = null;
   });
