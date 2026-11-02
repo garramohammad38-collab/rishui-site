@@ -299,6 +299,7 @@ function route() {
   const fcode = new URLSearchParams(location.search).get("c");
   if (fcode && !st.ui.fcodeUsed) { st.ui.fcodeUsed = true; return friendStart(fcode.toUpperCase().slice(0, 8), friendNick()); }
   if (!store.get(`intro:${st.user.id}`)) return intro();
+  if (st.profile?.track === "optometry" && !st.ui.optPart) return optChooser();
   const rs = (() => { try { return JSON.parse(sessionStorage.getItem("rs-res")); } catch { return null; } })();
   if (rs && !st.ui.warmUsed) {
     st.ui.warmUsed = true;
@@ -308,7 +309,6 @@ function route() {
   const w = warmNav(), tab = w && RESTORE().find((x) => x[0] === w);
   if (tab && !st.ui.warmUsed) { st.ui.warmUsed = true; return tab[1](); }
   if (!hasAccess() && !st.ui.paywallSeen) { st.ui.paywallSeen = true; st.ui.trialOffer = true; return plans(); }
-  if (st.profile?.track === "optometry" && !st.ui.optPart) return optChooser();
   home();
 }
 
