@@ -84,8 +84,8 @@ export const T = {
     activated: "המסלול שלך פעיל.", payFail: "הרכישה לא הושלמה. לא בוצע חיוב.",
     payPending: "התשלום התקבל. ההפעלה עשויה לקחת דקה; פתח שוב את האפליקציה אם לא מופיע.",
     storeOnly: "רכישה זמינה באפליקציה לאייפון ולאנדרואיד.",
-    webPay: "לוחצים על ״תשלום בביט״ ומזינים את סכום החבילה, ואז שולחים לנו צילום מסך של התשלום בוואטסאפ (הכפתור למטה ממלא את הפרטים שלכם). אנחנו פותחים לכם את החבילה בהקדם.", bitBtn: "תשלום בביט", webPayBtn: "שליחת אישור תשלום בוואטסאפ", webPayMsg: "היי, שילמתי בביט עבור החבילה:",
-    haveCode: "יש לך קוד גישה?", groupsWa: "לקבוצות נא ליצור קשר בוואטסאפ", code: "קוד גישה", apply: "הפעל",
+    webPay: "לוחצים על ״תשלום בביט״ ומזינים את סכום החבילה, ואז שולחים לנו צילום מסך של התשלום בווצאפ (הכפתור למטה ממלא את הפרטים שלכם). אנחנו פותחים לכם את החבילה בהקדם.", bitBtn: "תשלום בביט", webPayBtn: "שליחת אישור תשלום בווצאפ", webPayMsg: "היי, שילמתי בביט עבור החבילה:",
+    haveCode: "יש לך קוד גישה?", groupsWa: "לקבוצות נא ליצור קשר בווצאפ", code: "קוד גישה", apply: "הפעל",
     codeBad: "הקוד לא תקין או שפג תוקפו.", codeUsed: "כבר השתמשת בקוד הזה.", codeOk: "הקוד התקבל.",
     tryFree: "לנסות שאלות חינם", freeNote: "דוגמה חינמית: כמה שאלות כדי להכיר.",
     terms: "תנאי שימוש", privacy: "מדיניות פרטיות",
@@ -368,7 +368,7 @@ Object.assign(T.he, { smrPlans: "לצפייה במסלולים" });
 Object.assign(T.en, { pastLocked: "Locked", pastEmpty: "Reconstructed exams for this track will open when they are ready." });
 Object.assign(T.he, { pastLocked: "נעול", pastEmpty: "המבחנים המשוחזרים למסלול הזה ייפתחו כשיהיו מוכנים." });
 Object.assign(T.en, { waT: "Message us on WhatsApp" });
-Object.assign(T.he, { waT: "כתבו לנו בוואטסאפ" });
+Object.assign(T.he, { waT: "כתבו לנו בווצאפ" });
 Object.assign(T.en, { optTitle: "Optometry", optTheory: "Theory exam", optPractical: "Practical exam", optPracticalD: "The practical exam content is being prepared and will open soon." });
 Object.assign(T.he, { optTitle: "אופטומטריה", optTheory: "מבחן עיוני", optPractical: "מבחן מעשי", optPracticalD: "תוכן המבחן המעשי בהכנה ויפתח בקרוב." });
 Object.assign(T.en, { optSources: "Sources" });
@@ -378,4 +378,4 @@ Object.assign(T.en, { payLegal: "By subscribing you confirm that you have read a
 Object.assign(T.he, { payLegal: "בהרשמה אתה מאשר שקראת והסכמת ל{t} ול{p}." });
 
 Object.assign(T.en, { payCash: "For cash / Bit, please contact us on WhatsApp.", webPayBtn: "Contact us on WhatsApp" });
-Object.assign(T.he, { payCash: "למזומן / ביט נא ליצור קשר בוואטסאפ", webPayBtn: "צרו קשר בוואטסאפ" });
+Object.assign(T.he, { payCash: "למזומן / ביט נא ליצור קשר בווצאפ", webPayBtn: "צרו קשר בווצאפ" });

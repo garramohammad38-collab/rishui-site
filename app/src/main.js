@@ -5,7 +5,7 @@ import { Device } from "@capacitor/device";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
 import * as api from "./api.js";
-import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102h";
+import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102m";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
 import "./ptr.js?v=20261102i";
