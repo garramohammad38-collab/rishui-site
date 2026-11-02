@@ -4,7 +4,7 @@ import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
-import * as api from "./api.js";
+import * as api from "./api.js?v=20261102p";
 import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102m";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
@@ -92,7 +92,10 @@ const THEMES = {
 /* v2 look: a vivid gradient + a 3D character for each track */
 const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"], physio: ["#FFA05A", "#D9621A"], ot: ["#9B6BF6", "#5B2FC4"], radiography: ["#F4609A", "#B42357"], pharmacy: ["#3FAE6A", "#1D7A45"], dental: ["#F5B941", "#C9801A"] };
 const CHAR = { pharmacy: imgPharm, dental: imgDental, optometry: imgOptom, optometry_prac: imgOptom, nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
-const gradOf = (id) => GRAD[id] || [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`];
+// avatar + colour of a track can also come from the database (so new tracks need no app update)
+const dbTrack = (id) => (st.tracks || []).find((x) => x.id === id) || (st.soon || []).find((x) => x.id === id);
+const charOf = (id) => CHAR[id] || dbTrack(id)?.avatar_url || "";
+const gradOf = (id) => GRAD[id] || (dbTrack(id)?.color ? [dbTrack(id).color, `color-mix(in srgb,${dbTrack(id).color} 65%,#000)`] : [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`]);
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
   if (THEMES[id]) return THEMES[id];
@@ -534,10 +537,10 @@ function chooseTrack(pending) {
   const cur = st.profile?.track, first = !cur;
   const list = allowedTracks();
   const card = (x) => { const c = themeOf(x.id).l, on = (pending || cur) === x.id;
-    const g = gradOf(x.id), pic = CHAR[x.id];
+    const g = gradOf(x.id), pic = charOf(x.id);
     return `<button class="trk-card ${on ? "on" : ""}" data-k="${esc(x.id)}" style="--c1:${c[0]};--g1:${g[0]};--g2:${g[1]}">${pic ? `<img class="trk-img" src="${pic}" alt="" loading="eager">` : `<span class="trk-ico">${esc(x.icon || "")}</span>`}<b>${esc(x[st.lang] || x.id)}</b>${on ? '<span class="trk-ok">✓</span>' : ""}</button>`; };
   // tracks that are being prepared: shown locked, nobody can enter
-  const soonCard = (x) => { const g = gradOf(x.id), pic = CHAR[x.id];
+  const soonCard = (x) => { const g = gradOf(x.id), pic = charOf(x.id);
     if (pic) return `<div class="trk-card soon pic" aria-disabled="true" style="--g1:${g[0]};--g2:${g[1]}"><img class="trk-img" src="${pic}" alt="" loading="eager"><b>${esc(x[st.lang] || x.id)}</b><span class="trk-d">${t("soonTag")}</span></div>`;
     return `<div class="trk-card soon" aria-disabled="true"><span class="trk-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="M9.3 7.1l5.4 9.8"/></svg></span><b>${esc(x[st.lang] || x.id)}</b><span class="trk-d">${t("soonTag")}</span></div>`; };
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
@@ -652,7 +655,7 @@ async function waitForActivation() {
 
 const HSUB = { navQs: "hSubQs", navExams: "hSubExams", navStats: "hSubStats", navTools: "hSubTools", navNew: "hSubNew" };
 const heroTop = (trk) => `<div class="hv-top"><div class="hv-brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><span><b>${t("name")}</b><small ${trk && canSwitch() ? 'id="trk" role="button"' : ""}>${esc(trackName(TR()))}${trk && canSwitch() ? " ⇄" : ""}</small></span></div><div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>`;
-const heroArt = () => `<img class="h-deco d1" src="${icClip}" alt=""><img class="h-deco d2" src="${icPulse}" alt="">${CHAR[TR()] ? `<img class="h-char" src="${CHAR[TR()]}" alt="">` : ""}`;
+const heroArt = () => `<img class="h-deco d1" src="${icClip}" alt=""><img class="h-deco d2" src="${icPulse}" alt="">${charOf(TR()) ? `<img class="h-char" src="${charOf(TR())}" alt="">` : ""}`;
 // gradient header with the track's 3D character, shared by every main page
 function pageHero(k, extra = "") {
   return `<div class="h-hero ph">${heroTop(false)}<div class="h-txt"><h2>${t(k)}</h2><p>${t(HSUB[k])}</p>${extra}</div>${heroArt()}</div>`;

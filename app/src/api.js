@@ -64,7 +64,7 @@ export async function tracks() {
 }
 // tracks that are listed as "coming soon" (nobody can enter them yet)
 export async function soonTracks() {
-  const { data, error } = await supabase.from("tracks").select("id,he,en,icon,he_desc,en_desc,sort").eq("coming_soon", true).eq("active", false).order("sort");
+  const { data, error } = await supabase.from("tracks").select("id,he,en,icon,he_desc,en_desc,sort,avatar_url,color").eq("coming_soon", true).eq("active", false).order("sort");
   return error ? [] : data || [];
 }
 export async function topics(track) {
