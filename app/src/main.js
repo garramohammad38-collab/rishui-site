@@ -551,7 +551,7 @@ function plans() {
   // website: no store price; show the fixed web prices (payment by Bit, activated by us)
   const OPT = String(TR()).startsWith("optometry");
   if (OPT) st.ui.plan = "month";
-  const WEBP = OPT ? { month: "₪99" } : { month: "₪99", two: "₪149", exam: "₪229" };
+  const WEBP = OPT ? { month: "₪99", two: "₪169" } : { month: "₪99", two: "₪149", exam: "₪229" };
   const partName = OPT ? `${t("optTitle")} · ${TR() === "optometry_prac" ? t("optPractical") : t("optTheory")}` : trackName(TR());
   const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
   frame(`${msgHtml()}
@@ -561,7 +561,7 @@ function plans() {
     <span class="chip" ${canSwitch() ? 'id="trk" role="button" style="align-self:flex-start;cursor:pointer"' : 'style="align-self:flex-start"'}>${esc(partName)}${canSwitch() ? " · " + t("switchTrack") : ""}</span>
     <div class="plans">
       ${`<button class="plan ${st.ui.plan === "month" ? "on" : ""}" data-p="month"><span class="dot"></span><span class="info"><b>${t("monthly")}</b><span class="muted">${t("monthlyD")}</span></span>${pm ? `<span class="price">${esc(pm)}</span>` : ""}</button>`}
-      ${OPT ? "" : `<button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>`}
+      ${`<button class="plan ${st.ui.plan === "two" ? "on" : ""}" data-p="two"><span class="dot"></span><span class="info"><b>${t("twoMonths")}</b><span class="muted">${t("twoD")}</span></span>${p2 ? `<span class="price">${esc(p2)}</span>` : ""}</button>`}
       ${OPT ? "" : `<button class="plan ${st.ui.plan === "exam" ? "on" : ""}" data-p="exam"><span class="dot"></span><span class="info"><b>${t("untilExam")}</b><span class="muted">${t("untilD")}</span><span class="badge">${t("best")}</span></span>${pe ? `<span class="price">${esc(pe)}</span>` : ""}</button>`}
     </div>
     <div class="field" ${st.ui.plan === "exam" ? "" : "hidden"}><label for="ex">${t("examDate")}</label><input id="ex" type="date" value="${esc(exam)}" min="${today()}"></div>
