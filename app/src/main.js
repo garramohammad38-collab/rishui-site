@@ -312,6 +312,31 @@ function route() {
   home();
 }
 
+function optSources() {
+  S = { screen: optSources, back: home };
+  const he = st.lang === "he";
+  const K = "Kanski's Clinical Ophthalmology, 10th Edition (Salmon, 2024)", BV = "Clinical Management of Binocular Vision, 5th Edition (Scheiman, Wick)", CP = "Clinical Procedures for the Ocular Examination, 5th Edition (Reilly, Gaiser, Young)", OP = "Clinical Optics and Vision Rehabilitation, AAO 2022-2023", PS = "Pediatric Ophthalmology and Strabismus, AAO 2022-2023" + (he ? " (פרקים 1-12, 14, עמ' 193-194)" : " (chapters 1-12, 14, pp. 193-194)"), CL = "Clinical Manual of Contact Lenses, 5th Edition (Bennett, Henry)", AD = "AOA - Comprehensive Adult Eye and Vision Examination, 2nd Edition", PD = "AOA - Comprehensive Pediatric Eye and Vision Examination", MY = "AOA - EBO Myopia Clinical Report";
+  const sec = he ? [
+    ["אופטיקה", [OP]],
+    ["אנטומיה ופיזיולוגיה עינית ופתולוגיה", [K]],
+    ["בדיקה אופטומטרית ותשבורת", [CP, AD, PD, PS, OP]],
+    ["ראייה דו-עינית ואורתופטיקה", [BV, PS]],
+    ["עדשות מגע", [CL]],
+    ["שליטה במיופיה", [MY]],
+    ["חוק ואתיקה", ["חוק העיסוק באופטומטריה, התשנ\"א-1991, כולל תקנות ותיקונים", "חוק זכויות החולה, התשנ\"ו-1996", "הגדרת מקצוע האופטומטריה - מועצת האופטומטריסטים בישראל, נובמבר 2021", "חוק הביטוח הלאומי - הגדרת עיוורון", "תקנות התעבורה - סעיפים בנושא ראייה", "World Council of Optometry - The Sight Test (position paper)"]],
+  ] : [
+    ["Optics", [OP]],
+    ["Ocular anatomy, physiology and pathology", [K]],
+    ["Optometric examination and refraction", [CP, AD, PD, PS, OP]],
+    ["Binocular vision and orthoptics", [BV, PS]],
+    ["Contact lenses", [CL]],
+    ["Myopia control", [MY]],
+    ["Law and ethics", ["Israel Optometry Practice Law, 1991 (with regulations and amendments)", "Patient's Rights Law, 1996", "Definition of the optometry profession - Israeli Council of Optometrists, Nov 2021", "National Insurance Law - definition of blindness", "Traffic regulations - sections on vision", "World Council of Optometry - The Sight Test (position paper)"]],
+  ];
+  frame(`<div class="qbar"><button class="back" id="sbk" aria-label="${t("back")}">${bwd()}</button><h2 style="flex:1">${t("optSources")}</h2></div><p class="muted">${he ? "רשימת הספרות הרשמית של משרד הבריאות לבחינה." : "Official Ministry of Health reading list for the exam."}</p>${sec.map(([h, l]) => `<div class="card"><h3>${esc(h)}</h3><ul style="margin:6px 0 0;padding-inline-start:18px">${l.map((x) => `<li style="margin:4px 0">${esc(x)}</li>`).join("")}</ul></div>`).join("")}`);
+  $("sbk").onclick = home;
+}
+
 /* optometry: two separate parts (theory / practical) */
 function optChooser() {
   S = { screen: optChooser, back: null };
@@ -668,7 +693,7 @@ async function fillAnnouncement() {
 
 function home() {
   S = { screen: home };
-  setTimeout(() => { const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; optChooser(); }; }, 0);
+  setTimeout(() => { const sb = $("optsrc"); if (sb) sb.onclick = optSources; const b = $("optsw"); if (b) b.onclick = () => { st.ui.optPart = null; optChooser(); }; }, 0);
   const tt = totals(), pct = pctOf(tt.done, tt.n), dl = daysLeft(), e = ent();
   // "what's new": compare published counts per topic with what this student saw last time
   const seenKey = `seen-counts:${st.user.id}:${TR()}`;
@@ -682,7 +707,7 @@ function home() {
   const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
   frame(`${msgHtml()}<div id="annw"></div>${newBox}
   <div class="h-hero">${heroTop(true)}${heroArt()}
-    <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}${TR() === "optometry" ? `<button class="chip" id="optsw" style="cursor:pointer">${t("optTheory")} · ${t("switchTrack")}</button>` : ""}</div>
+    <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}${TR() === "optometry" ? `<button class="chip" id="optsrc" style="cursor:pointer">📚 ${t("optSources")}</button><button class="chip" id="optsw" style="cursor:pointer">${t("optTheory")} · ${t("switchTrack")}</button>` : ""}</div>
     <div id="missionw">${missionCard(null, "loading")}</div></div>
   <div class="hero">
     <div class="hero-row">
