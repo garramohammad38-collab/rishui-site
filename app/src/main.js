@@ -12,6 +12,7 @@ import "./ptr.js";
 import * as AD from "./adaptive.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
 const imgNursing = new URL("./img/nursing.webp", import.meta.url).href;
+const imgOptom = new URL("./img/optometry.webp", import.meta.url).href;
 const imgMedicine = new URL("./img/medicine.webp", import.meta.url).href;
 const imgOt = new URL("./img/ot.webp", import.meta.url).href;
 const imgPhysio = new URL("./img/physio.webp", import.meta.url).href;
@@ -88,7 +89,7 @@ const THEMES = {
 };
 /* v2 look: a vivid gradient + a 3D character for each track */
 const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"], physio: ["#FFA05A", "#D9621A"], ot: ["#9B6BF6", "#5B2FC4"], radiography: ["#F4609A", "#B42357"] };
-const CHAR = { nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
+const CHAR = { optometry: imgOptom, optometry_prac: imgOptom, nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
 const gradOf = (id) => GRAD[id] || [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`];
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
