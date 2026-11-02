@@ -13,6 +13,8 @@ import * as AD from "./adaptive.js";
 import { initPurchases, priceOf, buy, restore, storeAvailable, logoutPurchases } from "./purchases.js";
 const imgNursing = new URL("./img/nursing.webp", import.meta.url).href;
 const imgOptom = new URL("./img/optometry.webp", import.meta.url).href;
+const imgPharm = new URL("./img/pharmacy.webp", import.meta.url).href;
+const imgDental = new URL("./img/dental.webp", import.meta.url).href;
 const imgMedicine = new URL("./img/medicine.webp", import.meta.url).href;
 const imgOt = new URL("./img/ot.webp", import.meta.url).href;
 const imgPhysio = new URL("./img/physio.webp", import.meta.url).href;
@@ -88,8 +90,8 @@ const THEMES = {
   radiography: { l: ["#B42357", "#FAE1EA", "#FDF4F7"], d: ["#EE6E9A", "#4A1529", "#1C0C12"] },
 };
 /* v2 look: a vivid gradient + a 3D character for each track */
-const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"], physio: ["#FFA05A", "#D9621A"], ot: ["#9B6BF6", "#5B2FC4"], radiography: ["#F4609A", "#B42357"] };
-const CHAR = { optometry: imgOptom, optometry_prac: imgOptom, nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
+const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"], physio: ["#FFA05A", "#D9621A"], ot: ["#9B6BF6", "#5B2FC4"], radiography: ["#F4609A", "#B42357"], pharmacy: ["#3FAE6A", "#1D7A45"], dental: ["#F5B941", "#C9801A"] };
+const CHAR = { pharmacy: imgPharm, dental: imgDental, optometry: imgOptom, optometry_prac: imgOptom, nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
 const gradOf = (id) => GRAD[id] || [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`];
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
@@ -524,7 +526,8 @@ function chooseTrack(pending) {
     const g = gradOf(x.id), pic = CHAR[x.id];
     return `<button class="trk-card ${on ? "on" : ""}" data-k="${esc(x.id)}" style="--c1:${c[0]};--g1:${g[0]};--g2:${g[1]}">${pic ? `<img class="trk-img" src="${pic}" alt="" loading="eager">` : `<span class="trk-ico">${esc(x.icon || "")}</span>`}<b>${esc(x[st.lang] || x.id)}</b>${on ? '<span class="trk-ok">✓</span>' : ""}</button>`; };
   // tracks that are being prepared: shown locked, nobody can enter
-  const soonCard = (x) => { const c = themeOf(x.id).l;
+  const soonCard = (x) => { const g = gradOf(x.id), pic = CHAR[x.id];
+    if (pic) return `<div class="trk-card soon pic" aria-disabled="true" style="--g1:${g[0]};--g2:${g[1]}"><img class="trk-img" src="${pic}" alt="" loading="eager"><b>${esc(x[st.lang] || x.id)}</b><span class="trk-d">${t("soonTag")}</span></div>`;
     return `<div class="trk-card soon" aria-disabled="true"><span class="trk-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="M9.3 7.1l5.4 9.8"/></svg></span><b>${esc(x[st.lang] || x.id)}</b><span class="trk-d">${t("soonTag")}</span></div>`; };
   frame(`<div class="card"><h2>${t("chooseTrack")}</h2>
     <div class="trk-grid">${list.map(card).join("")}${(st.soon || []).map(soonCard).join("")}</div>
