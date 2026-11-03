@@ -157,7 +157,7 @@ function legalLinks(ig = false) {
 }
 function bindLegal() {
   if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
-  if ($("lg-wa")) $("lg-wa").onclick = () => openUrl("https://wa.me/972503227701");
+  if ($("lg-wa")) $("lg-wa").onclick = () => openUrl("https://wa.me/972505023423");
   if ($("lg-ig")) $("lg-ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/");
   if ($("lg-o")) $("lg-o").onclick = logout;
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
@@ -610,7 +610,7 @@ function plans() {
   if ($("wa")) $("wa").onclick = () => {
     const names = { month: t("monthly"), two: t("twoMonths"), exam: t("untilExam") };
     const msg = `${t("webPayMsg")}\n${partName} · ${names[st.ui.plan] || ""} · ${WEBP[st.ui.plan] || ""}\n${st.user?.email || ""}`;
-    openUrl(`https://wa.me/972503227701?text=${encodeURIComponent(msg)}`);
+    openUrl(`https://wa.me/972505023423?text=${encodeURIComponent(msg)}`);
   };
   if ($("tf")) $("tf").onclick = () => { st.ui.trialOffer = false; home(); };
   app.querySelectorAll(".plan").forEach((b) => (b.onclick = () => { st.ui.plan = b.dataset.p; plans(); }));
@@ -1399,7 +1399,7 @@ function tools() {
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   if ($("jt")) $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess() && !isAdmin()) return openUrl(Capacitor.getPlatform() === "android" ? "https://play.google.com/store/account/subscriptions" : "https://apps.apple.com/account/subscriptions"); st.ui.fromTools = true; plans(); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972503227701"); if ($("lgt2")) $("lgt2").onclick = league;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972505023423"); if ($("lgt2")) $("lgt2").onclick = league;
   if ($("rfp")) $("rfp").onclick = () => refPage(tools); if ($("clc")) $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
