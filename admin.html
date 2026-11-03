@@ -187,6 +187,7 @@ async function viewPastEx() {
 
 /* ---------- list ---------- */
 const PAGE = 50;
+const imgSrc = p => /^(https?:)?\/\//.test(p) ? p : "app/" + String(p).replace(/^\/+/, "");
 async function viewList() {
   const b = $("body"), s = listState;
   b.innerHTML = `<div class="card"><div class="row">
@@ -217,7 +218,7 @@ async function viewList() {
     const L = ["א","ב","ג","ד"];
     $("rows").innerHTML = `<tr><td colspan="4"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">${data.map(r => `<div style="border:1px solid #d9dee8;border-radius:12px;padding:12px;background:#fff">
       <div class="row" style="justify-content:space-between"><b>#${r.id}</b><span>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} <button class="btn ghost" data-edit="${r.id}" style="padding:2px 10px">تعديل</button></span></div>
-      ${r.he?.img ? `<img src="${esc(r.he.img)}" loading="lazy" style="width:100%;max-height:240px;object-fit:contain;background:#f1f3f7;border-radius:8px;margin:8px 0">` : ""}
+      ${r.he?.img ? `<img src="${esc(imgSrc(r.he.img))}" loading="lazy" style="width:100%;max-height:240px;object-fit:contain;background:#f1f3f7;border-radius:8px;margin:8px 0">` : ""}
       <div dir="rtl" class="he" style="font-weight:600;margin:6px 0">${esc(r.he?.q || "")}</div>
       <div dir="rtl" class="he">${(r.he?.o || []).map((o, i) => `<div style="padding:3px 6px;border-radius:6px;${i===r.answer?"background:#dff5e6;font-weight:600":""}">${L[i]}. ${esc(o)}${i===r.answer?" ✓":""}</div>`).join("")}</div>
       <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">الشرح</summary><div dir="rtl" class="he" style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(r.he?.e || "")}</div></details>
@@ -259,6 +260,8 @@ function viewEdit() {
     <div class="row"><div><label>المسار</label><select id="trk">${TRACKS.map(t => `<option value="${t.id}" ${(q.track||curTrack)===t.id?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
       <div><label>الموضوع</label><select id="tp"></select></div>
       <div><label>راجعه</label><input id="rv" value="${esc(q.reviewed_by || "")}"></div></div>
+    ${q.he?.img ? `<img src="${esc(imgSrc(q.he.img))}" style="max-width:100%;max-height:300px;object-fit:contain;background:#f1f3f7;border-radius:8px;display:block;margin:6px 0">` : ""}
+    <label>صورة السؤال (رابط أو مسار، اتركه فاضي بدون صورة)</label><input id="img" dir="ltr" value="${esc(q.he?.img || "")}">
     <p class="muted">علّم الدائرة جنب الجواب الصحيح (نفس الترتيب بالعبري والإنجليزي).</p>
     <div class="grid2">
       <div class="he" dir="rtl"><label>שאלה (עברית)</label><textarea id="he-q">${esc(q.he.q)}</textarea>${opts("he","rtl")}<label>הסבר (עברית)</label><textarea id="he-e">${esc(q.he.e)}</textarea></div>
@@ -287,11 +290,12 @@ function viewEdit() {
     const ans = root.querySelector("input[name=ans]:checked");
     const row = {
       track: v("trk"), topic: v("tp"), answer: ans ? +ans.value : -1,
-      he: { q: v("he-q"), o: [0,1,2,3].map(i => v("he-o"+i)), e: v("he-e") },
-      en: { q: v("en-q"), o: [0,1,2,3].map(i => v("en-o"+i)), e: v("en-e") },
+      he: { ...(q.he || {}), q: v("he-q"), o: (q.he.o || [0,1,2,3]).map((_, i) => v("he-o"+i)), e: v("he-e") },
+      en: { ...(q.en || {}), q: v("en-q"), o: (q.en.o || [0,1,2,3]).map((_, i) => v("en-o"+i)), e: v("en-e") },
       terms: v("tm").split("\n").map(l => l.split("|").map(x => x.trim())).filter(p => p.length === 2 && p[0] && p[1]),
       source: v("src"), reviewed_by: v("rv") || null, published: $("pb").checked, is_free: $("fr").checked, updated_at: new Date().toISOString(),
     };
+    const imgv = v("img"); if (imgv) row.he.img = imgv; else delete row.he.img;
     const problems = validate(row);
     if (problems.length) { $("er").innerHTML = `<div class="msg bad">${problems.map(esc).join("<br>")}</div>`; return; }
     const res = q.id ? await sb.from("questions").update(row).eq("id", q.id).select().single() : await sb.from("questions").insert(row).select().single();
@@ -303,10 +307,10 @@ function viewEdit() {
 function validate(r) {
   const p = [];
   if (!TOPICS_OF(r.track)[r.topic]) p.push(`موضوع غير معروف بمسار ${r.track}: ${r.topic}`);
-  if (!(r.answer >= 0 && r.answer <= 3)) p.push("لازم تختار الجواب الصحيح");
+  if (!(r.answer >= 0 && r.answer <= r.he.o.length - 1)) p.push("لازم تختار الجواب الصحيح");
   for (const [l,n] of [["he","العبري"],["en","الإنجليزي"]]) {
     if (!r[l].q) p.push(`نص السؤال ب${n} فاضي`);
-    if (r[l].o.length !== 4 || r[l].o.some(o => !o)) p.push(`لازم ٤ خيارات ب${n}`);
+    if (r[l].o.length < 4 || r[l].o.length > 5 || r[l].o.some(o => !o)) p.push(`لازم ٤ خيارات ب${n}`);
     if (!r[l].e) p.push(`الشرح ب${n} فاضي`);
   }
   if (!r.source) p.push("المصدر فاضي");
