@@ -75,7 +75,7 @@ const root = document.getElementById("root");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 const $ = id => document.getElementById(id);
 const cfg = { url: localStorage.getItem("rs-url") || "https://bbslhbcmfjfjbvqqcebg.supabase.co", key: localStorage.getItem("rs-key") || "sb_publishable_-PUr33K468fu-ywZehsbZQ_QBQnHeQX" };
-let sb = null, me = null, tab = "list", editing = null, listState = { topic: "", pub: "", q: "", page: 0 }, flashMsg = null;
+let sb = null, me = null, tab = "list", editing = null, listState = { topic: "", pub: "", q: "", page: 0, img: "", view: "table" }, flashMsg = null;
 
 function msg(text, ok = true) { flashMsg = { text, ok }; }
 function msgHtml() { const m = flashMsg; flashMsg = null; return m ? `<div class="msg ${m.ok ? "ok" : "bad"}">${esc(m.text)}</div>` : ""; }
@@ -192,21 +192,38 @@ async function viewList() {
   b.innerHTML = `<div class="card"><div class="row">
     <select id="ft"><option value="">كل المواضيع</option>${Object.entries(TOPICS_OF(curTrack)).map(([k,n]) => `<option value="${k}" ${s.topic===k?"selected":""}>${esc(n)}</option>`).join("")}</select>
     <select id="fp"><option value="">منشور وغير منشور</option><option value="1" ${s.pub==="1"?"selected":""}>منشور</option><option value="0" ${s.pub==="0"?"selected":""}>غير منشور</option></select>
+    <select id="fi"><option value="">مع صورة وبدون</option><option value="1" ${s.img==="1"?"selected":""}>فيها صورة فقط</option><option value="0" ${s.img==="0"?"selected":""}>بدون صورة</option></select>
+    <select id="fv"><option value="table" ${s.view!=="cards"?"selected":""}>عرض جدول</option><option value="cards" ${s.view==="cards"?"selected":""}>🖼 عرض بطاقات (سؤال + صورة)</option></select>
     <input id="fq" placeholder="بحث بنص السؤال" value="${esc(s.q)}">
     <button class="btn" id="go">بحث</button><button class="btn ghost" id="new">+ سؤال جديد</button><button class="btn" id="puball" style="display:none"></button></div>
     <div class="tbl"><table><thead><tr><th>#</th><th>الموضوع</th><th>السؤال (עברית)</th><th>الحالة</th></tr></thead><tbody id="rows"><tr><td colspan="4" class="muted">بحمّل…</td></tr></tbody></table></div>
     <div class="row" style="justify-content:space-between"><button class="btn ghost" id="pv">السابق</button><span class="muted" id="pg"></span><button class="btn ghost" id="nx">التالي</button></div></div>`;
-  $("go").onclick = () => { s.topic = $("ft").value; s.pub = $("fp").value; s.q = $("fq").value.trim(); s.page = 0; viewList(); };
+  $("go").onclick = () => { s.topic = $("ft").value; s.pub = $("fp").value; s.img = $("fi").value; s.view = $("fv").value; s.q = $("fq").value.trim(); s.page = 0; viewList(); };
+  $("fv").onchange = () => { s.view = $("fv").value; viewList(); };
   $("new").onclick = () => { editing = null; tab = "edit"; render(); };
   $("pv").onclick = () => { if (s.page > 0) { s.page--; viewList(); } };
   $("nx").onclick = () => { s.page++; viewList(); };
-  let q = sb.from("questions").select("id,topic,he,published,is_free", { count: "exact" }).eq("track", curTrack).order("id").range(s.page*PAGE, s.page*PAGE+PAGE-1);
+  const cards = s.view === "cards", PG = cards ? 12 : PAGE;
+  let q = sb.from("questions").select("id,topic,he,answer,published,is_free", { count: "exact" }).eq("track", curTrack).order("id").range(s.page*PG, s.page*PG+PG-1);
+  if (s.img === "1") q = q.not("he->>img", "is", null);
+  if (s.img === "0") q = q.is("he->>img", null);
   if (s.topic) q = q.eq("topic", s.topic);
   if (s.pub) q = q.eq("published", s.pub === "1");
   if (s.q) { const w = s.q.replace(/[,()*%]/g, " "); q = q.or(`he->>q.ilike.*${w}*,en->>q.ilike.*${w}*`); }
   const { data, count, error } = await q;
   if (error) { $("rows").innerHTML = `<tr><td colspan="4">${esc(error.message)}</td></tr>`; return; }
-  $("pg").textContent = `${count} سؤال · صفحة ${s.page+1} من ${Math.max(1, Math.ceil(count/PAGE))}`;
+  $("pg").textContent = `${count} سؤال · صفحة ${s.page+1} من ${Math.max(1, Math.ceil(count/PG))}`;
+  if (cards) {
+    const L = ["א","ב","ג","ד"];
+    $("rows").innerHTML = `<tr><td colspan="4"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">${data.map(r => `<div style="border:1px solid #d9dee8;border-radius:12px;padding:12px;background:#fff">
+      <div class="row" style="justify-content:space-between"><b>#${r.id}</b><span>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} <button class="btn ghost" data-edit="${r.id}" style="padding:2px 10px">تعديل</button></span></div>
+      ${r.he?.img ? `<img src="${esc(r.he.img)}" loading="lazy" style="width:100%;max-height:240px;object-fit:contain;background:#f1f3f7;border-radius:8px;margin:8px 0">` : ""}
+      <div dir="rtl" class="he" style="font-weight:600;margin:6px 0">${esc(r.he?.q || "")}</div>
+      <div dir="rtl" class="he">${(r.he?.o || []).map((o, i) => `<div style="padding:3px 6px;border-radius:6px;${i===r.answer?"background:#dff5e6;font-weight:600":""}">${L[i]}. ${esc(o)}${i===r.answer?" ✓":""}</div>`).join("")}</div>
+      <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">الشرح</summary><div dir="rtl" class="he" style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(r.he?.e || "")}</div></details>
+    </div>`).join("")}</div>${data.length ? "" : "ما في نتائج"}</td></tr>`;
+    $("rows").querySelectorAll("[data-edit]").forEach(bn => bn.onclick = () => openEditor(+bn.dataset.edit));
+  } else
   $("rows").innerHTML = data.length ? data.map(r => `<tr class="click" data-id="${r.id}"><td>${r.id}</td><td>${esc(TOPICS_OF(curTrack)[r.topic] || r.topic)}</td><td class="he" dir="rtl">${esc((r.he?.q || "").slice(0,120))}</td><td>${r.published ? `<span class="pill">منشور</span>` : `<span class="pill off">مسودة</span>`} ${r.is_free ? `<span class="pill">مجاني</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">ما في نتائج</td></tr>`;
   $("rows").querySelectorAll("tr.click").forEach(tr => tr.onclick = () => openEditor(+tr.dataset.id));
   // publish every draft of this track (optionally only the chosen topic) in one go
