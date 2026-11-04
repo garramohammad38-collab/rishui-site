@@ -1391,7 +1391,7 @@ function tools() {
     row("hp", "💬", t("helpT"), t("helpD")),
     row("ina", "👋", t("introAgain"), t("introAgainD")),
     row("ig", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c13584" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="#c13584" stroke="none"/></svg>`, t("igT"), "@Musmachapp"),
-    row("wa", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-.8.7c-.9-.4-1.7-1.200-2-2l.7-.8-1-1.8z" fill="#25a244" stroke="none"/></svg>`, t("waT"), "050-3227701"),
+    row("wa", `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#25a244" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-4.9A8.5 8.5 0 1 1 8 19.4L3 21z"/><path d="M9 9.5c.3 2.2 2.3 4.2 5 5l1.3-1.3-1.8-1-.8.7c-.9-.4-1.7-1.200-2-2l.7-.8-1-1.8z" fill="#25a244" stroke="none"/></svg>`, t("waT"), "050-5023423"),
     row("lg-t", "📄", t("terms"), ""),
     row("lg-p", "🔒", t("privacy"), ""),
   ]))}
