@@ -598,7 +598,11 @@ function chooseTrack(pending) {
   if ($("ok")) $("ok").onclick = () => pick(pending);
   app.querySelectorAll(".trk-card").forEach((b) => (b.onclick = () => {
     const k = b.dataset.k;
-    if (first && !isAdmin()) return chooseTrack(k); // first choice needs a confirm
+    if (first && !isAdmin()) { // first choice needs a confirm: keep the page where it was, then glide to the confirm button
+      const y = window.scrollY; chooseTrack(k); window.scrollTo(0, y);
+      requestAnimationFrame(() => $("ok")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+      return;
+    }
     if (k !== cur) pick(k);
   }));
 }
