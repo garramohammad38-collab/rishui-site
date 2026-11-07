@@ -114,10 +114,13 @@ export const email = (fallback) => (typeof UI.contact?.email === "string" && /^[
 
 /* ---- banners ---- */
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// inside the iPhone/Android app (not the website)
+const NATIVE = () => !!globalThis.Capacitor?.isNativePlatform?.();
 export function banners(place, track, lang) {
   const now = Date.now();
   const list = (UI.banners || []).filter((b) => b && b.active !== false
     && (b.place || "home") === place
+    && (!b.platform || b.platform === "all" || b.platform === (NATIVE() ? "app" : "web"))
     && (!b.tracks?.length || b.tracks.includes(track) || (track === "optometry_prac" && b.tracks.includes("optometry")))
     && (!b.from || Date.parse(b.from) <= now) && (!b.until || Date.parse(b.until) + 864e5 > now));
   if (!list.length) return "";
