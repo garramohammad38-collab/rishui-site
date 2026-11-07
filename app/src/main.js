@@ -5,7 +5,7 @@ import { Device } from "@capacitor/device";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
 import * as api from "./api.js?v=20261102p";
-import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102q";
+import { T, topicName as fallbackTopic } from "./i18n.js?v=20261107e";
 import * as RUI from "./remote.js?v=20261107a";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
@@ -636,7 +636,7 @@ function plans() {
     <h3>${t("haveCode")}</h3>
     <div class="field"><label for="cd">${t("code")}</label><div class="row2"><input id="cd" dir="ltr" autocomplete="off" autocapitalize="characters"><button class="ghost" id="ap">${t("apply")}</button></div></div>
   </div>
-  ${trial ? `<button class="ghost" id="tf" style="width:100%">${t("continueFree")}</button>` : ""}
+  ${trial && st.ui.freeDone ? `<div class="banner">🎉 ${t("freeDoneT")}</div><button class="ghost" id="tf" style="width:100%">${t("home")}</button>` : trial ? `<button class="ghost" id="tf" style="width:100%">${t("continueFree")}</button>` : ""}
   ${legalLinks()}`);
   bindLegal();
   st.ui.msg = null;
@@ -908,6 +908,7 @@ async function summaryView(id) {
 /* ---------------- new exam (builder) ---------------- */
 const EXAM_SECONDS_PER_Q = 90, EXAM_MAX = 180;
 function newExam() {
+  if (!hasAccess() && !newExam.ok) { loading(); freeGate().then((done) => { if (!done) { newExam.ok = true; newExam(); newExam.ok = false; } }); return; }
   const saved = store.get("exam-cfg") || {};
   const cfg = { n: saved.n || 50, timed: saved.timed ?? true, guided: saved.guided ?? false, topics: saved.topics || [], pool: saved.pool || "all" };
   S = { screen: newExam };
@@ -2139,6 +2140,7 @@ function bindGoal(rows) {
 /* ---------------- smart review ---------------- */
 async function smartReview() {
   loading();
+  if (await freeGate()) return;
   try {
     const due = await api.dueReviews(st.user.id, TR(), BATCH);
     if (due.length) return practice({ kind: "ids", ids: due.map((r) => r.question_id), smart: true });
@@ -2260,8 +2262,21 @@ function searchPage(back = route) {
 
 /* ---------------- practice ---------------- */
 const BATCH = 20;
+// free sample: once every free question of the track was answered, practice and new exams go to the plans page
+async function freeLeft() {
+  if (hasAccess()) return true;
+  if (!st.freeIds || st.freeTr !== TR()) {
+    try { st.freeIds = (await api.questions({ track: TR(), topic: null, afterId: 0, limit: 25 })).map((q) => q.id); st.freeTr = TR(); } catch { return true; }
+  }
+  return !st.freeIds.length || st.freeIds.some((id) => !st.answers.has(id));
+}
+async function freeGate() {
+  if (await freeLeft()) return false;
+  st.ui.freeDone = true; st.ui.fromTools = false; plans(); return true;
+}
 async function practice(src) {
   loading();
+  if (await freeGate()) return;
   try {
     let items;
     if (src.kind === "unanswered") {
