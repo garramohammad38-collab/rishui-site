@@ -22,6 +22,21 @@ h1,h2,h3{margin:0}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tabs.grp{flex-direction:column;gap:8px;align-items:stretch}
+.tabs .g{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tabs .g>span{font-size:12px;font-weight:600;opacity:.6;min-width:70px}
+.trpick{border:1px solid var(--line);border-radius:12px;padding:0}
+.trpick>summary{padding:12px 14px;cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.trpick>summary::-webkit-details-marker{display:none}
+.trpick>summary::after{content:"▾";opacity:.6}
+.trpick[open]>summary::after{content:"▴"}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;white-space:nowrap}
+.chip input{display:none}
+.chip:has(input:checked){background:var(--accent);color:#fff;border-color:var(--accent)}
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.subtabs button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer}
+.subtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 label{font-size:13px;font-weight:600;color:var(--muted)}
 input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
 textarea{min-height:70px;resize:vertical}
@@ -122,21 +137,31 @@ async function start() {
 }
 
 /* ---------- layout ---------- */
+function trPicker(cls, withAll) {
+  return `<details class="trpick" data-cls="${cls}"><summary><span>اختار المسارات</span><span class="muted trn">ولا واحد</span></summary><div class="chips">${withAll ? `<label class="chip"><input type="checkbox" id="gall"><b>كل المسارات</b></label>` : ""}${TRACKS.map(t => `<label class="chip"><input type="checkbox" class="${cls}" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div></details>`;
+}
+function wirePicker(cls) {
+  const d = document.querySelector(`.trpick[data-cls="${cls}"]`); if (!d) return;
+  const upd = () => { const n = d.querySelectorAll("." + cls + ":checked").length; d.querySelector(".trn").textContent = n ? n + " مختار" : "ولا واحد"; };
+  d.addEventListener("change", e => { if (e.target.id === "gall") d.querySelectorAll("." + cls).forEach(x => x.checked = e.target.checked); upd(); });
+  return upd;
+}
+const TAB_GROUPS = [["📚 المحتوى", ["list","edit","import","summaries","pastex","tracks"]], ["👥 الناس", ["users","insights","codes","messages","reports"]], ["📊 عام", ["look","ann","stats"]]];
 const EDITOR_TABS = ["list", "edit", "import", "stats"];   // what a limited admin may open
 function render() {
-  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["insights","🔍 تحليل المستخدمين"],["summaries","📘 ملخصات"],["pastex","📝 امتحانات سابقة"],["ann","📢 إعلانات"],["stats","أرقام"]];
+  const allTabs = [["list","الأسئلة"],["edit", editing?.id ? "تعديل سؤال" : "إضافة سؤال"],["import","استيراد"],["reports","التبليغات"],["messages","الرسائل"],["codes","أكواد الدخول"],["tracks","المسارات والمواضيع"],["users","المستخدمين"],["insights","🔍 تحليل المستخدمين"],["summaries","📘 ملخصات"],["pastex","📝 امتحانات سابقة"],["ann","📢 إعلانات"],["look","🎨 شكل التطبيق"],["stats","أرقام"]];
   const isAdmin = me.role === "admin";
   const tabs = isAdmin ? allTabs : allTabs.filter(t => EDITOR_TABS.includes(t[0]));
   if (!tabs.some(t => t[0] === tab)) tab = "list";
   root.innerHTML = `<div class="top"><h1>لوحة إدارة מוסמך</h1><div class="row" style="flex:none"><span class="muted" dir="ltr">${esc(me.email)}</span><button class="btn ghost" id="rf" title="تحديث">🔄 تحديث</button><button class="btn ghost" id="out">خروج</button></div></div>
   <div class="row" style="justify-content:flex-start"><label style="flex:none">المسار:</label><select id="ctr" style="flex:none;min-width:200px">${TRACKS.map(t => `<option value="${t.id}" ${t.id===curTrack?"selected":""}>${esc(trackLabel(t.id))}</option>`).join("")}</select></div>
-  <div class="tabs">${tabs.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>
+  <div class="tabs grp">${TAB_GROUPS.map(([gn, ks]) => { const g = tabs.filter(t => ks.includes(t[0])); return g.length ? `<div class="g"><span>${gn}</span>${g.map(([k,n]) => `<button data-t="${k}" class="${tab===k?"on":""}">${n}</button>`).join("")}</div>` : ""; }).join("")}</div>
   ${msgHtml()}<div id="body"></div>`;
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; if (tab === "edit" && b.textContent === "إضافة سؤال") editing = null; render(); });
   $("ctr").onchange = () => { curTrack = $("ctr").value; localStorage.setItem("rs-track", curTrack); listState.topic = ""; editing = null; render(); };
   $("rf").onclick = () => { $("rf").disabled = true; render(); };
   $("out").onclick = async () => { await sb.auth.signOut(); me = null; start(); };
-  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, insights: viewInsights, summaries: viewSummaries, pastex: viewPastEx, ann: viewAnn, stats: viewStats })[tab]();
+  ({ list: viewList, edit: viewEdit, import: viewImport, reports: viewReports, messages: viewMessages, codes: viewCodes, tracks: viewTracks, users: viewUsers, insights: viewInsights, summaries: viewSummaries, pastex: viewPastEx, ann: viewAnn, look: viewLook, stats: viewStats })[tab]();
 }
 
 
@@ -575,40 +600,49 @@ async function viewAnn() {
 }
 
 /* ---------- users ---------- */
-let userState = { q: "", page: 0 };
+let userState = { q: "", page: 0, sub: "list" };
 const fmtDT = d => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 async function viewUsers() {
   const s = userState, PAGE = 50;
-  $("body").innerHTML = `<div class="card"><h3>إضافة ادمن بصلاحيات محدودة</h3>
+  const SUBS = [["list","📋 قائمة المستخدمين"],["grant","🔓 فتح مسارات لحساب"],["editors","🛡️ ادمن محدود"]];
+  const sv = SUBS.some(x => x[0] === s.sub) ? s.sub : "list";
+  $("body").innerHTML = `<div class="subtabs">${SUBS.map(([k,n]) => `<button data-sub="${k}" class="${sv===k?"on":""}">${n}</button>`).join("")}</div>` +
+    (sv === "editors" ? `<div class="card"><h3>إضافة ادمن بصلاحيات محدودة</h3>
     <p class="muted">بيشوف الأسئلة (إضافة وتعديل واستيراد) وأرقام المسارات اللي بتحددها بس. ما بيشوف المستخدمين ولا الإشعارات ولا الإعلانات ولا الأكواد. لازم يكون سجّل حساب أولاً.</p>
     <input id="ed" type="email" dir="ltr" placeholder="إيميل الادمن">
-    <div class="row" style="justify-content:flex-start;flex-wrap:wrap">${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="edt" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    ${trPicker("edt", false)}
     <button class="btn" id="edgo" style="align-self:flex-start">إضافة / تحديث المسارات</button>
-    <div id="edl" class="muted">بحمّل…</div></div><div class="card"><h3>فتح مسارات لحساب</h3>
+    <div id="edl" class="muted">بحمّل…</div></div>` : sv === "grant" ? `<div class="card"><h3>فتح مسارات لحساب</h3>
     <p class="muted">بتحط إيميل حساب وبتختار المسارات، والحساب بيقدر يدخلها ويتنقل بينها مجاناً لحد التاريخ اللي بتحدده. لازم يكون سجّل حساب أولاً.</p>
     <input id="gem" type="email" dir="ltr" placeholder="إيميل الحساب">
-    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" id="gall"><b>كل المسارات</b></label>${TRACKS.map(t => `<label style="flex:none;display:flex;gap:6px;align-items:center"><input type="checkbox" class="gtr" value="${t.id}">${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    ${trPicker("gtr", true)}
     <div class="row" style="justify-content:flex-start;align-items:center"><span class="muted" style="flex:none">لحد:</span><input id="guntil" type="date" dir="ltr" style="flex:none;width:auto"><span class="muted" style="flex:none">(فاضي = بدون نهاية)</span></div>
     <button class="btn" id="ggo" style="align-self:flex-start">فتح المسارات</button>
     <div id="gmsg" class="muted"></div>
-    <div id="gl" class="muted">بحمّل…</div></div><div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
+    <div id="gl" class="muted">بحمّل…</div></div>` : `<div class="card"><div class="row"><input id="uq" dir="ltr" placeholder="ابحث بالإيميل…" value="${esc(s.q)}"><button class="btn" id="ugo" style="flex:none">بحث</button></div>
     <div class="muted" id="ucount">بحمّل…</div>
     <div class="tbl"><table><thead><tr><th>#</th><th>الإيميل</th><th>سجّل بتاريخ</th><th>آخر دخول</th><th>أجهزة</th><th>المسار</th><th>أسئلة محلولة</th><th>موعد الامتحان</th><th>الاشتراك</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">بحمّل…</td></tr></tbody></table></div>
-    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`;
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="upr" style="flex:none">→ السابق</button><span class="muted" id="upg"></span><button class="btn ghost" id="unx" style="flex:none">التالي ←</button></div></div>`);
+  document.querySelectorAll("[data-sub]").forEach(x => x.onclick = () => { s.sub = x.dataset.sub; viewUsers(); });
+  if (sv === "editors") {
   const loadEditors = async () => {
     const { data: ed } = await sb.from("profiles").select("email,tracks").eq("role", "editor").order("email");
     $("edl").innerHTML = (ed || []).length ? ed.map(e => `<div class="row" style="justify-content:space-between"><span><b dir="ltr">${esc(e.email)}</b><br><span class="muted">${(e.tracks || []).map(t => esc(trackLabel(t))).join(" · ")}</span></span><button class="btn ghost" data-ed="${esc(e.email)}" style="flex:none">إزالة</button></div>`).join("") : "ما في ادمن محدود مضاف";
     $("edl").querySelectorAll("[data-ed]").forEach(b => b.onclick = async () => { if (!confirm("تشيل صلاحية " + b.dataset.ed + "؟")) return; const { error } = await sb.rpc("admin_set_editor", { p_email: b.dataset.ed, p_tracks: [] }); if (error) alert(error.message); loadEditors(); });
   };
   loadEditors();
+  const updE = wirePicker("edt");
   $("edgo").onclick = async () => {
     const em = $("ed").value.trim(), tr = [...document.querySelectorAll(".edt:checked")].map(x => x.value);
     if (!em) return;
     if (!tr.length) { alert("اختار مسار واحد على الأقل"); return; }
     const { error } = await sb.rpc("admin_set_editor", { p_email: em, p_tracks: tr });
     if (error) { alert(error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message); return; }
-    $("ed").value = ""; document.querySelectorAll(".edt").forEach(x => x.checked = false); loadEditors();
+    $("ed").value = ""; document.querySelectorAll(".edt").forEach(x => x.checked = false); updE(); loadEditors();
   };
+    return;
+  }
+  if (sv === "grant") {
   const loadGrants = async () => {
     const { data: gr, error } = await sb.rpc("admin_list_grants");
     if (error) { $("gl").textContent = error.message; return; }
@@ -617,7 +651,7 @@ async function viewUsers() {
     $("gl").querySelectorAll("[data-rv]").forEach(a => a.onclick = async e => { e.preventDefault(); if (!confirm("تسكّر هذا المسار عن الحساب؟")) return; const { error: x } = await sb.rpc("admin_revoke_track", { p_user: a.dataset.rv, p_track: a.dataset.tr }); if (x) alert(x.message); loadGrants(); });
   };
   loadGrants();
-  $("gall").onchange = () => document.querySelectorAll(".gtr").forEach(x => x.checked = $("gall").checked);
+  const updG = wirePicker("gtr");
   $("ggo").onclick = async () => {
     const em = $("gem").value.trim(), tr = [...document.querySelectorAll(".gtr:checked")].map(x => x.value);
     if (!em) return;
@@ -626,8 +660,10 @@ async function viewUsers() {
     const { error } = await sb.rpc("admin_grant_tracks", { p_email: em, p_tracks: tr, p_until: u });
     if (error) { $("gmsg").textContent = error.message.includes("no account") ? "ما في حساب بهاد الإيميل. لازم يسجّل بالتطبيق أولاً." : error.message; return; }
     $("gmsg").textContent = `✓ انفتح ${tr.length} مسار لـ ${em}`;
-    $("gem").value = ""; $("guntil").value = ""; document.querySelectorAll(".gtr,#gall").forEach(x => x.checked = false); loadGrants();
+    $("gem").value = ""; $("guntil").value = ""; document.querySelectorAll(".gtr,#gall").forEach(x => x.checked = false); updG(); loadGrants();
   };
+    return;
+  }
   const go = () => { s.q = $("uq").value.trim(); s.page = 0; viewUsers(); };
   $("ugo").onclick = go; $("uq").onkeydown = e => { if (e.key === "Enter") go(); };
   let q = sb.from("profiles").select("id,email,created_at,track,exam_date,role,plan,plan_until", { count: "exact" }).order("created_at", { ascending: false }).range(s.page * PAGE, s.page * PAGE + PAGE - 1);
@@ -641,6 +677,12 @@ async function viewUsers() {
     const { data: dv } = await sb.from("devices").select("user_id,last_seen").in("user_id", ids).limit(2000);
     (dv || []).forEach(d => { const x = seen[d.user_id] || (seen[d.user_id] = { n: 0, last: null }); x.n++; if (!x.last || d.last_seen > x.last) x.last = d.last_seen; });
   }
+  // active subscriptions live in "entitlements" (App Store, codes, manual grants); the profile columns are only a legacy copy
+  const ents = {};
+  if (ids.length) {
+    const { data: en } = await sb.from("entitlements").select("user_id,track,plan,until").in("user_id", ids).gt("until", new Date().toISOString()).limit(5000);
+    (en || []).forEach(e => { const x = ents[e.user_id] || (ents[e.user_id] = []); x.push(e); });
+  }
   // questions solved per user, split by track
   const solved = {};
   if (ids.length) {
@@ -653,7 +695,7 @@ async function viewUsers() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const newToday = (data || []).filter(u => new Date(u.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }) === today).length;
   $("ucount").textContent = `${s.q ? "نتائج البحث" : "كل المستخدمين"}: ${count ?? 0}` + (!s.q && !s.page ? ` · سجّلوا اليوم: ${newToday}` : "");
-  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : `<span class="muted">مجاني</span>`;
+  const sub = u => u.role === "admin" ? `<span class="pill">مدير</span>` : u.role === "editor" ? `<span class="pill">ادمن محدود</span>` : u.plan_until && new Date(u.plan_until) > new Date() ? `<span class="pill">${u.plan === "code" ? "كود" : u.plan === "exam" ? "لحد الامتحان" : "شهري"} · لحد ${esc(String(u.plan_until).slice(0, 10))}</span>` : ents[u.id]?.length ? (e => `<span class="pill">${e.plan === "code" ? "كود" : e.plan === "exam" ? "لحد الامتحان" : e.plan === "admin" ? "منح يدوي" : "شهري"} · ${ents[u.id].length > 1 ? ents[u.id].length + " مسارات · " : esc(trackLabel(e.track)) + " · "}لحد ${esc(String(e.until).slice(0, 10))}</span>`)(ents[u.id].slice().sort((a, b) => (a.until < b.until ? 1 : -1))[0]) : `<span class="muted">مجاني</span>`;
   $("rows").innerHTML = (data || []).map((u, i) => `<tr><td>${s.page * PAGE + i + 1}</td><td dir="ltr" style="text-align:start"><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td><td dir="ltr" style="text-align:start">${fmtDT(u.created_at)}</td><td dir="ltr" style="text-align:start">${fmtDT(seen[u.id]?.last)}</td><td>${seen[u.id]?.n || 0}${seen[u.id]?.n ? ` <a href="#" data-rd="${esc(u.id)}" data-em="${esc(u.email)}" title="مسح الأجهزة" style="text-decoration:none">↺</a>` : ""}</td><td class="he">${esc(u.track ? trackLabel(u.track) : "—")}</td><td>${solvedCell(u.id)}</td><td dir="ltr" style="text-align:start">${esc(u.exam_date || "—")}</td><td>${sub(u)}</td><td>${u.role === "admin" ? "" : `<button class="btn ghost" data-del="${esc(u.id)}" data-em="${esc(u.email)}" style="flex:none;padding:4px 10px;color:#C0392B">🗑 حذف</button>`}</td></tr>`).join("")
     || `<tr><td colspan="10" class="muted">ما في مستخدمين</td></tr>`;
   $("rows").querySelectorAll("[data-rd]").forEach(a => a.onclick = async e => {
@@ -675,6 +717,208 @@ async function viewUsers() {
   $("upg").textContent = `صفحة ${s.page + 1} من ${pages}`;
   $("upr").disabled = s.page === 0; $("unx").disabled = s.page + 1 >= pages;
   $("upr").onclick = () => { s.page--; viewUsers(); }; $("unx").onclick = () => { s.page++; viewUsers(); };
+}
+
+/* ---------- 🎨 app look: change the app without an update (app_ui.config, read by app/src/remote.js) ---------- */
+const LOOK_SECTIONS = { mission: "🎯 مهمة اليوم", progress: "📊 بطاقة التقدّم", stats4: "🔢 الأرقام الأربعة (صح/غلط/…)", pastex: "📝 امتحانات سابقة", summaries: "📘 ملخصات", actions: "🧩 الأزرار الأربعة (امتحان/ذكي/أخطاء/محفوظات)", newexam: "  ↳ امتحان جديد", smart: "  ↳ مراجعة ذكية", mistakes: "  ↳ الأخطاء", bookmarks: "  ↳ المحفوظات", journey: "🗺️ موعد الامتحان والرحلة", league: "🏆 الدوري", goal: "📅 الهدف اليومي", heroChar: "🧑‍⚕️ الشخصية فوق", heroDeco: "✨ الرسومات الصغيرة فوق", lang: "🌐 زر اللغة עב/EN", instagram: "📷 زر إنستغرام", whatsapp: "💬 زر واتساب", navExams: "⬇️ تبويب الامتحانات تحت", navQs: "⬇️ تبويب الأسئلة تحت", navStats: "⬇️ تبويب الإحصائيات تحت" };
+const LOOK_COLORS = { accent: "اللون الأساسي (أزرار)", "accent-soft": "لون فاتح للخلفيات الصغيرة", "on-accent": "لون الكتابة فوق الأزرار", bg: "خلفية التطبيق", surface: "خلفية البطاقات", ink: "لون الكتابة", muted: "كتابة باهتة", line: "الخطوط والحدود", amber: "برتقالي (تنبيهات)", ok: "أخضر (صح)", bad: "أحمر (غلط)", g1: "التدرّج فوق — لون 1", g2: "التدرّج فوق — لون 2" };
+const LOOK_ACTS = { "": "بدون", plans: "صفحة الاشتراك", contact: "صفحة تواصل", pastex: "امتحانات سابقة", summaries: "ملخصات", league: "الدوري", exams: "امتحاناتي", stats: "الإحصائيات", whatsapp: "واتساب", instagram: "إنستغرام" };
+let look = null, lookSaved = "", lookSub = "banners", lookText = { q: "" }, lookEditBan = null, appTexts = null;
+const lookDirty = () => JSON.stringify(look) !== lookSaved;
+async function viewLook() {
+  if (!look) {
+    $("body").innerHTML = `<div class="card muted">بحمّل…</div>`;
+    const { data, error } = await sb.from("app_ui").select("config,updated_at,updated_by").eq("id", 1).maybeSingle();
+    if (error) { $("body").innerHTML = `<div class="card msg bad">${esc(error.message)}</div>`; return; }
+    look = data?.config || {}; lookSaved = JSON.stringify(look); look._meta = { at: data?.updated_at, by: data?.updated_by }; lookSaved = JSON.stringify(look);
+  }
+  const SUBS = [["banners","📣 بانرات"],["colors","🎨 ألوان"],["texts","✏️ نصوص"],["sections","👁️ إظهار/إخفاء"],["tracks","🖼️ المسارات"],["contact","📞 تواصل"],["maint","🛠️ صيانة وتحديث"],["css","🧩 CSS"],["history","🕘 السجل"]];
+  $("body").innerHTML = `<div class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><div><b>🎨 التحكم بشكل التطبيق</b><div class="muted">كل تغيير هون بيوصل للتطبيق والموقع بدون تحديث من Apple، أول ما الطالب يفتح التطبيق أو يرجعله.${look._meta?.at ? ` آخر حفظ: ${esc(fmtDT(look._meta.at))}` : ""}</div></div>
+    <button class="btn" id="lsave" ${lookDirty() ? "" : "disabled"}>💾 احفظ وانشر</button></div>${lookDirty() ? `<div class="pill off" style="align-self:flex-start">في تغييرات مش محفوظة</div>` : ""}</div>
+    <div class="subtabs">${SUBS.map(([k,n]) => `<button data-ls="${k}" class="${lookSub===k?"on":""}">${n}</button>`).join("")}</div><div id="lbody"></div>`;
+  document.querySelectorAll("[data-ls]").forEach(b => b.onclick = () => { lookSub = b.dataset.ls; lookEditBan = null; viewLook(); });
+  $("lsave").onclick = lookSave;
+  ({ banners: lookBanners, colors: lookColors, texts: lookTexts, sections: lookSections, tracks: lookTracks, contact: lookContact, maint: lookMaint, css: lookCss, history: lookHistory })[lookSub]();
+}
+function lookTouch() { const b = $("lsave"); if (b) b.disabled = !lookDirty(); }
+async function lookSave() {
+  const meta = look._meta; delete look._meta;
+  const { error } = await sb.from("app_ui").update({ config: look }).eq("id", 1);
+  look._meta = meta;
+  if (error) { alert("ما انحفظ: " + error.message); return; }
+  look = null; msg("✅ انحفظ وانتشر. الطلاب بيشوفوه أول ما يفتحوا التطبيق أو يرجعوله."); render();
+}
+async function lookUpload(file) {
+  if (!file) return null;
+  if (file.size > 3 * 1024 * 1024) { alert("الصورة أكبر من 3MB"); return null; }
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await sb.storage.from("ui").upload(path, file, { contentType: file.type, upsert: false });
+  if (error) { alert("ما انرفعت الصورة: " + error.message); return null; }
+  return sb.storage.from("ui").getPublicUrl(path).data.publicUrl;
+}
+const imgPick = (id, val) => `<div class="row"><input id="${id}" dir="ltr" placeholder="https://… (رابط صورة) أو ارفع صورة" value="${esc(val || "")}" style="flex:1"><label class="btn ghost" style="cursor:pointer">📤 ارفع<input type="file" accept="image/*" data-up="${id}" style="display:none"></label></div>${val ? `<img src="${esc(val)}" style="max-width:220px;max-height:140px;border-radius:10px;border:1px solid var(--line)">` : ""}`;
+function bindUploads(after) {
+  document.querySelectorAll("[data-up]").forEach(inp => inp.onchange = async () => {
+    const url = await lookUpload(inp.files[0]); if (!url) return;
+    $(inp.dataset.up).value = url; $(inp.dataset.up).dispatchEvent(new Event("input")); after && after();
+  });
+}
+
+/* banners */
+function lookBanners() {
+  const L = look.banners || (look.banners = []);
+  if (lookEditBan != null) return lookBanEdit();
+  const placeN = { home: "الرئيسية", all: "كل الصفحات", plans: "صفحة الاشتراك" };
+  $("lbody").innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3>📣 البانرات</h3><button class="btn" id="bnew">➕ بانر جديد</button></div>
+    <p class="muted">بطاقات بتطلع بالتطبيق (بالرئيسية أو بكل الصفحات أو بصفحة الاشتراك) — فيها صورة، عنوان، نص، وزر بيفتح رابط أو صفحة بالتطبيق. ممكن تحدد لأي مسار ولأي تواريخ.</p>
+    ${L.length ? L.map((b, i) => `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:8px">
+      <span>${b.image ? `<img src="${esc(b.image)}" style="width:54px;height:40px;object-fit:cover;border-radius:6px;vertical-align:middle"> ` : ""}<b dir="auto">${esc(b.he?.title || b.en?.title || "(بدون عنوان)")}</b><br>
+      <span class="muted">${({ web: "🌐 الموقع", app: "📱 الآيفون", all: "📱🌐" })[b.platform || "all"]} · ${placeN[b.place || "home"]} · ${b.tracks?.length ? b.tracks.map(trackLabel).join("، ") : "كل المسارات"}${b.until ? " · لحد " + esc(b.until) : ""}</span></span>
+      <span class="row"><span class="pill ${b.active === false ? "off" : ""}">${b.active === false ? "موقوف" : "ظاهر"}</span>
+      <button class="btn ghost" data-bup="${i}" ${i ? "" : "disabled"}>⬆️</button><button class="btn ghost" data-bed="${i}">✏️ عدّل</button><button class="btn danger" data-bdel="${i}">🗑</button></span></div>`).join("") : `<p class="muted">ما في بانرات.</p>`}</div>`;
+  $("bnew").onclick = () => { L.push({ id: Date.now().toString(36), active: true, place: "home", platform: "web", tracks: [], he: { title: "" }, en: {} }); lookEditBan = L.length - 1; viewLook(); };
+  document.querySelectorAll("[data-bed]").forEach(b => b.onclick = () => { lookEditBan = +b.dataset.bed; viewLook(); });
+  document.querySelectorAll("[data-bup]").forEach(b => b.onclick = () => { const i = +b.dataset.bup; [L[i - 1], L[i]] = [L[i], L[i - 1]]; viewLook(); });
+  document.querySelectorAll("[data-bdel]").forEach(b => b.onclick = () => { if (!confirm("تحذف البانر؟ (بينحذف من التطبيق بعد ما تحفظ)")) return; L.splice(+b.dataset.bdel, 1); viewLook(); });
+}
+function lookBanEdit() {
+  const b = look.banners[lookEditBan]; b.he = b.he || {}; b.en = b.en || {};
+  $("lbody").innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3>✏️ بانر</h3><button class="btn ghost" id="bback">→ رجوع للقائمة</button></div>
+    <label style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="b_on" style="width:auto" ${b.active === false ? "" : "checked"}> ظاهر</label>
+    <div class="row"><div style="flex:1"><label>العنوان (עברית)</label><input id="b_ht" dir="rtl" value="${esc(b.he.title || "")}"></div><div style="flex:1"><label>Title (English)</label><input id="b_et" dir="ltr" value="${esc(b.en.title || "")}"></div></div>
+    <div class="row"><div style="flex:1"><label>النص (עברית)</label><textarea id="b_hb" dir="rtl">${esc(b.he.body || "")}</textarea></div><div style="flex:1"><label>Text (English)</label><textarea id="b_eb" dir="ltr">${esc(b.en.body || "")}</textarea></div></div>
+    <div class="msg" style="background:var(--amber-soft);border-radius:10px;padding:8px 10px;font-size:13px">⚠️ أي بانر بيحكي عن ببيت أو كاش أو خصم بالموقع لازم يكون <b>🌐 الموقع بس</b> — إذا طلع بالآيفون Apple ممكن تسكّر التطبيق.</div>
+    <label>الصورة (اختياري)</label>${imgPick("b_img", b.image)}
+    <div class="row"><div style="flex:1"><label>لما يكبس عليه يفتح</label><select id="b_act">${Object.entries(LOOK_ACTS).map(([k, n]) => `<option value="${k}" ${(b.action || "") === k && !b.url ? "selected" : ""}>${n}</option>`).join("")}<option value="url" ${b.url ? "selected" : ""}>رابط خارجي…</option></select></div>
+      <div style="flex:1"><label>الرابط (إذا اخترت رابط خارجي)</label><input id="b_url" dir="ltr" placeholder="https://…" value="${esc(b.url || "")}"></div></div>
+    <div class="row"><div style="flex:1"><label>نص الزر (עברית) — فاضي = البطاقة كلها بتنكبس</label><input id="b_hbtn" dir="rtl" value="${esc(b.he.btn || "")}"></div><div style="flex:1"><label>Button (English)</label><input id="b_ebtn" dir="ltr" value="${esc(b.en.btn || "")}"></div></div>
+    <div class="row"><div><label>وين يطلع</label><select id="b_place"><option value="home">الرئيسية</option><option value="all">فوق كل الصفحات</option><option value="plans">صفحة الاشتراك</option></select></div>
+      <div><label>بأي مكان</label><select id="b_plat"><option value="web">🌐 الموقع بس</option><option value="all">📱🌐 الآيفون والموقع</option><option value="app">📱 الآيفون بس</option></select></div>
+      <div><label>لون الخلفية (فاضي = أبيض عادي)</label><div class="row"><input type="color" id="b_colp" value="${esc(b.color || "#1554A8")}" style="width:52px;padding:2px"><input id="b_col" dir="ltr" value="${esc(b.color || "")}" placeholder="#1554A8" style="width:110px"></div></div>
+      <div><label>من تاريخ</label><input type="date" id="b_from" value="${esc(b.from || "")}"></div><div><label>لحد تاريخ</label><input type="date" id="b_until" value="${esc(b.until || "")}"></div></div>
+    <label>لأي مسارات (ولا واحد = الكل)</label><div class="chips" style="padding:0">${TRACKS.map(t => `<label class="chip"><input type="checkbox" class="b_tr" value="${t.id}" ${(b.tracks || []).includes(t.id) ? "checked" : ""}>${esc(trackLabel(t.id))}</label>`).join("")}</div>
+    <label>هيك بيطلع (تقريباً):</label><div id="b_prev"></div></div>`;
+  $("b_place").value = b.place || "home"; $("b_plat").value = b.platform || "all";
+  const read = () => {
+    b.active = $("b_on").checked; b.he.title = $("b_ht").value.trim(); b.en.title = $("b_et").value.trim(); b.he.body = $("b_hb").value.trim(); b.en.body = $("b_eb").value.trim();
+    b.he.btn = $("b_hbtn").value.trim(); b.en.btn = $("b_ebtn").value.trim(); b.image = $("b_img").value.trim() || undefined;
+    const a = $("b_act").value; if (a === "url") { b.url = $("b_url").value.trim() || undefined; delete b.action; } else { delete b.url; if (a) b.action = a; else delete b.action; }
+    b.place = $("b_place").value; b.platform = $("b_plat").value; b.color = $("b_col").value.trim() || undefined; b.from = $("b_from").value || undefined; b.until = $("b_until").value || undefined;
+    b.tracks = [...document.querySelectorAll(".b_tr:checked")].map(x => x.value);
+    for (const k of ["he", "en"]) for (const f of ["title", "body", "btn"]) if (!b[k][f]) delete b[k][f];
+    const c = b.color, x = b.he;
+    $("b_prev").innerHTML = `<div dir="rtl" style="max-width:420px;border-radius:18px;padding:14px 16px;border:1px solid var(--line);display:flex;flex-direction:column;gap:8px;${c ? `background:${esc(c)};color:#fff;border-color:transparent` : "background:#fff"}">${b.image ? `<img src="${esc(b.image)}" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px">` : ""}${x.title ? `<b>${esc(x.title)}</b>` : ""}${x.body ? `<p style="margin:0;white-space:pre-line;opacity:.88">${esc(x.body)}</p>` : ""}${(b.url || b.action) && x.btn ? `<span class="btn" style="align-self:flex-start">${esc(x.btn)}</span>` : ""}</div>`;
+    lookTouch();
+  };
+  $("lbody").querySelectorAll("input,textarea,select").forEach(e => { e.oninput = read; e.onchange = read; });
+  $("b_colp").oninput = () => { $("b_col").value = $("b_colp").value; read(); };
+  bindUploads(read); read();
+  $("bback").onclick = () => { lookEditBan = null; viewLook(); };
+}
+
+/* colours */
+function lookColors() {
+  const C = look.colors || (look.colors = { light: {}, dark: {} }); C.light = C.light || {}; C.dark = C.dark || {};
+  const row = (mode, k) => `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:6px 0"><span>${LOOK_COLORS[k]} <span class="muted" dir="ltr">--${k}</span></span>
+    <span class="row"><input type="color" data-cp="${mode}:${k}" value="${esc(/^#[0-9a-f]{6}$/i.test(C[mode][k] || "") ? C[mode][k] : "#888888")}" style="width:46px;padding:2px">
+    <input data-ct="${mode}:${k}" dir="ltr" value="${esc(C[mode][k] || "")}" placeholder="الأصلي" style="width:110px"><button class="btn ghost" data-cr="${mode}:${k}" title="رجّع الأصلي">↺</button></span></div>`;
+  $("lbody").innerHTML = `<div class="card"><h3>🎨 الألوان</h3><p class="muted">فاضي = لون التطبيق الأصلي (وكل مسار إله لونه). إذا حطيت لون هون بيغطّي على كل المسارات. ألوان مسار معيّن من تبويب 🖼️ المسارات.</p>
+    <h4 style="margin:6px 0">☀️ الوضع الفاتح</h4>${Object.keys(LOOK_COLORS).map(k => row("light", k)).join("")}
+    <h4 style="margin:12px 0 6px">🌙 الوضع الغامق</h4>${Object.keys(LOOK_COLORS).map(k => row("dark", k)).join("")}</div>`;
+  const set = (mk, v) => { const [m, k] = mk.split(":"); if (v) C[m][k] = v; else delete C[m][k]; lookTouch(); };
+  document.querySelectorAll("[data-cp]").forEach(e => e.oninput = () => { document.querySelector(`[data-ct="${e.dataset.cp}"]`).value = e.value; set(e.dataset.cp, e.value); });
+  document.querySelectorAll("[data-ct]").forEach(e => e.oninput = () => set(e.dataset.ct, e.value.trim()));
+  document.querySelectorAll("[data-cr]").forEach(e => e.onclick = () => { set(e.dataset.cr, ""); viewLook(); });
+}
+
+/* texts */
+async function lookTexts() {
+  if (!appTexts) { try { appTexts = (await import("./app/src/i18n.js")).T; } catch (e) { $("lbody").innerHTML = `<div class="card msg bad">ما قدرت أحمّل نصوص التطبيق: ${esc(e.message)}</div>`; return; } }
+  const O = look.texts || (look.texts = { he: {}, en: {} }); O.he = O.he || {}; O.en = O.en || {};
+  const keys = Object.keys(appTexts.he).filter(k => typeof appTexts.he[k] === "string" && k !== "dir");
+  const draw = () => {
+    const q = lookText.q.trim().toLowerCase();
+    const list = keys.filter(k => (O.he[k] || O.en[k]) || (q && (k.toLowerCase().includes(q) || appTexts.he[k].toLowerCase().includes(q) || String(appTexts.en[k] || "").toLowerCase().includes(q)))).slice(0, 60);
+    $("tlist").innerHTML = list.length ? list.map(k => `<div style="border-top:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:6px">
+      <div class="muted" dir="ltr" style="text-align:start">${esc(k)}${O.he[k] || O.en[k] ? ' <span class="pill">معدّل</span>' : ""}</div>
+      <div class="row"><div style="flex:1"><div class="muted" dir="rtl">الأصلي: ${esc(appTexts.he[k])}</div><input data-th="${esc(k)}" dir="rtl" value="${esc(O.he[k] || "")}" placeholder="نص جديد بالعبري (فاضي = الأصلي)"></div>
+      <div style="flex:1"><div class="muted" dir="ltr" style="text-align:start">Original: ${esc(appTexts.en[k] || "")}</div><input data-te="${esc(k)}" dir="ltr" value="${esc(O.en[k] || "")}" placeholder="New English text (empty = original)"></div></div></div>`).join("")
+      : `<p class="muted">${q ? "ما في نتائج" : "اكتب كلمة من النص اللي بدك تغيّره (بالعبري أو الإنجليزي)، مثلاً: התחל"}</p>`;
+    $("tlist").querySelectorAll("[data-th]").forEach(e => e.oninput = () => { const v = e.value; if (v.trim()) O.he[e.dataset.th] = v; else delete O.he[e.dataset.th]; lookTouch(); });
+    $("tlist").querySelectorAll("[data-te]").forEach(e => e.oninput = () => { const v = e.value; if (v.trim()) O.en[e.dataset.te] = v; else delete O.en[e.dataset.te]; lookTouch(); });
+  };
+  $("lbody").innerHTML = `<div class="card"><h3>✏️ نصوص التطبيق</h3><p class="muted">ابحث عن أي نص بالتطبيق وغيّره. النصوص اللي غيّرتها بتضل ظاهرة هون فوق دايماً. امسح النص الجديد عشان يرجع الأصلي.</p>
+    <input id="tq" dir="auto" placeholder="🔎 ابحث…" value="${esc(lookText.q)}"><div id="tlist"></div></div>`;
+  $("tq").oninput = () => { lookText.q = $("tq").value; draw(); };
+  draw();
+}
+
+/* sections */
+function lookSections() {
+  const H = look.hide || (look.hide = []);
+  $("lbody").innerHTML = `<div class="card"><h3>👁️ إظهار وإخفاء أقسام</h3><p class="muted">شيل العلامة عن أي قسم بدك تخفيه من التطبيق.</p>
+    ${Object.entries(LOOK_SECTIONS).map(([k, n]) => `<label style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding:8px 0;white-space:pre"><input type="checkbox" data-sec="${k}" style="width:auto" ${H.includes(k) ? "" : "checked"}>${esc(n)}</label>`).join("")}</div>`;
+  document.querySelectorAll("[data-sec]").forEach(e => e.onchange = () => { const k = e.dataset.sec, i = H.indexOf(k); if (e.checked && i >= 0) H.splice(i, 1); if (!e.checked && i < 0) H.push(k); lookTouch(); });
+}
+
+/* tracks */
+function lookTracks() {
+  const X = look.tracks || (look.tracks = {});
+  $("lbody").innerHTML = `<div class="card"><h3>🖼️ شكل المسارات</h3><p class="muted">الصورة (الشخصية) وألوان كل مسار. فاضي = الأصلي. الاسم والوصف والترتيب من تبويب "المسارات والمواضيع".</p>
+    ${TRACKS.filter(t => t.id !== "archive_medicine").map(t => { const x = X[t.id] || {}; return `<div style="border-top:1px solid var(--line);padding:10px 0;display:flex;flex-direction:column;gap:8px">
+      <b>${esc(trackLabel(t.id))}</b>${imgPick("ti_" + t.id, x.image)}
+      <div class="row">${[["accent", "اللون الأساسي"], ["g1", "تدرّج 1"], ["g2", "تدرّج 2"]].map(([k, n]) => `<label class="row" style="gap:4px">${n}<input type="color" data-tc="${t.id}:${k}" value="${esc(x[k] || "#888888")}" style="width:44px;padding:2px"></label><button class="btn ghost" data-tr="${t.id}:${k}" title="رجّع الأصلي" ${x[k] ? "" : "disabled"}>↺</button>`).join("")}</div></div>`; }).join("")}</div>`;
+  const tr = id => X[id] || (X[id] = {});
+  TRACKS.forEach(t => { const e = $("ti_" + t.id); if (e) e.oninput = () => { const v = e.value.trim(); if (v) tr(t.id).image = v; else delete tr(t.id).image; lookTouch(); }; });
+  document.querySelectorAll("[data-tc]").forEach(e => e.oninput = () => { const [id, k] = e.dataset.tc.split(":"); tr(id)[k] = e.value; lookTouch(); });
+  document.querySelectorAll("[data-tr]").forEach(e => e.onclick = () => { const [id, k] = e.dataset.tr.split(":"); delete tr(id)[k]; viewLook(); });
+  bindUploads(() => viewLook());
+}
+
+/* contact */
+async function lookContact() {
+  const C = look.contact || (look.contact = {});
+  const { data: s } = await sb.from("app_settings").select("whatsapp").eq("id", 1).maybeSingle();
+  $("lbody").innerHTML = `<div class="card"><h3>📞 التواصل</h3>
+    <label>رقم الواتساب (بينحفظ فوراً لحاله) — بصيغة 9725…</label><div class="row"><input id="cwa" dir="ltr" value="${esc(s?.whatsapp || "")}" style="flex:1"><button class="btn" id="cwas">احفظ الرقم</button></div>
+    <label>رابط إنستغرام</label><input id="cig" dir="ltr" placeholder="https://www.instagram.com/musmachapp/" value="${esc(C.instagram || "")}">
+    <label>إيميل الدعم (صفحة "צור קשר")</label><input id="cem" dir="ltr" placeholder="support@…" value="${esc(C.email || "")}"></div>`;
+  $("cig").oninput = () => { const v = $("cig").value.trim(); if (v) C.instagram = v; else delete C.instagram; lookTouch(); };
+  $("cem").oninput = () => { const v = $("cem").value.trim(); if (v) C.email = v; else delete C.email; lookTouch(); };
+  $("cwas").onclick = async () => { const n = $("cwa").value.replace(/\D/g, ""); if (n.length < 10) { alert("الرقم مش صحيح"); return; }
+    const { error } = await sb.from("app_settings").update({ whatsapp: n }).eq("id", 1); alert(error ? "ما انحفظ: " + error.message : "✅ انحفظ رقم الواتساب"); };
+}
+
+/* maintenance + update note */
+function lookMaint() {
+  const M = look.maint || (look.maint = {}), U = look.update || (look.update = {});
+  $("lbody").innerHTML = `<div class="card"><h3>🛠️ وضع الصيانة</h3><p class="muted">لما يكون شغّال، كل الطلاب (مش الأدمن) بيشوفوا رسالة بدل التطبيق. استعمله بس وقت تصليح كبير.</p>
+    <label style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="m_on" style="width:auto" ${M.on ? "checked" : ""}> <b>شغّل وضع الصيانة</b></label>
+    <div class="row"><div style="flex:1"><label>الرسالة (עברית)</label><textarea id="m_he" dir="rtl" placeholder="אנחנו משדרגים את האפליקציה, נחזור בעוד כמה דקות 🙏">${esc(M.he || "")}</textarea></div><div style="flex:1"><label>Message (English)</label><textarea id="m_en" dir="ltr">${esc(M.en || "")}</textarea></div></div></div>
+    <div class="card"><h3>⬆️ تنبيه "في تحديث جديد"</h3><p class="muted">اللي عنده نسخة أقدم من رقم الـ build اللي بتحطه بيشوف شريط فوق بيقوله يحدّث (بيفتح الأب ستور).</p>
+    <label>أقل رقم build (فاضي = بدون تنبيه)</label><input id="u_b" dir="ltr" inputmode="numeric" value="${esc(U.min_build || "")}" style="width:140px">
+    <div class="row"><div style="flex:1"><label>النص (עברית)</label><input id="u_he" dir="rtl" placeholder="יש גרסה חדשה – לחצו לעדכון" value="${esc(U.he || "")}"></div><div style="flex:1"><label>Text (English)</label><input id="u_en" dir="ltr" value="${esc(U.en || "")}"></div></div></div>`;
+  const read = () => { M.on = $("m_on").checked; M.he = $("m_he").value.trim(); M.en = $("m_en").value.trim(); U.min_build = $("u_b").value.replace(/\D/g, "") || undefined; U.he = $("u_he").value.trim(); U.en = $("u_en").value.trim(); lookTouch(); };
+  $("lbody").querySelectorAll("input,textarea").forEach(e => { e.oninput = read; e.onchange = read; });
+}
+
+/* free CSS */
+function lookCss() {
+  $("lbody").innerHTML = `<div class="card"><h3>🧩 CSS حر (متقدّم)</h3><p class="muted">لأي تغيير بالشكل مش موجود بالتبويبات. انتبه: غلط هون ممكن يخرّب شكل التطبيق — بترجعه من 🕘 السجل.</p>
+    <textarea id="css" dir="ltr" style="min-height:260px;font-family:ui-monospace,monospace;font-size:13px" placeholder=".primary { border-radius: 24px; }">${esc(look.css || "")}</textarea></div>`;
+  $("css").oninput = () => { look.css = $("css").value; if (!look.css.trim()) delete look.css; lookTouch(); };
+}
+
+/* history */
+async function lookHistory() {
+  $("lbody").innerHTML = `<div class="card muted">بحمّل…</div>`;
+  const { data, error } = await sb.from("app_ui_history").select("id,saved_at,saved_by,config").order("id", { ascending: false }).limit(30);
+  if (error) { $("lbody").innerHTML = `<div class="card msg bad">${esc(error.message)}</div>`; return; }
+  const sum = c => [c.banners?.length ? `${c.banners.length} بانر` : "", c.hide?.length ? `${c.hide.length} مخفي` : "", Object.keys(c.texts?.he || {}).length + Object.keys(c.texts?.en || {}).length ? "نصوص" : "", Object.keys(c.colors?.light || {}).length ? "ألوان" : "", c.maint?.on ? "صيانة" : ""].filter(Boolean).join(" · ") || "الشكل الأصلي";
+  $("lbody").innerHTML = `<div class="card"><h3>🕘 النسخ السابقة</h3><p class="muted">كل مرة بتحفظ، النسخة اللي قبلها بتنحفظ هون. "رجّع" بيحطها مكان الحالية (لازم بعدها تكبس 💾 احفظ).</p>
+    ${(data || []).map(h => `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:8px"><span><b dir="ltr">${esc(fmtDT(h.saved_at))}</b><br><span class="muted">${esc(sum(h.config || {}))}</span></span><button class="btn ghost" data-hr="${h.id}">↩️ رجّع</button></span></div>`).join("") || `<p class="muted">لسا ما في نسخ سابقة.</p>`}</div>`;
+  document.querySelectorAll("[data-hr]").forEach(b => b.onclick = () => { const h = data.find(x => x.id === +b.dataset.hr); const meta = look._meta; look = JSON.parse(JSON.stringify(h.config || {})); look._meta = meta; lookSub = "banners"; viewLook(); });
 }
 
 /* ---------- user insights: why people stopped ---------- */
