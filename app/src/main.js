@@ -6,6 +6,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
 import * as api from "./api.js?v=20261102p";
 import { T, topicName as fallbackTopic } from "./i18n.js?v=20261102q";
+import * as RUI from "./remote.js?v=20261107a";
 import { REF } from "./reference.js";
 import { calcQuestion } from "./calc.js";
 import "./ptr.js?v=20261102i";
@@ -34,7 +35,11 @@ const icTarget = new URL("./img/ic-target.webp", import.meta.url).href;
 const app = document.getElementById("app");
 const wm = document.getElementById("wm");
 const LEGAL = window.__env.VITE_LEGAL_BASE || "";
-const SUPPORT = window.__env.VITE_SUPPORT_EMAIL || "";
+const SUPPORT0 = window.__env.VITE_SUPPORT_EMAIL || "";
+// the look of the app can be changed from the admin panel (remote.js): apply the last saved look at once
+RUI.apply(RUI.cached(), T);
+let SUPPORT = RUI.email(SUPPORT0);
+const IG0 = "https://www.instagram.com/musmachapp/";
 
 function storeGetter() {
   return {
@@ -94,10 +99,11 @@ const GRAD = { nursing: ["#3B8CF0", "#1554A8"], medicine: ["#2EBE8C", "#0F7A5C"]
 const CHAR = { pharmacy: imgPharm, dental: imgDental, optometry: imgOptom, optometry_prac: imgOptom, nursing: imgNursing, medicine: imgMedicine, physio: imgPhysio, ot: imgOt, radiography: imgRadio };
 // avatar + colour of a track can also come from the database (so new tracks need no app update)
 const dbTrack = (id) => (st.tracks || []).find((x) => x.id === id) || (st.soon || []).find((x) => x.id === id);
-const charOf = (id) => CHAR[id] || dbTrack(id)?.avatar_url || "";
-const gradOf = (id) => GRAD[id] || (dbTrack(id)?.color ? [dbTrack(id).color, `color-mix(in srgb,${dbTrack(id).color} 65%,#000)`] : [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`]);
+const charOf = (id) => RUI.trackImage(id) || CHAR[id] || dbTrack(id)?.avatar_url || "";
+const gradOf = (id) => RUI.trackGrad(id) || GRAD[id] || (dbTrack(id)?.color ? [dbTrack(id).color, `color-mix(in srgb,${dbTrack(id).color} 65%,#000)`] : [themeOf(id).l[0], `color-mix(in srgb,${themeOf(id).l[0]} 65%,#000)`]);
 const EXTRA = [["#0B7285", "#D3EEF2", "#E9F6F8"], ["#7A6A12", "#F1EBC8", "#F8F5E6"], ["#2F7D32", "#DCEFDC", "#EEF7EE"]];
 function themeOf(id) {
+  const rt = RUI.trackTheme(id); if (rt) return rt;
   if (THEMES[id]) return THEMES[id];
   const i = [...(id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length, l = EXTRA[i];
   return { l, d: [l[0], "#1E2A30", "#0E1418"] };
@@ -126,12 +132,20 @@ function frame(inner, { protect = false, wide = false, nav = null, nobrand = fal
   stopTimer();
   watermark(false);
   applyTheme();
+  RUI.keepLast();
+  const mt = st.user && !isAdmin() ? RUI.maintenance(st.lang) : null;
+  if (mt) { inner = `<div class="card" style="text-align:center;margin-top:40px"><div style="font-size:42px">🛠️</div><p>${esc(mt).replace(/\n/g, "<br>")}</p><button class="ghost" id="mtr">${t("retry")}</button></div>`; nav = null; protect = false; }
+  else if (st.user) {
+    const un = RUI.updateNote(st.build, st.lang);
+    inner = (un ? `<button class="banner" id="rui-upd" style="width:100%;text-align:start;cursor:pointer">⬆️ ${esc(un)}</button>` : "") + RUI.banners("all", TR(), st.lang) + inner;
+  }
   document.documentElement.lang = st.lang;
   document.documentElement.dir = t("dir");
   app.className = "app" + (protect ? " protect" : "") + (wide ? " wide" : "") + (nav ? " has-nav" : "") + (nobrand ? " nobrand" : "") + (inner.includes("h-hero") ? " hv" : "") + (inner.includes('class="splash"') ? " sp" : "");
   app.innerHTML = `<div class="top"><div class="brand"><div class="mark">${st.lang === "he" ? "מ" : "M"}</div><div><h1>${t("name")}</h1><small>${st.profile?.track ? trackName(st.profile.track) : t("tag")}</small></div></div>
   <div class="lang"><button data-l="he" class="${st.lang === "he" ? "on" : ""}">עב</button><button data-l="en" class="${st.lang === "en" ? "on" : ""}">EN</button></div></div>${nav ? navHtml(nav) : ""}${inner}`;
   if (nav) bindNav();
+  bindRemote();
   try {
     sessionStorage.removeItem("rs-res");
     const k = nav ? (nav === "newx" ? "exams" : nav) : RESTORE().find(([, f]) => f === S?.screen)?.[0];
@@ -143,6 +157,22 @@ function frame(inner, { protect = false, wide = false, nav = null, nobrand = fal
     (S?.screen || route)();
   }));
   window.scrollTo(0, 0);
+}
+// buttons inside admin banners: open a link, or go to a screen of the app
+function bindRemote() {
+  app.querySelectorAll("[data-rui-url]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openUrl(b.dataset.ruiUrl); }));
+  const ACT = { plans: () => { st.ui.fromTools = false; plans(); }, contact: () => contact(S?.screen || route), pastex: () => pastExams(), summaries: () => summaries(), league: () => league(), exams: () => myExams(), stats: () => stats(), whatsapp: () => openUrl(`https://wa.me/${WA}`), instagram: () => openUrl(RUI.instagram(IG0)) };
+  app.querySelectorAll("[data-rui-act]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); ACT[b.dataset.ruiAct]?.(); }));
+  if ($("rui-upd")) $("rui-upd").onclick = () => openUrl("https://apps.apple.com/app/id6820664638");
+  if ($("mtr")) $("mtr").onclick = () => refreshLook(true);
+}
+// fetch the newest look from the server; redraw calm screens (never in the middle of a quiz)
+async function refreshLook(force) {
+  const changed = await RUI.refresh(api.supabase, T);
+  SUPPORT = RUI.email(SUPPORT0);
+  if (!changed && !force) return;
+  const calm = [home, plans, tools, login].includes(S?.screen) || !S?.screen || RUI.maintenance(st.lang) || $("mtr");
+  if (calm) (S?.screen || route)();
 }
 // first screen while the app opens: branded gradient instead of a bare spinner
 function bootSplash() {
@@ -158,7 +188,7 @@ function legalLinks(ig = false) {
 function bindLegal() {
   if ($("lg-c")) { const from = S?.screen; $("lg-c").onclick = () => contact(from); }
   if ($("lg-wa")) $("lg-wa").onclick = () => openUrl("https://wa.me/972505023423");
-  if ($("lg-ig")) $("lg-ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/");
+  if ($("lg-ig")) $("lg-ig").onclick = () => openUrl(RUI.instagram(IG0));
   if ($("lg-o")) $("lg-o").onclick = logout;
   if ($("lg-t")) $("lg-t").onclick = () => openUrl(`${LEGAL}/terms-${st.lang}.html`);
   if ($("lg-p")) $("lg-p").onclick = () => openUrl(`${LEGAL}/privacy-${st.lang}.html`);
@@ -170,6 +200,7 @@ for (const ev of ["copy", "cut", "contextmenu", "selectstart", "dragstart"])
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return saveExam();
+  refreshLook(false).catch(() => {});
   if (st.user && watchedDev) api.deviceOk(watchedDev).then((ok) => { if (ok === false) kickedOut(); }).catch(() => {});
   // back in the app after a while: refresh question totals (new questions may have been added)
   if (st.user && st.profile?.track && Date.now() - (st.loadedAt || 0) > 10 * 60e3) {
@@ -225,6 +256,7 @@ async function boot() {
   let recovery = /type=recovery/.test(location.hash);
   api.auth.onChange((event) => { if (event === "PASSWORD_RECOVERY") { recovery = true; newPassword(); } });
   askPushOnLaunch();
+  refreshLook(false).catch(() => {});
   const session = await api.auth.session().catch(() => null);
   if (session && recovery) return newPassword();
   if (session) await afterLogin(session.user); else login();
@@ -581,7 +613,7 @@ function plans() {
     const WEBP = { month: "₪99", two: "₪169", exam: "₪269" };
   const partName = OPT ? `${t("optTitle")} · ${TR() === "optometry_prac" ? t("optPractical") : t("optTheory")}` : trackName(TR());
   const pm = priceOf(TR(), "month") || (storeAvailable ? null : WEBP.month), p2 = priceOf(TR(), "two") || (storeAvailable ? null : WEBP.two), pe = priceOf(TR(), "exam") || (storeAvailable ? null : WEBP.exam);
-  frame(`${msgHtml()}
+  frame(`${msgHtml()}${RUI.banners("plans", TR(), st.lang)}
   ${st.ui.fromTools ? `<button class="ghost" id="pbk">←</button>` : ""}
   <div class="card">
     <h2>${t("choose")}</h2>
@@ -740,7 +772,7 @@ function home() {
     <div class="newbox-l">${Object.entries(added).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip cool">+${n} ${t("newIn")}${st.lang === "he" ? "" : " "}${esc(topicName(k, st.lang))}</span>`).join("")}</div></div>` : "";
   const pkg = isAdmin() ? t("admin") : st.freeMode ? t("freeNow") : e ? `${t("validUntil")}: <bdi>${fmtDate(e.until)}</bdi>` : t("planNone");
   const h = new Date().getHours(), greet = t(h < 5 ? "gNight" : h < 12 ? "gMorning" : h < 17 ? "gNoon" : h < 22 ? "gEvening" : "gNight");
-  frame(`${msgHtml()}<div id="annw"></div>${newBox}
+  frame(`${msgHtml()}<div id="annw"></div>${RUI.banners("home", TR(), st.lang)}${newBox}
   <div class="h-hero">${heroTop(true)}${heroArt()}
     <div class="h-txt"><h2>${greet}</h2><p>${t("hSubHome")}</p>${dl != null ? `<span class="chip">📅 ${dl} ${t("daysLeft")}</span>` : ""}${st.profile?.track === "optometry" ? `<button class="chip" id="optsrc" style="cursor:pointer">📚 ${t("optSources")}</button><button class="chip" id="optsw" style="cursor:pointer">${st.ui.optPart === "practical" ? t("optPractical") : t("optTheory")} · ${t("switchTrack")}</button>` : ""}</div>
     <div id="missionw">${OPH ? "" : missionCard(null, "loading")}</div></div>
@@ -1399,7 +1431,7 @@ function tools() {
   bindLegal(); st.ui.msg = null; bindReminder(); bindPush();
   if ($("jt")) $("jt").onclick = async () => { try { st.plan = await api.getPlan(st.user.id, TR()); } catch { st.plan = null; } st.plan ? journey() : planSetup(tools); };
   $("sub").onclick = () => { if (hasAccess() && !isAdmin()) return openUrl(Capacitor.getPlatform() === "android" ? "https://play.google.com/store/account/subscriptions" : "https://apps.apple.com/account/subscriptions"); st.ui.fromTools = true; plans(); };
-  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl("https://www.instagram.com/musmachapp/"); $("wa").onclick = () => openUrl("https://wa.me/972505023423"); if ($("lgt2")) $("lgt2").onclick = league;
+  $("ac").onclick = account; $("hp").onclick = () => contact(tools); $("ina").onclick = () => intro(0); $("ig").onclick = () => openUrl(RUI.instagram(IG0)); $("wa").onclick = () => openUrl("https://wa.me/972505023423"); if ($("lgt2")) $("lgt2").onclick = league;
   if ($("rfp")) $("rfp").onclick = () => refPage(tools); if ($("clc")) $("clc").onclick = () => calcTrainer(tools); $("srch").onclick = () => searchPage(tools);
   $("fl").onclick = () => { st.ui.flashI = 0; st.ui.flashBack = false; cards(); };
   $("rs").onclick = async () => {
