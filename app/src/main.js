@@ -554,10 +554,12 @@ async function logout() {
 // tracks this student may open: everything before the first choice; afterwards only tracks they hold
 // a plan or code for (admins can open all)
 function allowedTracks() {
-  if (!st.profile?.track || isAdmin()) return st.tracks;
+  // the optometry practical part is opened from inside the optometry card (theory / practical), not as a card of its own
+  const vis = (l) => l.filter((x) => x.id !== "optometry_prac");
+  if (!st.profile?.track || isAdmin()) return vis(st.tracks);
   const now = new Date();
   const paid = new Set(st.ents.filter((e) => new Date(e.until) > now).map((e) => e.track));
-  return st.tracks.filter((x) => x.id === st.profile.track || paid.has(x.id));
+  return vis(st.tracks.filter((x) => x.id === st.profile.track || paid.has(x.id) || (x.id === "optometry" && paid.has("optometry_prac"))));
 }
 const canSwitch = () => allowedTracks().length > 1;
 const soonName = (x) => (st.lang === "he" ? x.he : x.en);
